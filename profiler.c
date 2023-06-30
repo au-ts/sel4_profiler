@@ -15,7 +15,7 @@ uintptr_t uart_base;
 static void
 enable_cycle_counter_el0()
 {
-	uint64_t init_cnt = 0xffffffffffffffff - 0x1999999999999999;
+	uint64_t init_cnt = 0xffffffffffffffff - 0x100000;
     	// uint64_t init_cnt = 0xffffffffffffffff - ;
     // uint64_t init_cnt = 0;
 
@@ -46,7 +46,7 @@ enable_cycle_counter_el0()
 static void
 init_pmu_event() {
     printf_("Initialising a PMU event\n");
-    uint32_t evtCount = 0x00;
+    uint32_t evtCount = 0x03;
     uint32_t evtCount2 = 0x04;
     /* Setup PMU counter to record specific event */
     /* evtCount is the event id */

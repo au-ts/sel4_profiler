@@ -4,42 +4,62 @@
 
 #define BIT(nr) (1UL << (nr))
 
-/* AML_UART_CONTROL bits */
-#define AML_UART_TX_EN			BIT(12)
-#define AML_UART_RX_EN			BIT(13)
-#define AML_UART_TWO_WIRE_EN		BIT(15)
-#define AML_UART_STOP_BIT_LEN_MASK	(0x03 << 16)
-#define AML_UART_STOP_BIT_1SB		(0x00 << 16)
-#define AML_UART_STOP_BIT_2SB		(0x01 << 16)
-#define AML_UART_PARITY_TYPE		BIT(18)
-#define AML_UART_PARITY_EN		BIT(19)
-#define AML_UART_TX_RST			BIT(22)
-#define AML_UART_RX_RST			BIT(23)
-#define AML_UART_CLEAR_ERR		BIT(24)
-#define AML_UART_RX_INT_EN		BIT(27)
-#define AML_UART_TX_INT_EN		BIT(28)
-#define AML_UART_DATA_LEN_MASK		(0x03 << 20)
-#define AML_UART_DATA_LEN_8BIT		(0x00 << 20)
-#define AML_UART_DATA_LEN_7BIT		(0x01 << 20)
-#define AML_UART_DATA_LEN_6BIT		(0x02 << 20)
-#define AML_UART_DATA_LEN_5BIT		(0x03 << 20)
-/* AML_UART_STATUS bits */
-#define AML_UART_PARITY_ERR		BIT(16)
-#define AML_UART_FRAME_ERR		BIT(17)
-#define AML_UART_TX_FIFO_WERR		BIT(18)
-#define AML_UART_RX_EMPTY		BIT(20)
-#define AML_UART_TX_FULL		BIT(21)
-#define AML_UART_TX_EMPTY		BIT(22)
-#define AML_UART_XMIT_BUSY		BIT(25)
-#define AML_UART_ERR			(AML_UART_PARITY_ERR | AML_UART_FRAME_ERR  | AML_UART_TX_FIFO_WERR)
-/* AML_UART_IRQ bits */
-#define AML_UART_XMIT_IRQ(c)		(((c) & 0xff) << 8)
-#define AML_UART_RECV_IRQ(c)		((c) & 0xff)
-/* AML_UART_REG5 bits */
-#define AML_UART_BAUD_MASK		0x7fffff
-#define AML_UART_BAUD_USE		BIT(23)
-#define AML_UART_BAUD_XTAL		BIT(24)
-#define AML_UART_BAUD_XTAL_DIV2		BIT(27)
+#define UART_SR1_RRDY          BIT( 9)
+#define UART_SR1_TRDY          BIT(13)
+/* CR1 */
+#define UART_CR1_UARTEN        BIT( 0)
+#define UART_CR1_RRDYEN        BIT( 9)
+/* CR2 */
+#define UART_CR2_SRST          BIT( 0)
+#define UART_CR2_RXEN          BIT( 1)
+#define UART_CR2_TXEN          BIT( 2)
+#define UART_CR2_ATEN          BIT( 3)
+#define UART_CR2_RTSEN         BIT( 4)
+#define UART_CR2_WS            BIT( 5)
+#define UART_CR2_STPB          BIT( 6)
+#define UART_CR2_PROE          BIT( 7)
+#define UART_CR2_PREN          BIT( 8)
+#define UART_CR2_RTEC          BIT( 9)
+#define UART_CR2_ESCEN         BIT(11)
+#define UART_CR2_CTS           BIT(12)
+#define UART_CR2_CTSC          BIT(13)
+#define UART_CR2_IRTS          BIT(14)
+#define UART_CR2_ESCI          BIT(15)
+/* CR3 */
+#define UART_CR3_RXDMUXDEL     BIT( 2)
+/* FCR */
+#define UART_FCR_RFDIV(x)      ((x) * BIT(7))
+#define UART_FCR_RFDIV_MASK    UART_FCR_RFDIV(0x7)
+#define UART_FCR_RXTL(x)       ((x) * BIT(0))
+#define UART_FCR_RXTL_MASK     UART_FCR_RXTL(0x1F)
+/* SR2 */
+#define UART_SR2_RXFIFO_RDR    BIT(0)
+#define UART_SR2_TXFIFO_EMPTY  BIT(14)
+/* RXD */
+#define UART_URXD_READY_MASK   BIT(15)
+#define UART_BYTE_MASK         0xFF
+ /* DMA */
+#define UCR1_RXDMAEN	(1<<8)	/* Recv ready DMA enable */
+#define UCR1_TXDMAEN	(1<<3)	/* Transmitter ready DMA enable */
+#define USR1_TRDY	(1<<13) /* Transmitter ready interrupt/dma flag */
+#define USR1_RRDY	(1<<9)	 /* Receiver ready interrupt/dma flag */
+/* INTERRUPT FLAGS*/
+#define USR1_PARITYERR	(1<<15) /* Parity error interrupt flag */
+#define IRQ_MASK (USR1_TRDY | USR1_RRDY)
+
+// Might need to copy over the platform specific files, for now copied into one serial.h
+
+#define UART1_PADDR  0x30860000
+#define UART2_PADDR  0x30890000
+#define UART3_PADDR  0x30880000
+#define UART4_PADDR  0x30a60000
+
+#define UART1_IRQ    58
+#define UART2_IRQ    59
+#define UART3_IRQ    60
+#define UART4_IRQ    61
+
+#define UART_REF_CLK 12096000
 
 // Move this into a seperate file in the future
 #define NUM_BUFFERS 512
@@ -51,20 +71,32 @@ enum serial_parity {
     PARITY_ODD
 };
 
-struct meson_uart_regs {
-    uint32_t wfifo;      /* 0x000 Write Data */
-    uint32_t rfifo;      /* 0x040 Read Data */
-    uint32_t cr;         /* 0x080 Control Register */
-    uint32_t sr;         /* 0x0c0 Status Register */
-    uint32_t irqc;       /* 0x100 IRQ Control Register*/
-    uint32_t reg5;       /* 0x140 Baud Rate Control */
+struct imx_uart_regs {
+    uint32_t rxd;      /* 0x000 Receiver Register */
+    uint32_t res0[15];
+    uint32_t txd;      /* 0x040 Transmitter Register */
+    uint32_t res1[15];
+    uint32_t cr1;      /* 0x080 Control Register 1 */
+    uint32_t cr2;      /* 0x084 Control Register 2 */
+    uint32_t cr3;      /* 0x088 Control Register 3 */
+    uint32_t cr4;      /* 0x08C Control Register 4 */
+    uint32_t fcr;      /* 0x090 FIFO Control Register */
+    uint32_t sr1;      /* 0x094 Status Register 1 */
+    uint32_t sr2;      /* 0x098 Status Register 2 */
+    uint32_t esc;      /* 0x09c Escape Character Register */
+    uint32_t tim;      /* 0x0a0 Escape Timer Register */
+    uint32_t bir;      /* 0x0a4 BRM Incremental Register */
+    uint32_t bmr;      /* 0x0a8 BRM Modulator Register */
+    uint32_t brc;      /* 0x0ac Baud Rate Counter Register */
+    uint32_t onems;    /* 0x0b0 One Millisecond Register */
+    uint32_t ts;       /* 0x0b4 Test Register */
 };
-typedef volatile struct meson_uart_regs meson_uart_regs_t;
+typedef volatile struct imx_uart_regs imx_uart_regs_t;
 
 /*
 serial driver struct akin to patrick's implementation*/
 struct serial_driver {
-    meson_uart_regs_t *regs;
+    imx_uart_regs_t *regs;
 
     ring_handle_t rx_ring;
     ring_handle_t tx_ring;

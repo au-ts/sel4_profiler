@@ -1,5 +1,5 @@
 /*
-* Sample serial driver for odroid c4 (amlogic meson gx uart) based on the sDDF
+* Sample serial driver for imx8mm based on the sDDF
 */
 
 #include <stdbool.h>
@@ -41,30 +41,30 @@ struct serial_driver global_serial_driver = {0};
  * BMR and BIR are 16 bit
  * Function taken from seL4 util_libs serial.c implementation for imx8mm
  */
-// static void imx_uart_set_baud(long bps)
-// {
-//     imx_uart_regs_t *regs = (imx_uart_regs_t *) uart_base;
+static void imx_uart_set_baud(long bps)
+{
+    imx_uart_regs_t *regs = (imx_uart_regs_t *) uart_base;
 
-//     uint32_t bmr, bir, fcr;
-//     fcr = regs->fcr;
-//     fcr &= ~UART_FCR_RFDIV_MASK;
-//     fcr |= UART_FCR_RFDIV(4);
-//     bir = 0xf;
-//     bmr = UART_REF_CLK / bps - 1;
-//     regs->bir = bir;
-//     regs->bmr = bmr;
-//     regs->fcr = fcr;
-// }
+    uint32_t bmr, bir, fcr;
+    fcr = regs->fcr;
+    fcr &= ~UART_FCR_RFDIV_MASK;
+    fcr |= UART_FCR_RFDIV(4);
+    bir = 0xf;
+    bmr = UART_REF_CLK / bps - 1;
+    regs->bir = bir;
+    regs->bmr = bmr;
+    regs->fcr = fcr;
+}
 
 static int internal_is_tx_fifo_busy(
-    meson_uart_regs_t *regs)
+    imx_uart_regs_t *regs)
 {
     /* check the TXFE (transmit buffer FIFO empty) flag, which is cleared
      * automatically when data is written to the TxFIFO. Even though the flag
      * is set, the actual data transmission via the UART's 32 byte FIFO buffer
      * might still be in progress.
      */
-    return (0 == (regs->sr & AML_UART_TX_EMPTY));
+    return (0 == (regs->sr2 & UART_SR2_TXFIFO_EMPTY));
 }
 
 int serial_configure(
@@ -73,69 +73,97 @@ int serial_configure(
     enum serial_parity parity,
     int stop_bits)
 {
-    meson_uart_regs_t *regs = (meson_uart_regs_t *) uart_base;
+    imx_uart_regs_t *regs = (imx_uart_regs_t *) uart_base;
     
-    uint32_t cr;
+    uint32_t cr2;
     /* Character size */
-    cr = regs->cr;
+    cr2 = regs->cr2;
     if (char_size == 8) {
-        cr |= AML_UART_DATA_LEN_8BIT;
+        cr2 |= UART_CR2_WS;
     } else if (char_size == 7) {
-        cr |= AML_UART_DATA_LEN_7BIT;
+        cr2 &= ~UART_CR2_WS;
     } else {
         return -1;
     }
     /* Stop bits */
     if (stop_bits == 2) {
-        cr |= AML_UART_STOP_BIT_2SB;
+        cr2 |= UART_CR2_STPB;
     } else if (stop_bits == 1) {
-        cr |= AML_UART_STOP_BIT_1SB;
+        cr2 &= ~UART_CR2_STPB;
     } else {
         return -1;
     }
-
     /* Parity */
     if (parity == PARITY_NONE) {
-        cr &= ~AML_UART_PARITY_EN;
+        cr2 &= ~UART_CR2_PREN;
     } else if (parity == PARITY_ODD) {
         /* ODD */
-        cr |= AML_UART_PARITY_EN;
-        cr |= AML_UART_PARITY_TYPE;
+        cr2 |= UART_CR2_PREN;
+        cr2 |= UART_CR2_PROE;
     } else if (parity == PARITY_EVEN) {
         /* Even */
-        cr |= AML_UART_PARITY_EN;
-        cr &= ~AML_UART_PARITY_TYPE;
+        cr2 |= UART_CR2_PREN;
+        cr2 &= ~UART_CR2_PROE;
     } else {
         return -1;
     }
     /* Apply the changes */
-    regs->cr = cr;
-    //sel4cp_dbg_puts("finished configuring the line, setting the baud rate\n");
-    /* Now set the baud rate */
-    // imx_uart_set_baud(bps);
+    regs->cr2 = cr2;
+    // sel4cp_dbg_puts("finished configuring the line, setting the baud rate\n");
+    /* Now set the board rate */
+    imx_uart_set_baud(bps);
     return 0;
 }
 
 int getchar()
 {
-    meson_uart_regs_t *regs = (meson_uart_regs_t *) uart_base;
+    imx_uart_regs_t *regs = (imx_uart_regs_t *) uart_base;
+    uint32_t reg = 0;
+    int c = -1;
 
-    while (regs->sr & AML_UART_RX_EMPTY);
-    return regs->rfifo;
+    if (regs->sr2 & UART_SR2_RXFIFO_RDR) {
+        reg = regs->rxd;
+        if (reg & UART_URXD_READY_MASK) {
+            c = reg & UART_BYTE_MASK;
+        }
+    }
+    return c;
 }
 
 // Putchar that is using the hardware FIFO buffers --> Switch to DMA later 
 int putchar(int c) {
 
-    meson_uart_regs_t *regs = (meson_uart_regs_t *) uart_base;
+    imx_uart_regs_t *regs = (imx_uart_regs_t *) uart_base;
 
-    while (regs->sr & AML_UART_TX_FULL);
-
-    /* Add character to the buffer. */
-    regs->wfifo = c & 0x7f;
-    if (c == '\n') {
-        putchar('\r');
+    if (internal_is_tx_fifo_busy(regs)) {
+        // A transmit is probably in progress, we will have to wait
+        return -1;
     }
+
+    if (c == '\n') {
+        // For now, by default we will have Auto-send CR(Carriage Return) enabled
+        /* write CR first */
+        regs->txd = '\r';
+        /* if we transform a '\n' (LF) into '\r\n' (CR+LF) this shall become an
+         * atom, ie we don't want CR to be sent and then fail at sending LF
+         * because the TX FIFO is full. Basically there are two options:
+         *   - check if the FIFO can hold CR+LF and either send both or none
+         *   - send CR, then block until the FIFO has space and send LF.
+         * Assuming that if SERIAL_AUTO_CR is set, it's likely this is a serial
+         * console for logging, so blocking seems acceptable in this special
+         * case. The IMX6's TX FIFO size is 32 byte and TXFIFO_EMPTY is cleared
+         * automatically as soon as data is written from regs->txd into the
+         * FIFO. Thus the worst case blocking is roughly the time it takes to
+         * send 1 byte to have room in the FIFO again. At 115200 baud with 8N1
+         * this takes 10 bit-times, which is 10/115200 = 86,8 usec.
+         */
+        while (internal_is_tx_fifo_busy(regs)) {
+            /* busy loop */
+        }
+    
+    }
+
+    regs->txd = c;
 
     return 0;
 }
@@ -144,7 +172,7 @@ int putchar(int c) {
 static void
 raw_tx(char *phys, unsigned int len, void *cookie)
 {
-    //sel4cp_dbg_puts("entering raw tx function\n");
+    // sel4cp_dbg_puts("entering raw tx function\n");
     // This is byte by byte for now, switch to DMA use later
     for (int i = 0; i < len || phys[i] != '\0'; i++) {
         // Loop until the fifo queue is ready to transmit
@@ -153,14 +181,14 @@ raw_tx(char *phys, unsigned int len, void *cookie)
 }
 
 void handle_tx() {
-    //sel4cp_dbg_puts("In the handle tx func\n");
+    // sel4cp_dbg_puts("In the handle tx func\n");
     uintptr_t buffer = 0;
     unsigned int len = 0;
     void *cookie = 0;
     // Dequeue something from the Tx ring -> the server will have placed something in here, if its empty then nothing to do
-    //sel4cp_dbg_puts("Dequeuing and printing everything currently in the ring buffer\n");
+    // sel4cp_dbg_puts("Dequeuing and printing everything currently in the ring buffer\n");
     while (!driver_dequeue(tx_ring.used_ring, &buffer, &len, &cookie)) {
-        //sel4cp_dbg_puts("in the driver dequeue loop\n");
+        // sel4cp_dbg_puts("in the driver dequeue loop\n");
         // Buffer cointaining the bytes to write to serial
         char *phys = (char * )buffer;
         // Handle the tx
@@ -168,7 +196,7 @@ void handle_tx() {
         // Then enqueue this buffer back into the available queue, so that it can be collected and reused by the server
         enqueue_avail(&tx_ring, buffer, len, &cookie);
     }
-    //sel4cp_dbg_puts("Finished handle_tx\n");
+    // sel4cp_dbg_puts("Finished handle_tx\n");
 }
 
 // Increment the number of chars that the server has requested us to get.
@@ -185,13 +213,13 @@ void handle_irq() {
     ready to be processed by the client server
     */
 
-    //sel4cp_dbg_puts("Entering handle irq function\n");
+    // sel4cp_dbg_puts("Entering handle irq function\n");
 
     int input = getchar();
 
     if (input == -1) {
-        //sel4cp_dbg_puts(sel4cp_name);
-        //sel4cp_dbg_puts(": invalid input when attempting to getchar\n");
+        // sel4cp_dbg_puts(sel4cp_name);
+        // sel4cp_dbg_puts(": invalid input when attempting to getchar\n");
         return;
     }
 
@@ -205,10 +233,10 @@ void handle_irq() {
     However, if we have multiple clients waiting on getchars we may have an issue, I need to look 
     more into the expected behaviour of getchar in these situations.
     */
-    //sel4cp_dbg_puts("Looping to service all current requests to getchar\n");
+    // sel4cp_dbg_puts("Looping to service all current requests to getchar\n");
 
     while (global_serial_driver.num_to_get_chars > 0) {
-        //sel4cp_dbg_puts("In loop\n");
+        // sel4cp_dbg_puts("In loop\n");
         // Address that we will pass to dequeue to store the buffer address
         uintptr_t buffer = 0;
         // Integer to store the length of the buffer
@@ -219,8 +247,8 @@ void handle_irq() {
         int ret = dequeue_avail(&rx_ring, &buffer, &buffer_len, &cookie);
 
         if (ret != 0) {
-            //sel4cp_dbg_puts(sel4cp_name);
-            //sel4cp_dbg_puts(": unable to dequeue from the rx available ring\n");
+            // sel4cp_dbg_puts(sel4cp_name);
+            // sel4cp_dbg_puts(": unable to dequeue from the rx available ring\n");
             return;
         }
 
@@ -230,8 +258,8 @@ void handle_irq() {
         ret = enqueue_used(&rx_ring, buffer, 1, &cookie);
 
         if (ret != 0) {
-            //sel4cp_dbg_puts(sel4cp_name);
-            //sel4cp_dbg_puts(": unable to enqueue to the tx available ring\n");
+            // sel4cp_dbg_puts(sel4cp_name);
+            // sel4cp_dbg_puts(": unable to enqueue to the tx available ring\n");
             return;
         }
 
@@ -239,12 +267,12 @@ void handle_irq() {
         global_serial_driver.num_to_get_chars--;
     }
 
-    //sel4cp_dbg_puts("Finished handling the irq\n");
+    // sel4cp_dbg_puts("Finished handling the irq\n");
 }
 
 void init_post() {
-    //sel4cp_dbg_puts(sel4cp_name);
-    //sel4cp_dbg_puts(": init_post function running\n");
+    // sel4cp_dbg_puts(sel4cp_name);
+    // sel4cp_dbg_puts(": init_post function running\n");
 
     // Init the shared ring buffers
     ring_init(&rx_ring, (ring_buffer_t *)rx_avail, (ring_buffer_t *)rx_used, NULL, 0);
@@ -256,15 +284,15 @@ void init_post() {
 
 // Init function required by CP for every PD
 void init(void) {
-    //sel4cp_dbg_puts(sel4cp_name);
-    //sel4cp_dbg_puts(": elf PD init function running\n");
+    // sel4cp_dbg_puts(sel4cp_name);
+    // sel4cp_dbg_puts(": elf PD init function running\n");
 
 
     // Call init_post here to setup the ring buffer regions. The init_post case in the notified
     // switch statement may be redundant.
     init_post();
 
-    meson_uart_regs_t *regs = (meson_uart_regs_t *) uart_base;
+    imx_uart_regs_t *regs = (imx_uart_regs_t *) uart_base;
 
     // Software reset results in failed uart init, not too sure why
     /* Software reset */
@@ -276,40 +304,36 @@ void init(void) {
     global_serial_driver.tx_ring = tx_ring;
     global_serial_driver.num_to_get_chars = 0;
 
-    //sel4cp_dbg_puts("Line configuration\n");
+    // sel4cp_dbg_puts("Line configuration\n");
 
     /* Line configuration */
     int ret = serial_configure(115200, 8, PARITY_NONE, 1);
 
     if (ret != 0) {
-        //sel4cp_dbg_puts("Error occured during line configuration\n");
+        // sel4cp_dbg_puts("Error occured during line configuration\n");
     }
 
-    //sel4cp_dbg_puts("Configured serial, enabling uart\n");
+    // sel4cp_dbg_puts("Configured serial, enabling uart\n");
 
-    // /* Enable the UART */
-    uint32_t val;
-    val = regs->cr;
-    val |= AML_UART_CLEAR_ERR;
-    regs->cr = val;
-    val &= ~AML_UART_CLEAR_ERR;
-    regs->cr = val;
-    val |= (AML_UART_RX_EN | AML_UART_TX_EN);
-    regs->cr = val;
-    val |= (AML_UART_RX_INT_EN);
-    regs->cr = val;
-    val = (AML_UART_RECV_IRQ(1));
-    regs->irqc = val;
+    /* Enable the UART */
+    regs->cr1 |= UART_CR1_UARTEN;                /* Enable The uart.                  */
+    regs->cr2 |= UART_CR2_RXEN | UART_CR2_TXEN;  /* RX/TX enable                      */
+    regs->cr2 |= UART_CR2_IRTS;                  /* Ignore RTS                        */
+    regs->cr3 |= UART_CR3_RXDMUXDEL;             /* Configure the RX MUX              */
+    /* Initialise the receiver interrupt.                                             */
+    regs->cr1 &= ~UART_CR1_RRDYEN;               /* Disable recv interrupt.           */
+    regs->fcr &= ~UART_FCR_RXTL_MASK;            /* Clear the rx trigger level value. */
+    regs->fcr |= UART_FCR_RXTL(1);               /* Set the rx tigger level to 1.     */
+    regs->cr1 |= UART_CR1_RRDYEN;                /* Enable recv interrupt.            */
 
-
-    //sel4cp_dbg_puts("Enabled the uart, init the ring buffers\n");
+    // sel4cp_dbg_puts("Enabled the uart, init the ring buffers\n");
 
 }
 
 // Entry point that is invoked on a serial interrupt, or notifications from the server using the TX and RX channels
 void notified(sel4cp_channel ch) {
-    //sel4cp_dbg_puts(sel4cp_name);
-    //sel4cp_dbg_puts(": elf PD notified function running\n");
+    // sel4cp_dbg_puts(sel4cp_name);
+    // sel4cp_dbg_puts(": elf PD notified function running\n");
 
     switch(ch) {
         case IRQ_CH:
@@ -320,14 +344,14 @@ void notified(sel4cp_channel ch) {
             init_post();
             break;
         case TX_CH:
-            //sel4cp_dbg_puts("Notified to print something\n");
+            // sel4cp_dbg_puts("Notified to print something\n");
             handle_tx();
             break;
         case RX_CH:
             handle_rx();
             break;
         default:
-            //sel4cp_dbg_puts("eth driver: received notification on unexpected channel\n");
+            // sel4cp_dbg_puts("eth driver: received notification on unexpected channel\n");
             break;
     }
 }

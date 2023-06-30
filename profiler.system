@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <system>
-    <memory_region name="uart" size="0x1_000" phys_addr="0xff803000" />
+    <!-- <memory_region name="uart" size="0x1_000" phys_addr="0xff803000" /> -->
+    <memory_region name="uart" size="0x10_000" phys_addr="0x30890000" />
+
     <memory_region name="shared_dma" size="0x200_000" page_size="0x200_000" />
 
     <!-- shared memory for ring buffer mechanism : serial -->
@@ -12,6 +14,7 @@
     <protection_domain name="profiler" priority="101" pp="true">
         <program_image path="profiler.elf" />
         <map mr="uart" vaddr="0x5_000_000" perms="rw" cached="false" setvar_vaddr="uart_base" />
+        
             <!-- shared memory for ring buffer mechanism -->
         <map mr="rx_avail_serial" vaddr="0x4_000_000" perms="rw" cached="true" setvar_vaddr="rx_avail" />
         <map mr="rx_used_serial" vaddr="0x4_200_000" perms="rw" cached="true" setvar_vaddr="rx_used" />
@@ -19,9 +22,6 @@
         <map mr="tx_used_serial" vaddr="0x4_600_000" perms="rw" cached="true" setvar_vaddr="tx_used" />
 
         <map mr="shared_dma" vaddr="0x2_400_000" perms="rw" cached="true" setvar_vaddr="shared_dma" />
-
-        <irq irq="84" id="1" trigger="edge" /> <!-- Serial Interrupt -->
-
     </protection_domain>
 
     <protection_domain name="serial" priority="102" pp="true">
@@ -40,8 +40,9 @@
         <!-- we need physical addresses dma region -->
         <setvar symbol="shared_dma_paddr" region_paddr="shared_dma" />
         
+        <irq irq="59" id="1" /> <!-- Serial Interrupt (I think - serial@30890000)-->
 
-        <irq irq="225" id="1" trigger="edge" /> <!-- Serial Interrupt -->
+        <!-- <irq irq="225" id="1" trigger="edge" /> Serial Interrupt -->
     </protection_domain>
 
     <!-- These following channels are needed for communication between the server and driver -->
