@@ -17,6 +17,7 @@ uintptr_t uart_base;
 
 pmu_snapshot_t snapshot_arr[1000];
 int snapshot_arr_top;
+uint32_t active_counters = BIT(31); 
 
 static void
 enable_cycle_counter()
@@ -124,10 +125,7 @@ void halt_cnt() {
 
 /* Resume the PMU */
 void resume_cnt() {
-    asm volatile("msr pmcntenset_el0, %0" :: "r" BIT(31));
-            uint32_t r = 0;
-        asm volatile("mrs %0, pmcntenset_el0" : "=r" (r));
-        asm volatile("msr pmcntenset_el0, %0" : : "r" (r|1));
+    asm volatile("msr pmcntenset_el0, %0" :: "r" (active_counters));
 }
 
 /* Add a snapshot of the cycle and event registers to the array. This array needs to become a ring buffer. */
@@ -169,31 +167,37 @@ int user_pmu_configure(pmu_config_args_t config_args) {
     case EVENT_CTR_0:
         asm volatile("isb; msr pmevtyper0_el0, %0" : : "r" (event));
         asm volatile("msr pmevcntr0_el0, %0" : : "r" (config_args.reg_val));
+        active_counters |= BIT(0);
         break;
     case EVENT_CTR_1:
         asm volatile("isb; msr pmevtyper1_el0, %0" : : "r" (event));
         asm volatile("msr pmevcntr1_el0, %0" : : "r" (config_args.reg_val));
+        active_counters |= BIT(1);
         break;
     case EVENT_CTR_2:
         asm volatile("isb; msr pmevtyper2_el0, %0" : : "r" (event));
         asm volatile("msr pmevcntr2_el0, %0" : : "r" (config_args.reg_val));
+        active_counters |= BIT(2);
         break;
     case EVENT_CTR_3:
         asm volatile("isb; msr pmevtyper3_el0, %0" : : "r" (event));
         asm volatile("msr pmevcntr3_el0, %0" : : "r" (config_args.reg_val));
+        active_counters |= BIT(3);
         break;
     case EVENT_CTR_4:
         asm volatile("isb; msr pmevtyper4_el0, %0" : : "r" (event));
         asm volatile("msr pmevcntr4_el0, %0" : : "r" (config_args.reg_val));
+        active_counters |= BIT(4);
         break;
     case EVENT_CTR_5:
         asm volatile("isb; msr pmevtyper5_el0, %0" : : "r" (event));
         asm volatile("msr pmevcntr5_el0, %0" : : "r" (config_args.reg_val));
+        active_counters |= BIT(5);
         break;
     default:
         break;
     }
-    printf_("Finished configuring\n");
+    printf_("Finished configuring, active bit string: %u\n", active_counters);
 }
 
 seL4_MessageInfo_t
