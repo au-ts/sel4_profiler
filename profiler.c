@@ -125,6 +125,9 @@ void halt_cnt() {
 /* Resume the PMU */
 void resume_cnt() {
     asm volatile("msr pmcntenset_el0, %0" :: "r" BIT(31));
+            uint32_t r = 0;
+        asm volatile("mrs %0, pmcntenset_el0" : "=r" (r));
+        asm volatile("msr pmcntenset_el0, %0" : : "r" (r|1));
 }
 
 /* Add a snapshot of the cycle and event registers to the array. This array needs to become a ring buffer. */
@@ -156,6 +159,41 @@ void add_snapshot() {
 
         snapshot_arr_top += 1;
     }
+}
+
+int user_pmu_configure(pmu_config_args_t config_args) {
+    uint32_t event = config_args.reg_event & ARMV8_PMEVTYPER_EVTCOUNT_MASK;
+    // In each of these cases set event for counter, set value of counter.
+    switch (config_args.reg_num)
+    {
+    case EVENT_CTR_0:
+        asm volatile("isb; msr pmevtyper0_el0, %0" : : "r" (event));
+        asm volatile("msr pmevcntr0_el0, %0" : : "r" (config_args.reg_val));
+        break;
+    case EVENT_CTR_1:
+        asm volatile("isb; msr pmevtyper1_el0, %0" : : "r" (event));
+        asm volatile("msr pmevcntr1_el0, %0" : : "r" (config_args.reg_val));
+        break;
+    case EVENT_CTR_2:
+        asm volatile("isb; msr pmevtyper2_el0, %0" : : "r" (event));
+        asm volatile("msr pmevcntr2_el0, %0" : : "r" (config_args.reg_val));
+        break;
+    case EVENT_CTR_3:
+        asm volatile("isb; msr pmevtyper3_el0, %0" : : "r" (event));
+        asm volatile("msr pmevcntr3_el0, %0" : : "r" (config_args.reg_val));
+        break;
+    case EVENT_CTR_4:
+        asm volatile("isb; msr pmevtyper4_el0, %0" : : "r" (event));
+        asm volatile("msr pmevcntr4_el0, %0" : : "r" (config_args.reg_val));
+        break;
+    case EVENT_CTR_5:
+        asm volatile("isb; msr pmevtyper5_el0, %0" : : "r" (event));
+        asm volatile("msr pmevcntr5_el0, %0" : : "r" (config_args.reg_val));
+        break;
+    default:
+        break;
+    }
+    printf_("Finished configuring\n");
 }
 
 seL4_MessageInfo_t
@@ -191,6 +229,16 @@ protected(sel4cp_channel ch, sel4cp_msginfo msginfo)
                 sel4cp_mr_set(5, VAL_LOWER);
             These message registers are then unpacted here and applied to the PMU state.     
             */
+
+            pmu_config_args_t args;
+            args.reg_num = sel4cp_mr_get(1);
+            args.reg_event = sel4cp_mr_get(2);
+            args.reg_flags = sel4cp_mr_get(3);
+            uint32_t top = sel4cp_mr_get(4);
+            uint32_t bottom = sel4cp_mr_get(5);
+            args.reg_val = ((uint64_t) top << 32) | bottom;
+            printf_("This is the re-constructed value: %ld\n", args.reg_val);
+            user_pmu_configure(args);
             break;
         default:
             break;

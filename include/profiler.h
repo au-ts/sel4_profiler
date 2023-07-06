@@ -54,3 +54,12 @@
 #define BUS_ACCESS_LD 0x60          /* Bus access - Read */
 
 /* TO-DO: There are more events as defined in the cortex a55 spec. Add these here. */
+
+struct pmu_config_args {
+    uint16_t reg_num;
+    uint16_t reg_event;
+    uint32_t reg_flags;
+    uint64_t reg_val;
+};
+
+typedef struct pmu_config_args pmu_config_args_t;
