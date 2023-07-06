@@ -180,6 +180,18 @@ protected(sel4cp_channel ch, sel4cp_msginfo msginfo)
             halt_cnt();
             // Also want to flush out anything that may be left in the ring buffer
             break;
+        case PROFILER_CONFIGURE:
+            printf_("Configuring the PMU\n");
+            /* Example layout of what a call to profile configure should look like (Based on the perfmon2 spec):
+                sel4cp_mr_set(0, PROFILER_CONFIGURE);
+                sel4cp_mr_set(1, REG_NUM);
+                sel4cp_mr_set(2, EVENT NUM);
+                sel4cp_mr_set(3, FLAGS(empty for now));
+                sel4cp_mr_set(4, VAL_UPPER);
+                sel4cp_mr_set(5, VAL_LOWER);
+            These message registers are then unpacted here and applied to the PMU state.     
+            */
+            break;
         default:
             break;
         }
