@@ -22,6 +22,9 @@
         <map mr="tx_used_serial" vaddr="0x4_600_000" perms="rw" cached="true" setvar_vaddr="tx_used" />
 
         <map mr="shared_dma" vaddr="0x2_400_000" perms="rw" cached="true" setvar_vaddr="shared_dma" />
+
+        <irq irq="124" id="0"/> 
+        <!-- This irq is from imx8mm datasheet, + 32 bit offset -->
     </protection_domain>
 
     <protection_domain name="serial" priority="102" pp="true">
@@ -45,6 +48,10 @@
         <!-- <irq irq="225" id="1" trigger="edge" /> Serial Interrupt -->
     </protection_domain>
 
+    <protection_domain name="dummy_prog" priority="100" pp="true">
+        <program_image path="dummy_prog.elf"/>
+
+    </protection_domain>
     <!-- These following channels are needed for communication between the server and driver -->
 
     <channel>
@@ -57,5 +64,10 @@
         <!-- Channel to be used for the getchar communication -->
         <end pd="serial" id="10" />
         <end pd="profiler" id="11"/>
+    </channel>
+
+    <channel>
+        <end pd="profiler" id="5"/>
+        <end pd="dummy_prog" id="5"/>
     </channel>
 </system>
