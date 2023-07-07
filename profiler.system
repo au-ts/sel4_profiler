@@ -11,10 +11,12 @@
     <memory_region name="tx_avail_serial" size="0x200_000" page_size="0x200_000"/>
     <memory_region name="tx_used_serial" size="0x200_000" page_size="0x200_000"/>
 
-    <protection_domain name="profiler" priority="101" pp="true">
+    <memory_region name="profiler_control" size="0x1_000" page_size="0x1_000"/>
+
+    <protection_domain name="profiler" priority="103">
         <program_image path="profiler.elf" />
         <map mr="uart" vaddr="0x5_000_000" perms="rw" cached="false" setvar_vaddr="uart_base" />
-        
+        <map mr="profiler_control" vaddr="0x3_800_000" perms="rw" cached="false" setvar_vaddr="profiler_control"/>
             <!-- shared memory for ring buffer mechanism -->
         <map mr="rx_avail_serial" vaddr="0x4_000_000" perms="rw" cached="true" setvar_vaddr="rx_avail" />
         <map mr="rx_used_serial" vaddr="0x4_200_000" perms="rw" cached="true" setvar_vaddr="rx_used" />
@@ -23,35 +25,42 @@
 
         <map mr="shared_dma" vaddr="0x2_400_000" perms="rw" cached="true" setvar_vaddr="shared_dma" />
 
+        <protection_domain name="serial" priority="104" id="1">
+            <program_image path="serial.elf" />
+
+            <map mr="uart" vaddr="0x5_000_000" perms="rw" cached="false" setvar_vaddr="uart_base" />
+            
+            <!-- shared memory for ring buffer mechanism -->
+            <map mr="rx_avail_serial" vaddr="0x4_000_000" perms="rw" cached="true" setvar_vaddr="rx_avail" />
+            <map mr="rx_used_serial" vaddr="0x4_200_000" perms="rw" cached="true" setvar_vaddr="rx_used" />
+            <map mr="tx_avail_serial" vaddr="0x4_400_000" perms="rw" cached="true" setvar_vaddr="tx_avail" />
+            <map mr="tx_used_serial" vaddr="0x4_600_000" perms="rw" cached="true" setvar_vaddr="tx_used" />
+
+            <map mr="shared_dma" vaddr="0x2_400_000" perms="rw" cached="true" setvar_vaddr="shared_dma_vaddr" />
+
+            <!-- we need physical addresses dma region -->
+            <setvar symbol="shared_dma_paddr" region_paddr="shared_dma" />
+            
+            <irq irq="59" id="1" /> <!-- Serial Interrupt (I think - serial@30890000)-->
+
+            <!-- <irq irq="225" id="1" trigger="edge" /> Serial Interrupt -->
+        </protection_domain>
+
+        <protection_domain name="dummy_prog" priority="100" id="0">
+            <program_image path="dummy_prog.elf"/>
+                <map mr="profiler_control" vaddr="0x3_800_000" perms="rw" cached="false" setvar_vaddr="profiler_control"/>
+        </protection_domain>
+
+        <protection_domain name="dummy_prog2" priority="100" id="2">
+            <program_image path="dummy_prog2.elf"/>
+        </protection_domain>
+
         <irq irq="124" id="0"/> 
+
         <!-- This irq is from imx8mm datasheet, + 32 bit offset -->
     </protection_domain>
 
-    <protection_domain name="serial" priority="102" pp="true">
-        <program_image path="serial.elf" />
 
-        <map mr="uart" vaddr="0x5_000_000" perms="rw" cached="false" setvar_vaddr="uart_base" />
-        
-        <!-- shared memory for ring buffer mechanism -->
-        <map mr="rx_avail_serial" vaddr="0x4_000_000" perms="rw" cached="true" setvar_vaddr="rx_avail" />
-        <map mr="rx_used_serial" vaddr="0x4_200_000" perms="rw" cached="true" setvar_vaddr="rx_used" />
-        <map mr="tx_avail_serial" vaddr="0x4_400_000" perms="rw" cached="true" setvar_vaddr="tx_avail" />
-        <map mr="tx_used_serial" vaddr="0x4_600_000" perms="rw" cached="true" setvar_vaddr="tx_used" />
-
-        <map mr="shared_dma" vaddr="0x2_400_000" perms="rw" cached="true" setvar_vaddr="shared_dma_vaddr" />
-
-        <!-- we need physical addresses dma region -->
-        <setvar symbol="shared_dma_paddr" region_paddr="shared_dma" />
-        
-        <irq irq="59" id="1" /> <!-- Serial Interrupt (I think - serial@30890000)-->
-
-        <!-- <irq irq="225" id="1" trigger="edge" /> Serial Interrupt -->
-    </protection_domain>
-
-    <protection_domain name="dummy_prog" priority="100" pp="true">
-        <program_image path="dummy_prog.elf"/>
-
-    </protection_domain>
     <!-- These following channels are needed for communication between the server and driver -->
 
     <channel>
@@ -70,4 +79,10 @@
         <end pd="profiler" id="5"/>
         <end pd="dummy_prog" id="5"/>
     </channel>
+
+    <channel>
+        <end pd="dummy_prog2" id="6"/>
+        <end pd="dummy_prog" id="6"/>
+    </channel>
+
 </system>

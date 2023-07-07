@@ -9,13 +9,11 @@
 #include "printf.h"
 #include "snapshot.h"
 
-
-
 uintptr_t uart_base;
-
+uintptr_t profiler_control;
 // Global snapshot array, this needs to be a ring buffer in teh future
 
-pmu_snapshot_t snapshot_arr[1000];
+pmu_snapshot_t snapshot_arr[10000];
 int snapshot_arr_top;
 uint32_t active_counters = BIT(31); 
 
@@ -35,61 +33,17 @@ enable_cycle_counter()
     asm volatile("msr pmccntr_el0, %0" : : "r" (init_cnt));
 }
 
-static void
-init_pmu_event() {
-    printf_("Initialising a PMU event\n");
-    uint32_t evtCount = 0x03;
-    uint32_t evtCount2 = 0x04;
-    /* Setup PMU counter to record specific event */
-    /* evtCount is the event id */
-    asm volatile("msr pmevcntr0_el0, %0" : : "r" (0xfffffff0));
-    uint32_t temp;
-    asm volatile("mrs %0, pmevcntr0_el0" : "=r" (temp));
-    printf_("This is the current event counter 0 before: %d\n", temp);
-    evtCount &= ARMV8_PMEVTYPER_EVTCOUNT_MASK;
-    evtCount2 &= ARMV8_PMEVTYPER_EVTCOUNT_MASK;
-    asm volatile("isb");
-    /* Just use counter 0 here */
-    asm volatile("msr pmevtyper0_el0, %0" : : "r" (evtCount));
-    asm volatile("isb");
-    asm volatile("msr pmevtyper1_el0, %0" : : "r" (evtCount2));
-    /*   Performance Monitors Count Enable Set register bit 30:1 disable, 31,1 enable */
-    // asm volatile("msr pmcntenset_el0, %0" : : "r" (ARMV8_PMCNTENSET_EL0_ENABLE));
-    uint32_t r = 0;
-    asm volatile("mrs %0, pmcntenset_el0" : "=r" (r));
-    asm volatile("msr pmcntenset_el0, %0" : : "r" (r|1));
-    asm volatile("msr pmcntenset_el0, %0" : : "r" (r|2));
+void print_snapshot(pmu_snapshot_t snapshot) {
+    printf_("This is the current cycle counter: %lu\n", snapshot.clock);
+    printf_("This is the current program counter: %p\n", snapshot.pc);
+    printf_("This is the current event counter 0: %d\n", snapshot.cnt1);
+    printf_("This is the current event counter 1: %d\n", snapshot.cnt2);
+    printf_("This is the current event counter 2: %d\n", snapshot.cnt3);
+    printf_("This is the current event counter 3: %d\n", snapshot.cnt4);
+    printf_("This is the current event counter 4: %d\n", snapshot.cnt5);
+    printf_("This is the current event counter 5: %d\n", snapshot.cnt6);
 
-    uint32_t r1 = 0;;
 
-    asm volatile("mrs %0, pmevcntr0_el0" : "=r" (r));
-    printf_("This is the current event counter 0: %d\n", r);
-
-    asm volatile("mrs %0, pmevcntr1_el0" : "=r" (r1));
-    printf_("This is the current event counter 1: %d\n", r1);
-
-    asm volatile("mrs %0, pmccntr_el0" : "=r" (r));
-    printf_("This is the current cycle counter: %d\n", r);
-
-}
-
-void print_snapshot() {
-    uint64_t rr = 0;
-    uint32_t r = 0;
-
-    asm volatile("isb; mrs %0, pmccntr_el0" : "=r" (rr));
-    printf_("This is the current cycle counter: %lu\n", rr);
-
-    asm volatile("isb; mrs %0, pmevcntr0_el0" : "=r" (r));
-    printf_("This is the current event counter 0: %d\n", r);
-    asm volatile("isb; mrs %0, pmevcntr1_el0" : "=r" (r));
-    printf_("This is the current event counter 1: %d\n", r);
-    asm volatile("isb; mrs %0, pmevcntr2_el0" : "=r" (r));
-    printf_("This is the current event counter 2: %d\n", r);
-    asm volatile("isb; mrs %0, pmevcntr3_el0" : "=r" (r));
-    printf_("This is the current event counter 3: %d\n", r);
-    asm volatile("isb; mrs %0, pmevcntr4_el0" : "=r" (r));
-    printf_("This is the current event counter 4: %d\n", r);
 }
 
 /* Reset the cycle counter to the sampling period. This needs to be changed
@@ -99,12 +53,12 @@ void reset_cnt() {
     asm volatile("msr pmccntr_el0, %0" : : "r" (init_cnt));
 }
 
-static inline int armv8pmu_has_overflowed(uint32_t pmovsr)
+static inline int pmu_has_overflowed(uint32_t pmovsr)
 {
 	return pmovsr & ARMV8_OVSR_MASK;
 }
 
-static inline uint32_t armv8pmu_getreset_flags(void)
+static inline uint32_t pmu_getreset_flags(void)
 {
 	uint32_t value;
 
@@ -130,31 +84,33 @@ void resume_cnt() {
 
 /* Add a snapshot of the cycle and event registers to the array. This array needs to become a ring buffer. */
 void add_snapshot() {
-    if (snapshot_arr_top < 100) {
-        pmu_snapshot_t new_entry;
-        asm volatile("isb; mrs %0, pmccntr_el0" : "=r" (new_entry.clock));
-        asm volatile("isb; mrs %0, pmevcntr0_el0" : "=r" (new_entry.cnt1));
-        asm volatile("isb; mrs %0, pmevcntr1_el0" : "=r" (new_entry.cnt2));
-        asm volatile("isb; mrs %0, pmevcntr2_el0" : "=r" (new_entry.cnt3));
-        asm volatile("isb; mrs %0, pmevcntr3_el0" : "=r" (new_entry.cnt4));
-        asm volatile("isb; mrs %0, pmevcntr4_el0" : "=r" (new_entry.cnt5));
+    pmu_snapshot_t new_entry;
+    asm volatile("isb; mrs %0, pmccntr_el0" : "=r" (new_entry.clock));
+    asm volatile("isb; mrs %0, pmevcntr0_el0" : "=r" (new_entry.cnt1));
+    asm volatile("isb; mrs %0, pmevcntr1_el0" : "=r" (new_entry.cnt2));
+    asm volatile("isb; mrs %0, pmevcntr2_el0" : "=r" (new_entry.cnt3));
+    asm volatile("isb; mrs %0, pmevcntr3_el0" : "=r" (new_entry.cnt4));
+    asm volatile("isb; mrs %0, pmevcntr4_el0" : "=r" (new_entry.cnt5));
+    asm volatile("isb; mrs %0, pmevcntr4_el0" : "=r" (new_entry.cnt5));
+    seL4_UserContext regs;
+    seL4_Error err = seL4_TCB_ReadRegisters(BASE_TCB_CAP + PD_ID, false, 0, SEL4_USER_CONTEXT_SIZE, &regs);
+    if (err) {
+        new_entry.pc = 0;
+    } else {
+        new_entry.pc = regs.pc;
+    }
+
+    if (snapshot_arr_top < 10000) {
         snapshot_arr[snapshot_arr_top] = new_entry;
         snapshot_arr_top += 1;
-    } else if (snapshot_arr_top == 100) {
-        pmu_snapshot_t temp = snapshot_arr[55];
-        printf_("This is the current cycle counter: %lu\n", temp.clock);
-
-        printf_("This is the current event counter 0: %d\n", temp.cnt1);
-        printf_("This is the current event counter 1: %d\n", temp.cnt2);
-        printf_("This is the current event counter 2: %d\n", temp.cnt3);
-        printf_("This is the current event counter 3: %d\n", temp.cnt4);
-        printf_("This is the current event counter 4: %d\n", temp.cnt5);
-
-        // Stall here. REMOVE
-        while(1) {
-            
+    } else if (snapshot_arr_top == 10000) {
+        // Purge the snapshot array, currently purge through serial
+        for (int i = 0; i < 10000; i++) {
+            print_snapshot(snapshot_arr[i]);
         }
-
+        // All the fields should be purged, so we can overwrite old entries now
+        snapshot_arr_top = 0;
+        snapshot_arr[snapshot_arr_top] = new_entry;
         snapshot_arr_top += 1;
     }
 }
@@ -203,8 +159,7 @@ int user_pmu_configure(pmu_config_args_t config_args) {
 seL4_MessageInfo_t
 protected(sel4cp_channel ch, sel4cp_msginfo msginfo)
 {
-    // This is very core platform specific for now. We may need to change this in the future
-
+    // This is deprecated for now. Using a shared memory region between process and profiler to control/configure
     // For now we should only be recieving on channel 5
     if (ch == 5) {
         // For now, we should have only 1 message 
@@ -252,7 +207,9 @@ protected(sel4cp_channel ch, sel4cp_msginfo msginfo)
 
 void init () {
     snapshot_arr_top = 0;
-    
+    int *prof_cnt = (int *) profiler_control;
+
+    *prof_cnt = 0;
     init_serial();
 
     enable_cycle_counter();
@@ -267,20 +224,16 @@ void notified(sel4cp_channel ch) {
         // Halt the PMU
         halt_cnt();
 
-        // IN HERE WE NEED A WAY TO GET THE INSTRUCTION POINTER OF WHERE WE WERE 
-        // EXECUTING BEFORE THE OVERFLOW INTERRUPT OCCURED. THIS WILL MOST LIKELY
-        // NEED CORE PLATFORM/KERNEL CHANGES.
-
         // Print over serial for now
-        print_snapshot();
-        // add_snapshot();
+        // print_snapshot();
+        add_snapshot();
 
         // Get the reset flags
-        uint32_t pmovsr = armv8pmu_getreset_flags();
+        uint32_t pmovsr = pmu_getreset_flags();
 
         // Check if an overflow has occured
 
-        if(armv8pmu_has_overflowed(pmovsr)) {
+        if(pmu_has_overflowed(pmovsr)) {
             printf_("PMU has overflowed\n");
         } else {
             printf_("PMU hasn't overflowed\n");
@@ -294,6 +247,28 @@ void notified(sel4cp_channel ch) {
         resume_cnt();
         // Ack the irq
         sel4cp_irq_ack(ch);
+    } else if (ch == 5) {
+        pmu_config_args_t *config = (pmu_config_args_t *) profiler_control;
+        printf_("This is the reg_val: %lu\n", config->notif_opt);
+        if (config->notif_opt == PROFILER_START) {
+            config->notif_opt = PROFILER_READY;
+            printf_("Starting the PMU\n");
+            // Notfication to start PMU
+            resume_cnt();
+        } else if (config->notif_opt == PROFILER_STOP) {
+            config->notif_opt = PROFILER_READY;
+            printf_("Halting the PMU\n");
+            // Notification to stop PMU
+            halt_cnt();
+            // purge any structures left in the array
+            for (int i = 0; i < snapshot_arr_top; i++) {
+                print_snapshot(snapshot_arr[i]);
+            }
+        } else if (config->notif_opt == PROFILER_CONFIGURE) {
+            config->notif_opt = PROFILER_READY;
+            user_pmu_configure(*config);
+
+        }
     }
 
 }

@@ -3,6 +3,10 @@
 #define BIT(nr) (1UL << (nr))
 // CHANGE THIS VALUE TO CHANGE THE FREQUENCY OF SAMPLING
 #define SAMPLING_PERIOD 1200000000
+// CHANGE THIS VALUE TO CHANGE WHAT PD TO TRACK (WE NEED TO ACCESS THE TCB OF
+// A PD TO TRACK PC)
+#define PD_ID 0
+#define SEL4_USER_CONTEXT_SIZE 0x24
 
 #define ARMV8_PMEVTYPER_EVTCOUNT_MASK 0x3ff
 #define ARMV8_PMCNTENSET_EL0_ENABLE (1<<31) /* *< Enable Perf count reg */
@@ -12,7 +16,7 @@
 #define PROFILER_START 0
 #define PROFILER_STOP 1
 #define PROFILER_CONFIGURE 2
-
+#define PROFILER_READY 3
 // Definitions of counters available on PMU
 #define CYCLE_CTR 0
 #define EVENT_CTR_0 1
@@ -56,6 +60,7 @@
 /* TO-DO: There are more events as defined in the cortex a55 spec. Add these here. */
 
 struct pmu_config_args {
+    uint8_t notif_opt; /* This is the kind of operation we want the profiler to carry out. 0 for start profiling, 1 for stop profiling, 2 for configure.*/
     uint16_t reg_num;
     uint16_t reg_event;
     uint32_t reg_flags;

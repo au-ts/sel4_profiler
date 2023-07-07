@@ -141,7 +141,6 @@ void putchar_(char character)
 
     if(is_empty) {
         // Notify the driver through the printf channel
-        //sel4cp_dbg_puts("Notifying the driver that we have something to print\n");
         sel4cp_notify(SERVER_PRINT_CHANNEL);
     }
 
