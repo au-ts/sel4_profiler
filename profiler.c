@@ -245,7 +245,7 @@ void init () {
     *prof_cnt = 0;
     init_serial();
 
-    enable_cycle_counter();
+    // enable_cycle_counter();
     /* TODO */
     /* HERE USERS CAN ADD IN CONFIGURATION OPTIONS FOR THE PROFILER BY SETTING
     CALLING THE CONFIGURE FUNCTIONS. For example:
@@ -262,10 +262,10 @@ void notified(sel4cp_channel ch) {
     if (ch == 0) {
         // Halt the PMU
         halt_cnt();
-
+        printf_("WE HAVE BEEN INTERRUPTED!\n");
         // Print over serial for now
-        print_snapshot();
-        add_snapshot();
+        // print_snapshot();
+        // add_snapshot();
 
         // Get the reset flags
         uint32_t pmovsr = pmu_getreset_flags();
@@ -289,13 +289,16 @@ void notified(sel4cp_channel ch) {
     } else if (ch == 5) {
         /* WIP: Need to ensure that the shared mem isn't updated by the client before 
         we can get to this section */
+
+        add_snapshot();
+        print_snapshot(snapshot_arr[0]);
         pmu_config_args_t *config = (pmu_config_args_t *) profiler_control;
         printf_("This is the reg_val: %lu\n", config->notif_opt);
         if (config->notif_opt == PROFILER_START) {
             config->notif_opt = PROFILER_READY;
             printf_("Starting the PMU\n");
             // Notfication to start PMU
-            resume_cnt();
+            // resume_cnt();
         } else if (config->notif_opt == PROFILER_STOP) {
             config->notif_opt = PROFILER_READY;
             printf_("Halting the PMU\n");

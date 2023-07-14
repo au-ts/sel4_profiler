@@ -60,6 +60,9 @@
         <!-- This irq is from imx8mm datasheet, + 32 bit offset -->
     </protection_domain>
 
+    <protection_domain name="profiler_rs" priority="104">
+            <program_image path="profiler_rs.elf"/>
+    </protection_domain>
 
     <!-- These following channels are needed for communication between the server and driver -->
 
