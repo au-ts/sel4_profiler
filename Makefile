@@ -38,6 +38,40 @@ CFLAGS := -mcpu=$(CPU) -mstrict-align -ffreestanding -g3 -O3 -Wall  -Wno-unused-
 LDFLAGS := -L$(BOARD_DIR)/lib -Llib
 LIBS := -lsel4cp -Tsel4cp.ld -lc
 
+########################
+# Rust compilation stuff
+
+RUST_TARGET_PATH := rust_target
+RUST_SEL4CP_TARGET := aarch64-sel4cp-minimal
+TARGET_DIR := $(BUILD_DIR)/target
+
+SEL4CP_SDK_CONFIG := $(SEL4CP_SDK)/board/$(SEL4CP_BOARD)/$(SEL4CP_CONFIG)/config.json
+SEL4CP_SDK_INCLUDE_DIR := $(SEL4CP_SDK)/board/$(SEL4CP_BOARD)/$(SEL4CP_CONFIG)/include
+
+RUST_ENV := \
+	RUST_TARGET_PATH=$(abspath $(RUST_TARGET_PATH)) \
+	SEL4_CONFIG=$(abspath $(SEL4CP_SDK_CONFIG)) \
+	SEL4_INCLUDE_DIRS=$(abspath $(SEL4CP_SDK_INCLUDE_DIR))
+
+RUST_OPTIONS := \
+	--locked \
+	-Z unstable-options \
+	-Z bindeps \
+	-Z build-std=core,alloc,compiler_builtins \
+	-Z build-std-features=compiler-builtins-mem \
+	--target $(RUST_SEL4CP_TARGET) \
+	--release \
+	--target-dir $(abspath $(TARGET_DIR)) \
+
+RUST_DOC_OPTIONS := $(RUST_OPTIONS)
+
+RUST_BUILD_OPTIONS := \
+	$(RUST_OPTIONS) \
+	--out-dir $(BUILD_DIR)
+
+# Rust compilation stuff ends
+########################
+
 IMAGE_FILE = $(BUILD_DIR)/loader.img
 REPORT_FILE = $(BUILD_DIR)/report.txt
 

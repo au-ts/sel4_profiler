@@ -1,0 +1,15 @@
+[package]
+name = "sel4_profiler"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "profiler_rs"
+path = "profiler.rs"
+
+[dependencies]
+num_enum = { version = "0.5.9", default-features = false }
+zerocopy = "0.6.1"
+
+[dependencies.sel4cp]
+path = "../../rust-seL4/crates/sel4cp"
