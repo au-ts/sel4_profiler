@@ -11,18 +11,18 @@
 
 uintptr_t uart_base;
 uintptr_t profiler_control;
-// Global snapshot array, this needs to be a ring buffer in teh future
 
+// Global snapshot array, this needs to be a ring buffer in teh future
 pmu_snapshot_t snapshot_arr[10000];
 int snapshot_arr_top;
+/* This global bit string allows us to keep track of what event counters
+are being used. We use this bit string when enabling/disabling the PMU */
 uint32_t active_counters = BIT(31); 
 
-static void
-enable_cycle_counter()
-{
+/* Enable the cycle counter, with initial value 0 */
+static void enable_cycle_counter() {
 	uint64_t init_cnt = 0;
     uint64_t val;
-
 
 	asm volatile("mrs %0, pmcr_el0" : "=r" (val));
 
@@ -33,6 +33,7 @@ enable_cycle_counter()
     asm volatile("msr pmccntr_el0, %0" : : "r" (init_cnt));
 }
 
+/* Prints a snapshot of the PMU, as well as the PC of the TCB that has been set */
 void print_snapshot(pmu_snapshot_t snapshot) {
     printf_("This is the current cycle counter: %lu\n", snapshot.clock);
     printf_("This is the current program counter: %p\n", snapshot.pc);
@@ -42,44 +43,6 @@ void print_snapshot(pmu_snapshot_t snapshot) {
     printf_("This is the current event counter 3: %d\n", snapshot.cnt4);
     printf_("This is the current event counter 4: %d\n", snapshot.cnt5);
     printf_("This is the current event counter 5: %d\n", snapshot.cnt6);
-
-
-}
-
-/* Reset the cycle counter to the sampling period. This needs to be changed
-to allow sampling on other event counters. */
-void reset_cnt() {
-    uint64_t init_cnt = 0xffffffffffffffff - SAMPLING_PERIOD;
-    asm volatile("msr pmccntr_el0, %0" : : "r" (init_cnt));
-}
-
-static inline int pmu_has_overflowed(uint32_t pmovsr)
-{
-	return pmovsr & ARMV8_OVSR_MASK;
-}
-
-static inline uint32_t pmu_getreset_flags(void)
-{
-	uint32_t value;
-
-	/* Read */
-	asm volatile("mrs %0, pmovsclr_el0" : "=r" (value));
-
-	/* Write to clear flags */
-	value &= ARMV8_OVSR_MASK;
-	asm volatile("msr pmovsclr_el0, %0" :: "r" (value));
-
-	return value;
-}
-
-/* Halt the PMU */
-void halt_cnt() {
-    asm volatile("msr pmcntenset_el0, %0" :: "r"(0 << 31));
-}
-
-/* Resume the PMU */
-void resume_cnt() {
-    asm volatile("msr pmcntenset_el0, %0" :: "r" (active_counters));
 }
 
 /* Add a snapshot of the cycle and event registers to the array. This array needs to become a ring buffer. */
@@ -115,40 +78,109 @@ void add_snapshot() {
     }
 }
 
+/* Check if the PMU has overflowed */
+static inline int pmu_has_overflowed(uint32_t pmovsr)
+{
+	return pmovsr & ARMV8_OVSR_MASK;
+}
+
+/* Get the reset flags after an interrupt has occured on the PMU */
+static inline uint32_t pmu_getreset_flags(void)
+{
+	uint32_t value;
+
+	/* Read */
+	asm volatile("mrs %0, pmovsclr_el0" : "=r" (value));
+
+	/* Write to clear flags */
+	value &= ARMV8_OVSR_MASK;
+	asm volatile("msr pmovsclr_el0, %0" :: "r" (value));
+
+	return value;
+}
+
+/* Halt the PMU */
+void halt_cnt() {
+    asm volatile("msr pmcntenset_el0, %0" :: "r"(0 << 31));
+}
+
+/* Resume the PMU */
+void resume_cnt() {
+    asm volatile("msr pmcntenset_el0, %0" :: "r" (active_counters));
+}
+
+/* Reset the cycle counter to the sampling period. This needs to be changed
+to allow sampling on other event counters. */
+void reset_cnt() {
+    uint64_t init_cnt = 0xffffffffffffffff - SAMPLING_PERIOD;
+    asm volatile("msr pmccntr_el0, %0" : : "r" (init_cnt));
+}
+
+/* Configure event counter 0 */
+int configure_cnt0(uint32_t event, uint64_t val) {
+    asm volatile("isb; msr pmevtyper0_el0, %0" : : "r" (event));
+    asm volatile("msr pmevcntr0_el0, %0" : : "r" (val));
+    active_counters |= BIT(0);
+}
+
+/* Configure event counter 1 */
+int configure_cnt1(uint32_t event, uint64_t val) {
+    asm volatile("isb; msr pmevtyper1_el0, %0" : : "r" (event));
+    asm volatile("msr pmevcntr1_el0, %0" : : "r" (val));
+    active_counters |= BIT(1);
+}
+
+/* Configure event counter 2 */
+int configure_cnt2(uint32_t event, uint64_t val) {
+    asm volatile("isb; msr pmevtyper2_el0, %0" : : "r" (event));
+    asm volatile("msr pmevcntr2_el0, %0" : : "r" (val));
+    active_counters |= BIT(2);
+}
+
+/* Configure event counter 3 */
+int configure_cnt3(uint32_t event, uint64_t val) {
+    asm volatile("isb; msr pmevtyper3_el0, %0" : : "r" (event));
+    asm volatile("msr pmevcntr3_el0, %0" : : "r" (val));
+    active_counters |= BIT(3);
+}
+
+/* Configure event counter 4 */
+int configure_cnt4(uint32_t event, uint64_t val) {
+    asm volatile("isb; msr pmevtyper4_el0, %0" : : "r" (event));
+    asm volatile("msr pmevcntr4_el0, %0" : : "r" (val));
+    active_counters |= BIT(4);
+}
+
+/* Configure event counter 5 */
+int configure_cnt5(uint32_t event, uint64_t val) {
+    asm volatile("isb; msr pmevtyper5_el0, %0" : : "r" (event));
+    asm volatile("msr pmevcntr5_el0, %0" : : "r" (val));
+    active_counters |= BIT(5);
+}
+
+/* Initial user PMU configure interface */
 int user_pmu_configure(pmu_config_args_t config_args) {
     uint32_t event = config_args.reg_event & ARMV8_PMEVTYPER_EVTCOUNT_MASK;
     // In each of these cases set event for counter, set value of counter.
     switch (config_args.reg_num)
     {
     case EVENT_CTR_0:
-        asm volatile("isb; msr pmevtyper0_el0, %0" : : "r" (event));
-        asm volatile("msr pmevcntr0_el0, %0" : : "r" (config_args.reg_val));
-        active_counters |= BIT(0);
+        configure_cnt0(event, config_args.reg_val);
         break;
     case EVENT_CTR_1:
-        asm volatile("isb; msr pmevtyper1_el0, %0" : : "r" (event));
-        asm volatile("msr pmevcntr1_el0, %0" : : "r" (config_args.reg_val));
-        active_counters |= BIT(1);
+        configure_cnt1(event, config_args.reg_val);
         break;
     case EVENT_CTR_2:
-        asm volatile("isb; msr pmevtyper2_el0, %0" : : "r" (event));
-        asm volatile("msr pmevcntr2_el0, %0" : : "r" (config_args.reg_val));
-        active_counters |= BIT(2);
+        configure_cnt2(event, config_args.reg_val);
         break;
     case EVENT_CTR_3:
-        asm volatile("isb; msr pmevtyper3_el0, %0" : : "r" (event));
-        asm volatile("msr pmevcntr3_el0, %0" : : "r" (config_args.reg_val));
-        active_counters |= BIT(3);
+        configure_cnt3(event, config_args.reg_val);
         break;
     case EVENT_CTR_4:
-        asm volatile("isb; msr pmevtyper4_el0, %0" : : "r" (event));
-        asm volatile("msr pmevcntr4_el0, %0" : : "r" (config_args.reg_val));
-        active_counters |= BIT(4);
+        configure_cnt4(event, config_args.reg_val);
         break;
     case EVENT_CTR_5:
-        asm volatile("isb; msr pmevtyper5_el0, %0" : : "r" (event));
-        asm volatile("msr pmevcntr5_el0, %0" : : "r" (config_args.reg_val));
-        active_counters |= BIT(5);
+        configure_cnt5(event, config_args.reg_val);
         break;
     default:
         break;
@@ -156,6 +188,7 @@ int user_pmu_configure(pmu_config_args_t config_args) {
     printf_("Finished configuring, active bit string: %u\n", active_counters);
 }
 
+/* PPC will arrive from application to configure the PMU */
 seL4_MessageInfo_t
 protected(sel4cp_channel ch, sel4cp_msginfo msginfo)
 {
@@ -213,6 +246,12 @@ void init () {
     init_serial();
 
     enable_cycle_counter();
+    /* TODO */
+    /* HERE USERS CAN ADD IN CONFIGURATION OPTIONS FOR THE PROFILER BY SETTING
+    CALLING THE CONFIGURE FUNCTIONS. For example:
+
+    configure_cnt0(L1I_CACHE_REFILL, 0xfffffff); 
+    */
 
     // Notifying our dummy program to start running. This is just an empty infinite loop.
     sel4cp_notify(5);
@@ -225,19 +264,19 @@ void notified(sel4cp_channel ch) {
         halt_cnt();
 
         // Print over serial for now
-        // print_snapshot();
+        print_snapshot();
         add_snapshot();
 
         // Get the reset flags
         uint32_t pmovsr = pmu_getreset_flags();
 
         // Check if an overflow has occured
-
         if(pmu_has_overflowed(pmovsr)) {
             printf_("PMU has overflowed\n");
         } else {
             printf_("PMU hasn't overflowed\n");
         }
+
         // Mask the interuppt flag
         asm volatile("msr PMOVSCLR_EL0, %0" : : "r" BIT(31));
         
@@ -248,6 +287,8 @@ void notified(sel4cp_channel ch) {
         // Ack the irq
         sel4cp_irq_ack(ch);
     } else if (ch == 5) {
+        /* WIP: Need to ensure that the shared mem isn't updated by the client before 
+        we can get to this section */
         pmu_config_args_t *config = (pmu_config_args_t *) profiler_control;
         printf_("This is the reg_val: %lu\n", config->notif_opt);
         if (config->notif_opt == PROFILER_START) {
