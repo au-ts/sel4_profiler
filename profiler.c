@@ -161,8 +161,8 @@ void resume_cnt() {
 
 void reset_cycle_cnt() {
     uint64_t init_cnt = 0;
-    
-    if (IRQ_COUNTER == 6) {
+
+    if (IRQ_COUNTER == 31) {
         init_cnt = 0xffffffffffffffff - SAMPLING_PERIOD;
     }
 
@@ -400,25 +400,20 @@ void notified(sel4cp_channel ch) {
         // Halt the PMU
         halt_cnt();
 
-        // Print over serial for now
-        // print_snapshot();
-        add_snapshot();
-
         // Get the reset flags
         uint32_t pmovsr = pmu_getreset_flags();
 
-        printf_("This is the overflow flag: %p\n", pmovsr);
-        uint64_t ccnt;
-        asm volatile("isb; mrs %0, pmccntr_el0" : "=r" (ccnt));
-
-        printf_("This is the cycle counter: %lu\n", ccnt);
+        // Only add a snapshot if the counter we are sampling on is in the interrupt flag
+        if (pmovsr & BIT(IRQ_COUNTER)) {
+            printf_("Adding snapshot\n");
+            add_snapshot();
+        }
         // Check if an overflow has occured
         if(pmu_has_overflowed(pmovsr)) {
             printf_("PMU has overflowed\n");
         } else {
             printf_("PMU hasn't overflowed\n");
         }
-        
         // Reset our cycle counter
         reset_cnt(pmovsr);
         // Resume cycle counter
@@ -433,9 +428,6 @@ void notified(sel4cp_channel ch) {
             config->notif_opt = PROFILER_READY;
             printf_("Starting the PMU\n");
             // Notfication to start PMU
-            uint32_t c0cnt;
-            asm volatile("isb; mrs %0, pmevcntr0_el0" : "=r" (c0cnt));
-            printf_("This is the value of counter 0: %d\n", c0cnt);
             resume_cnt();
         } else if (config->notif_opt == PROFILER_STOP) {
             config->notif_opt = PROFILER_READY;
@@ -443,9 +435,6 @@ void notified(sel4cp_channel ch) {
             // Notification to stop PMU
             halt_cnt();
             // purge any structures left in the array
-            uint32_t c0cnt;
-            asm volatile("isb; mrs %0, pmevcntr0_el0" : "=r" (c0cnt));
-            printf_("This is the value of counter 0: %d\n", c0cnt);
             flush_profiler_ring();
         } else if (config->notif_opt == PROFILER_CONFIGURE) {
             config->notif_opt = PROFILER_READY;
