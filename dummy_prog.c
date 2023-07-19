@@ -19,9 +19,7 @@ void endless_loop() {
         if (i == 999999999) {
             i = 0;
             ticker++;
-        } else if (ticker == 5) {
-            break;
-        }
+        } 
         
         i += 1;
     }

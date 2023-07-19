@@ -1,13 +1,10 @@
 #pragma once
 
 #define BIT(nr) (1UL << (nr))
-// CHANGE THIS VALUE TO CHANGE THE FREQUENCY OF SAMPLING
-#define SAMPLING_PERIOD 1200000000
+
 // Maybe try and expand the num of buffers in the future
 #define NUM_BUFFERS 500
-// CHANGE THIS VALUE TO CHANGE WHAT PD TO TRACK (WE NEED TO ACCESS THE TCB OF
-// A PD TO TRACK PC)
-#define PD_ID 0
+
 #define SEL4_USER_CONTEXT_SIZE 0x24
 
 #define ARMV8_PMEVTYPER_EVTCOUNT_MASK 0x3ff

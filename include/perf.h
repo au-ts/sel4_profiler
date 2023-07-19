@@ -43,38 +43,41 @@ struct perf_event_attr {
     uint64_t sample_freq;           /* Frequency for sampling if .freq is set */
     uint64_t sample_type;           /* Information on what is stored in the sampling record */
     uint64_t read_format;           /* NOT SURE WHAT THIS DOES */
-    unsigned int disabled:1;        /* off by default */
-    unsigned int inherit:1;         /* children inherit it */
-    unsigned int pinned:1;          /* must always be on PMU */
-    unsigned int exclusive:1;       /* only group on PMU */
-    unsigned int exclude_user:1;    /* don't count user*/
-    unsigned int exclude_kernel:1;  /* ditto kernel */
-    unsigned int exclude_hv:1;      /* ditto hypervisor */
-    unsigned int exclude_idle:1;    /* don't count when idle */
-    unsigned int mmap:1;            /* MMAP records are included in file */
-    unsigned int comm:1;            /* COMM records are included in file */
-    unsigned int freq:1;            /* If set, sample freq is valid otherwise sample_period */
-    unsigned int inherit_stat:1;    /* Per task counts */
-    unsigned int enable_on_exec:1;  /* next exec enables */
-    unsigned int task:1;            /* trace fork/exit */
-    unsigned int watermark:1;       /* wakeup_watermark */
-    unsigned int precise_ip:2;      /* “0 - SAMPLE IP can have arbitrary skid”
+    uint64_t disabled:1,            /* off by default */
+            inherit:1,              /* children inherit it */
+            pinned:1,               /* must always be on PMU */
+            exclusive:1,            /* only group on PMU */
+            exclude_user:1,         /* don't count user*/
+            exclude_kernel:1,       /* ditto kernel */
+            exclude_hv:1,           /* ditto hypervisor */
+            exclude_idle:1,         /* don't count when idle */
+            mmap:1,                 /* MMAP records are included in file */
+            comm:1,                 /* COMM records are included in file */
+            freq:1,                 /* If set, sample freq is valid otherwise sample_period */
+            inherit_stat:1,         /* Per task counts */
+            enable_on_exec:1,       /* next exec enables */
+            task:1,                 /* trace fork/exit */
+            watermark:1,            /* wakeup_watermark */
+            precise_ip:2,           /* “0 - SAMPLE IP can have arbitrary skid”
                                         “1 - SAMPLE IP must have constant skid”
                                         “2 - SAMPLE IP can have arbitrary skid”
                                         “3 - SAMPLE IP must have 0 skid */
-    unsigned int mmap_data:1;       /* non-exec mmap data */
-    unsigned int sample_id_all:1;   /* If set, the following records hold data. We assume this bit to be set */
-    uint64_t reserved:45;   
-    /* Switch the following variables to unions */
+            mmap_data:1,            /* non-exec mmap data */
+            sample_id_all:1,        /* If set, the following records hold data. We assume this bit to be set */
+            reserved:45;   
     union {
         uint32_t wakeup_events;         /* wakeup every n events */
         uint32_t wakeup_watermark;      /* Bytes before wakeup */
     };
-    uint32_t bp_type;   
-    uint64_t bp_addr;
-    uint64_t config1;
-    uint64_t bp_len;
-    uint64_t config2;
+    uint32_t bp_type;
+    union {
+        uint64_t bp_addr;
+        uint64_t config1;
+    };
+    union {
+        uint64_t bp_len;
+        uint64_t config2;
+    };
 };
 
 typedef struct perf_event_attr perf_event_attr_t;
@@ -113,7 +116,7 @@ struct perf_sample {
     uint32_t pid;               /* Process ID */
     uint32_t tid;               /* Thread ID -- Unused*/
     uint64_t time;              /* Timestamp */
-    uint64_t addr;              /* @kwinter: Not sure what this addr refers to */
+    uint64_t addr;              /* For sampling memory maps/unmaps */
     uint64_t id;                /* Identification @kwinter not sure what this is supposed to identify */
     uint64_t stream_id;
     uint32_t cpu;               /* used CPU */

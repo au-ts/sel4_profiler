@@ -10,6 +10,7 @@
 #include "snapshot.h"
 #include "perf.h"
 #include "timer.h"
+#include "profiler_config.h"
 
 uintptr_t uart_base;
 uintptr_t profiler_control;
@@ -25,7 +26,7 @@ pmu_snapshot_t snapshot_arr[10000];
 int snapshot_arr_top;
 /* This global bit string allows us to keep track of what event counters
 are being used. We use this bit string when enabling/disabling the PMU */
-uint32_t active_counters = BIT(31); 
+uint32_t active_counters = (BIT(31)); 
 
 /* Enable the cycle counter, with initial value 0 */
 static void enable_cycle_counter() {
@@ -34,11 +35,21 @@ static void enable_cycle_counter() {
 
 	asm volatile("mrs %0, pmcr_el0" : "=r" (val));
 
-	val |= (BIT(0) | BIT(2));
+	val |= BIT(2);
 
     asm volatile("isb; msr pmcr_el0, %0" : : "r" (val));
 
     asm volatile("msr pmccntr_el0, %0" : : "r" (init_cnt));
+
+}
+
+static void enable_event_counters() {
+    uint64_t val;
+    asm volatile("mrs %0, pmcr_el0" : "=r" (val));
+
+	val |= BIT(0);
+
+    asm volatile("isb; msr pmcr_el0, %0" : : "r" (val));
 }
 
 void flush_profiler_ring() {
@@ -54,6 +65,7 @@ void flush_profiler_ring() {
         printf_("IP: %p\n", temp_sample->ip);
         printf_("PD_ID: %lu\n", temp_sample->id);
         printf_("TIME: %lu\n", temp_sample->time);
+        
         int ret = enqueue_avail(&profiler_ring, buffer, buffer_len, &cookie);
         if (ret != 0) {
             sel4cp_dbg_puts("Enqueue in the profiler ring avail failed\n");
@@ -147,50 +159,120 @@ void resume_cnt() {
     asm volatile("msr pmcntenset_el0, %0" :: "r" (active_counters));
 }
 
-/* Reset the cycle counter to the sampling period. This needs to be changed
-to allow sampling on other event counters. */
-void reset_cnt() {
-    uint64_t init_cnt = 0xffffffffffffffff - SAMPLING_PERIOD;
+void reset_cycle_cnt() {
+    uint64_t init_cnt = 0;
+    
+    if (IRQ_COUNTER == 6) {
+        init_cnt = 0xffffffffffffffff - SAMPLING_PERIOD;
+    }
+
     asm volatile("msr pmccntr_el0, %0" : : "r" (init_cnt));
 }
 
+/* Reset the cycle counter to the sampling period. This needs to be changed
+to allow sampling on other event counters. */
+void reset_cnt(uint32_t interrupt_flags) {
+    // Go through all of the interrupt flags, and reset the appropriate counters to
+    // the appropriate values. 
+    if (interrupt_flags & BIT(0)) {
+        printf_("Counter 0 overflowed\n");
+        uint32_t val = 0;
+        if (IRQ_COUNTER == 0) {
+            val = 0xffffffff - SAMPLING_PERIOD;
+        }
+        asm volatile("msr pmevcntr0_el0, %0" : : "r" (val));
+    } 
+
+    if (interrupt_flags & (BIT(1))) {
+        printf_("Counter 1 overflowed\n");
+            uint32_t val = 0;
+        if (IRQ_COUNTER == 1) {
+            val = 0xffffffff - SAMPLING_PERIOD;
+        }
+        asm volatile("msr pmevcntr1_el0, %0" : : "r" (val));
+    } 
+    if (interrupt_flags & (BIT(2))) {
+        printf_("counter 2 overflowed\n");
+        uint32_t val = 0;
+        if (IRQ_COUNTER == 2) {
+            val = 0xffffffff - SAMPLING_PERIOD;
+        }
+        asm volatile("msr pmevcntr2_el0, %0" : : "r" (val));
+    }
+
+    if (interrupt_flags & (BIT(3))) {
+        printf_("counter 3 overflowed\n");
+
+        uint32_t val = 0;
+        if (IRQ_COUNTER == 3) {
+            val = 0xffffffff - SAMPLING_PERIOD;
+        }
+        asm volatile("msr pmevcntr3_el0, %0" : : "r" (val));
+    }
+
+    if (interrupt_flags & (BIT(4))) {
+        printf_("counter 3 overflowed\n");
+
+        uint32_t val = 0;
+        if (IRQ_COUNTER == 4) {
+            val = 0xffffffff - SAMPLING_PERIOD;
+        }
+        asm volatile("msr pmevcntr4_el0, %0" : : "r" (val));
+    }
+
+    if (interrupt_flags & (BIT(5))) {
+        printf_("counter 3 overflowed\n");
+
+        uint32_t val = 0;
+        if (IRQ_COUNTER == 5) {
+            val = 0xffffffff - SAMPLING_PERIOD;
+        }
+        asm volatile("msr pmevcntr5_el0, %0" : : "r" (val));
+    }
+
+    if (interrupt_flags & (BIT(31))) {
+        printf_("Cycle counter overflowed\n");
+        reset_cycle_cnt();
+    }
+}
+
 /* Configure event counter 0 */
-int configure_cnt0(uint32_t event, uint64_t val) {
+int configure_cnt0(uint32_t event, uint32_t val) {
     asm volatile("isb; msr pmevtyper0_el0, %0" : : "r" (event));
     asm volatile("msr pmevcntr0_el0, %0" : : "r" (val));
     active_counters |= BIT(0);
 }
 
 /* Configure event counter 1 */
-int configure_cnt1(uint32_t event, uint64_t val) {
+int configure_cnt1(uint32_t event, uint32_t val) {
     asm volatile("isb; msr pmevtyper1_el0, %0" : : "r" (event));
     asm volatile("msr pmevcntr1_el0, %0" : : "r" (val));
     active_counters |= BIT(1);
 }
 
 /* Configure event counter 2 */
-int configure_cnt2(uint32_t event, uint64_t val) {
+int configure_cnt2(uint32_t event, uint32_t val) {
     asm volatile("isb; msr pmevtyper2_el0, %0" : : "r" (event));
     asm volatile("msr pmevcntr2_el0, %0" : : "r" (val));
     active_counters |= BIT(2);
 }
 
 /* Configure event counter 3 */
-int configure_cnt3(uint32_t event, uint64_t val) {
+int configure_cnt3(uint32_t event, uint32_t val) {
     asm volatile("isb; msr pmevtyper3_el0, %0" : : "r" (event));
     asm volatile("msr pmevcntr3_el0, %0" : : "r" (val));
     active_counters |= BIT(3);
 }
 
 /* Configure event counter 4 */
-int configure_cnt4(uint32_t event, uint64_t val) {
+int configure_cnt4(uint32_t event, uint32_t val) {
     asm volatile("isb; msr pmevtyper4_el0, %0" : : "r" (event));
     asm volatile("msr pmevcntr4_el0, %0" : : "r" (val));
     active_counters |= BIT(4);
 }
 
 /* Configure event counter 5 */
-int configure_cnt5(uint32_t event, uint64_t val) {
+int configure_cnt5(uint32_t event, uint32_t val) {
     asm volatile("isb; msr pmevtyper5_el0, %0" : : "r" (event));
     asm volatile("msr pmevcntr5_el0, %0" : : "r" (val));
     active_counters |= BIT(5);
@@ -298,13 +380,15 @@ void init () {
     }
 
 
-    enable_cycle_counter();
-    /* TODO */
+    /* INITIALISE WHAT COUNTERS WE WANT TO TRACK IN HERE*/
     /* HERE USERS CAN ADD IN CONFIGURATION OPTIONS FOR THE PROFILER BY SETTING
     CALLING THE CONFIGURE FUNCTIONS. For example:
 
     configure_cnt0(L1I_CACHE_REFILL, 0xfffffff); 
     */
+
+    enable_event_counters();
+    configure_cnt2(L1I_CACHE_REFILL, 0xffffff00); 
 
     // Notifying our dummy program to start running. This is just an empty infinite loop.
     sel4cp_notify(5);
@@ -323,18 +407,20 @@ void notified(sel4cp_channel ch) {
         // Get the reset flags
         uint32_t pmovsr = pmu_getreset_flags();
 
+        printf_("This is the overflow flag: %p\n", pmovsr);
+        uint64_t ccnt;
+        asm volatile("isb; mrs %0, pmccntr_el0" : "=r" (ccnt));
+
+        printf_("This is the cycle counter: %lu\n", ccnt);
         // Check if an overflow has occured
         if(pmu_has_overflowed(pmovsr)) {
             printf_("PMU has overflowed\n");
         } else {
             printf_("PMU hasn't overflowed\n");
         }
-
-        // Mask the interuppt flag
-        asm volatile("msr PMOVSCLR_EL0, %0" : : "r" BIT(31));
         
         // Reset our cycle counter
-        reset_cnt();
+        reset_cnt(pmovsr);
         // Resume cycle counter
         resume_cnt();
         // Ack the irq
@@ -347,6 +433,9 @@ void notified(sel4cp_channel ch) {
             config->notif_opt = PROFILER_READY;
             printf_("Starting the PMU\n");
             // Notfication to start PMU
+            uint32_t c0cnt;
+            asm volatile("isb; mrs %0, pmevcntr0_el0" : "=r" (c0cnt));
+            printf_("This is the value of counter 0: %d\n", c0cnt);
             resume_cnt();
         } else if (config->notif_opt == PROFILER_STOP) {
             config->notif_opt = PROFILER_READY;
@@ -354,6 +443,9 @@ void notified(sel4cp_channel ch) {
             // Notification to stop PMU
             halt_cnt();
             // purge any structures left in the array
+            uint32_t c0cnt;
+            asm volatile("isb; mrs %0, pmevcntr0_el0" : "=r" (c0cnt));
+            printf_("This is the value of counter 0: %d\n", c0cnt);
             flush_profiler_ring();
         } else if (config->notif_opt == PROFILER_CONFIGURE) {
             config->notif_opt = PROFILER_READY;
