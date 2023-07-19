@@ -8,10 +8,18 @@
 #include "serial_server.h"
 #include "printf.h"
 #include "snapshot.h"
+#include "perf.h"
+#include "timer.h"
 
 uintptr_t uart_base;
 uintptr_t profiler_control;
 
+uintptr_t profiler_ring_used;
+uintptr_t profiler_ring_avail;
+uintptr_t profiler_mem;
+
+ring_handle_t profiler_ring
+;
 // Global snapshot array, this needs to be a ring buffer in teh future
 pmu_snapshot_t snapshot_arr[10000];
 int snapshot_arr_top;
@@ -33,6 +41,26 @@ static void enable_cycle_counter() {
     asm volatile("msr pmccntr_el0, %0" : : "r" (init_cnt));
 }
 
+void flush_profiler_ring() {
+    int size = ring_size(&profiler_ring.used_ring);
+    printf_("This is the size of the used ring: %d\n", size);
+
+    uintptr_t buffer = 0;
+    unsigned int buffer_len = 0;
+    void *cookie;
+
+    while (!dequeue_used(&profiler_ring, &buffer, &buffer_len, &cookie)) {
+        perf_sample_t *temp_sample = (perf_sample_t *) buffer;
+        printf_("IP: %p\n", temp_sample->ip);
+        printf_("PD_ID: %lu\n", temp_sample->id);
+        printf_("TIME: %lu\n", temp_sample->time);
+        int ret = enqueue_avail(&profiler_ring, buffer, buffer_len, &cookie);
+        if (ret != 0) {
+            sel4cp_dbg_puts("Enqueue in the profiler ring avail failed\n");
+        }
+    }
+}
+
 /* Prints a snapshot of the PMU, as well as the PC of the TCB that has been set */
 void print_snapshot(pmu_snapshot_t snapshot) {
     printf_("This is the current cycle counter: %lu\n", snapshot.clock);
@@ -47,6 +75,7 @@ void print_snapshot(pmu_snapshot_t snapshot) {
 
 /* Add a snapshot of the cycle and event registers to the array. This array needs to become a ring buffer. */
 void add_snapshot() {
+    // This will be added to the raw data section
     pmu_snapshot_t new_entry;
     asm volatile("isb; mrs %0, pmccntr_el0" : "=r" (new_entry.clock));
     asm volatile("isb; mrs %0, pmevcntr0_el0" : "=r" (new_entry.cnt1));
@@ -63,20 +92,29 @@ void add_snapshot() {
         new_entry.pc = regs.pc;
     }
 
-    if (snapshot_arr_top < 10000) {
-        snapshot_arr[snapshot_arr_top] = new_entry;
-        snapshot_arr_top += 1;
-    } else if (snapshot_arr_top == 10000) {
-        // Purge the snapshot array, currently purge through serial
-        for (int i = 0; i < 10000; i++) {
-            print_snapshot(snapshot_arr[i]);
-        }
-        // All the fields should be purged, so we can overwrite old entries now
-        snapshot_arr_top = 0;
-        snapshot_arr[snapshot_arr_top] = new_entry;
-        snapshot_arr_top += 1;
-    }
+    uintptr_t buffer = 0;
+    unsigned int buffer_len = 0;
+    void * cookie = 0;
+
+    int ret = dequeue_avail(&profiler_ring, &buffer, &buffer_len, &cookie);
+
+    perf_sample_t *temp_sample = (perf_sample_t *) buffer;
+
+    temp_sample->ip = regs.pc;
+    temp_sample->pid = PD_ID;
+    temp_sample->tid = PD_ID;
+    temp_sample->time = sys_now(); /* TODO - Add in timer driver support */
+    temp_sample->addr = 0;
+    temp_sample->id = 0;
+    temp_sample->stream_id = 0;
+    temp_sample->cpu = 0;
+    temp_sample->period = 0;
+    temp_sample->values = 0;
+    temp_sample->data = &new_entry;
+    ret = enqueue_used(&profiler_ring, buffer, buffer_len, &cookie);
 }
+
+
 
 /* Check if the PMU has overflowed */
 static inline int pmu_has_overflowed(uint32_t pmovsr)
@@ -243,7 +281,22 @@ void init () {
     int *prof_cnt = (int *) profiler_control;
 
     *prof_cnt = 0;
+
+    // Init the record buffers
+    ring_init(&profiler_ring, (ring_buffer_t *) profiler_ring_avail, (ring_buffer_t *) profiler_ring_used, NULL, 0);
     init_serial();
+    gpt_init();
+    
+    for (int i = 0; i < NUM_BUFFERS - 1; i++) {
+        int ret = enqueue_avail(&profiler_ring, profiler_mem + (i * sizeof(perf_sample_t)), sizeof(perf_sample_t), NULL);
+        if (ret != 0) {
+            printf_("This is the number of buffers we were able to enqueue: %d\n", i);
+            sel4cp_dbg_puts(sel4cp_name);
+            sel4cp_dbg_puts("Failed to populate buffers for the perf record ring buffer\n");
+            break;
+        }
+    }
+
 
     enable_cycle_counter();
     /* TODO */
@@ -264,7 +317,7 @@ void notified(sel4cp_channel ch) {
         halt_cnt();
 
         // Print over serial for now
-        print_snapshot();
+        // print_snapshot();
         add_snapshot();
 
         // Get the reset flags
@@ -290,7 +343,6 @@ void notified(sel4cp_channel ch) {
         /* WIP: Need to ensure that the shared mem isn't updated by the client before 
         we can get to this section */
         pmu_config_args_t *config = (pmu_config_args_t *) profiler_control;
-        printf_("This is the reg_val: %lu\n", config->notif_opt);
         if (config->notif_opt == PROFILER_START) {
             config->notif_opt = PROFILER_READY;
             printf_("Starting the PMU\n");
@@ -302,9 +354,7 @@ void notified(sel4cp_channel ch) {
             // Notification to stop PMU
             halt_cnt();
             // purge any structures left in the array
-            for (int i = 0; i < snapshot_arr_top; i++) {
-                print_snapshot(snapshot_arr[i]);
-            }
+            flush_profiler_ring();
         } else if (config->notif_opt == PROFILER_CONFIGURE) {
             config->notif_opt = PROFILER_READY;
             user_pmu_configure(*config);

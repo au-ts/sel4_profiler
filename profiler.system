@@ -2,6 +2,7 @@
 <system>
     <!-- <memory_region name="uart" size="0x1_000" phys_addr="0xff803000" /> -->
     <memory_region name="uart" size="0x10_000" phys_addr="0x30890000" />
+    <memory_region name="timer" size="0x10_000" phys_addr="0x302d0000" />
 
     <memory_region name="shared_dma" size="0x200_000" page_size="0x200_000" />
 
@@ -10,20 +11,27 @@
     <memory_region name="rx_used_serial" size="0x200_000" page_size="0x200_000"/>
     <memory_region name="tx_avail_serial" size="0x200_000" page_size="0x200_000"/>
     <memory_region name="tx_used_serial" size="0x200_000" page_size="0x200_000"/>
+    <memory_region name="profiler_ring_avail" size="0x200_000" page_size="0x200_000"/>
+    <memory_region name="profiler_ring_used" size="0x200_000" page_size="0x200_000"/>
+    <memory_region name="profiler_mem" size="0x1_000_000" page_size="0x200_000"/>
 
     <memory_region name="profiler_control" size="0x1_000" page_size="0x1_000"/>
 
     <protection_domain name="profiler" priority="103">
         <program_image path="profiler.elf" />
         <map mr="uart" vaddr="0x5_000_000" perms="rw" cached="false" setvar_vaddr="uart_base" />
+        <map mr="timer" vaddr="0x5_200_000" perms="rw" cached="false" setvar_vaddr="gpt_regs" />
+
         <map mr="profiler_control" vaddr="0x3_800_000" perms="rw" cached="false" setvar_vaddr="profiler_control"/>
             <!-- shared memory for ring buffer mechanism -->
         <map mr="rx_avail_serial" vaddr="0x4_000_000" perms="rw" cached="true" setvar_vaddr="rx_avail" />
         <map mr="rx_used_serial" vaddr="0x4_200_000" perms="rw" cached="true" setvar_vaddr="rx_used" />
         <map mr="tx_avail_serial" vaddr="0x4_400_000" perms="rw" cached="true" setvar_vaddr="tx_avail" />
         <map mr="tx_used_serial" vaddr="0x4_600_000" perms="rw" cached="true" setvar_vaddr="tx_used" />
-
+        <map mr="profiler_ring_avail" vaddr="0x2_000_000" perms="rw" cached="true" setvar_vaddr="profiler_ring_avail" />
+        <map mr="profiler_ring_used" vaddr="0x2_200_000" perms="rw" cached="true" setvar_vaddr="profiler_ring_used" />
         <map mr="shared_dma" vaddr="0x2_400_000" perms="rw" cached="true" setvar_vaddr="shared_dma" />
+        <map mr="profiler_mem" vaddr="0x2_600_000" perms="rw" cached="true" setvar_vaddr="profiler_mem" />
 
         <protection_domain name="serial" priority="104" id="1">
             <program_image path="serial.elf" />
@@ -55,7 +63,8 @@
             <program_image path="dummy_prog2.elf"/>
         </protection_domain>
 
-        <irq irq="124" id="0"/> 
+        <irq irq="124" id="0"/>  <!-- Profiler interrupt for imx8mm -->
+        <irq irq="87" id="1" />  <!-- Timer interupt for imx8mm -->
 
         <!-- This irq is from imx8mm datasheet, + 32 bit offset -->
     </protection_domain>

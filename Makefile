@@ -46,7 +46,7 @@ CFLAGS += -I$(BOARD_DIR)/include \
 	-I$(RINGBUFFERDIR)/include \
 
 SERIAL_OBJS := serial.o libsharedringbuffer/shared_ringbuffer.o
-PROFILER_OBJS := profiler.o serial_server.o printf.o libsharedringbuffer/shared_ringbuffer.o
+PROFILER_OBJS := profiler.o serial_server.o printf.o timer.o libsharedringbuffer/shared_ringbuffer.o
 DUMMY_PROG_OBJS := dummy_prog.o
 DUMMY_PROG2_OBJS := dummy_prog2.o
 all: directories $(IMAGE_FILE)

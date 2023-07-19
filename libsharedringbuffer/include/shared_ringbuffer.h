@@ -11,7 +11,7 @@
 #include <sel4cp.h>
 #include "fence.h"
 
-#define SIZE 512
+#define SIZE 511
 
 /* Function pointer to be used to 'notify' components on either end of the shared memory */
 typedef void (*notify_fn)(void);
