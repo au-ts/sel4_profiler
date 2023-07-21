@@ -120,7 +120,7 @@ void add_snapshot() {
     temp_sample->id = 0;
     temp_sample->stream_id = 0;
     temp_sample->cpu = 0;
-    temp_sample->period = 0;
+    temp_sample->period = CYCLE_COUNTER_PERIOD;
     temp_sample->values = 0;
     temp_sample->data = &new_entry;
     ret = enqueue_used(&profiler_ring, buffer, buffer_len, &cookie);
@@ -162,8 +162,8 @@ void resume_cnt() {
 void reset_cycle_cnt() {
     uint64_t init_cnt = 0;
 
-    if (IRQ_COUNTER == 31) {
-        init_cnt = 0xffffffffffffffff - SAMPLING_PERIOD;
+    if (IRQ_CYCLE_COUNTER == 1) {
+        init_cnt = 0xffffffffffffffff - CYCLE_COUNTER_PERIOD;
     }
 
     asm volatile("msr pmccntr_el0, %0" : : "r" (init_cnt));
@@ -177,8 +177,8 @@ void reset_cnt(uint32_t interrupt_flags) {
     if (interrupt_flags & BIT(0)) {
         printf_("Counter 0 overflowed\n");
         uint32_t val = 0;
-        if (IRQ_COUNTER == 0) {
-            val = 0xffffffff - SAMPLING_PERIOD;
+        if (IRQ_COUNTER0 == 1) {
+            val = 0xffffffff - COUNTER0_PERIOD;
         }
         asm volatile("msr pmevcntr0_el0, %0" : : "r" (val));
     } 
@@ -186,16 +186,16 @@ void reset_cnt(uint32_t interrupt_flags) {
     if (interrupt_flags & (BIT(1))) {
         printf_("Counter 1 overflowed\n");
             uint32_t val = 0;
-        if (IRQ_COUNTER == 1) {
-            val = 0xffffffff - SAMPLING_PERIOD;
+        if (IRQ_COUNTER1 == 1) {
+            val = 0xffffffff - COUNTER1_PERIOD;
         }
         asm volatile("msr pmevcntr1_el0, %0" : : "r" (val));
     } 
     if (interrupt_flags & (BIT(2))) {
         printf_("counter 2 overflowed\n");
         uint32_t val = 0;
-        if (IRQ_COUNTER == 2) {
-            val = 0xffffffff - SAMPLING_PERIOD;
+        if (IRQ_COUNTER2 == 1) {
+            val = 0xffffffff - COUNTER2_PERIOD;
         }
         asm volatile("msr pmevcntr2_el0, %0" : : "r" (val));
     }
@@ -204,8 +204,8 @@ void reset_cnt(uint32_t interrupt_flags) {
         printf_("counter 3 overflowed\n");
 
         uint32_t val = 0;
-        if (IRQ_COUNTER == 3) {
-            val = 0xffffffff - SAMPLING_PERIOD;
+        if (IRQ_COUNTER3 == 1) {
+            val = 0xffffffff - COUNTER3_PERIOD;
         }
         asm volatile("msr pmevcntr3_el0, %0" : : "r" (val));
     }
@@ -214,8 +214,8 @@ void reset_cnt(uint32_t interrupt_flags) {
         printf_("counter 3 overflowed\n");
 
         uint32_t val = 0;
-        if (IRQ_COUNTER == 4) {
-            val = 0xffffffff - SAMPLING_PERIOD;
+        if (IRQ_COUNTER4 == 1) {
+            val = 0xffffffff - COUNTER4_PERIOD;
         }
         asm volatile("msr pmevcntr4_el0, %0" : : "r" (val));
     }
@@ -224,8 +224,8 @@ void reset_cnt(uint32_t interrupt_flags) {
         printf_("counter 3 overflowed\n");
 
         uint32_t val = 0;
-        if (IRQ_COUNTER == 5) {
-            val = 0xffffffff - SAMPLING_PERIOD;
+        if (IRQ_COUNTER5 == 1) {
+            val = 0xffffffff - COUNTER5_PERIOD;
         }
         asm volatile("msr pmevcntr5_el0, %0" : : "r" (val));
     }
@@ -404,20 +404,35 @@ void notified(sel4cp_channel ch) {
         uint32_t pmovsr = pmu_getreset_flags();
 
         // Only add a snapshot if the counter we are sampling on is in the interrupt flag
-        if (pmovsr & BIT(IRQ_COUNTER)) {
+        // @kwinter Change this to deal with new counter definitions
+        if (pmovsr & (IRQ_CYCLE_COUNTER << 31) ||
+            pmovsr & (IRQ_COUNTER0 << 0) ||
+            pmovsr & (IRQ_COUNTER1 << 1) ||
+            pmovsr & (IRQ_COUNTER2 << 2) ||
+            pmovsr & (IRQ_COUNTER3 << 3) ||
+            pmovsr & (IRQ_COUNTER4 << 4) ||
+            pmovsr & (IRQ_COUNTER5 << 5)) {
+
             printf_("Adding snapshot\n");
             add_snapshot();
         }
+
         // Check if an overflow has occured
         if(pmu_has_overflowed(pmovsr)) {
             printf_("PMU has overflowed\n");
         } else {
             printf_("PMU hasn't overflowed\n");
         }
-        // Reset our cycle counter
+        
+        // Reset any counters that overflowed.
+
+        // @kwinter Need a way to count how many times a certain counter has overflowed, if we 
+        // are not sampling on it. Add this to the raw data section of the perf sample.
         reset_cnt(pmovsr);
-        // Resume cycle counter
+
+        // Resume counters
         resume_cnt();
+
         // Ack the irq
         sel4cp_irq_ack(ch);
     } else if (ch == 5) {
