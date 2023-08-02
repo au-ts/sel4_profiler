@@ -19,11 +19,8 @@ uintptr_t profiler_ring_used;
 uintptr_t profiler_ring_avail;
 uintptr_t profiler_mem;
 
-ring_handle_t profiler_ring
-;
-// Global snapshot array, this needs to be a ring buffer in teh future
-pmu_snapshot_t snapshot_arr[10000];
-int snapshot_arr_top;
+ring_handle_t profiler_ring;
+
 /* This global bit string allows us to keep track of what event counters
 are being used. We use this bit string when enabling/disabling the PMU */
 uint32_t active_counters = (BIT(31)); 
@@ -85,6 +82,43 @@ void print_snapshot(pmu_snapshot_t snapshot) {
     printf_("This is the current event counter 5: %d\n", snapshot.cnt6);
 }
 
+// void Arch_userStackTrace(tcb_t *tptr)
+// {
+//     cap_t threadRoot;
+//     vspace_root_t *vspaceRoot;
+//     word_t sp;
+
+//     threadRoot = TCB_PTR_CTE_PTR(tptr, tcbVTable)->cap;
+
+//     /* lookup the vspace root */
+//     if (cap_get_capType(threadRoot) != cap_vtable_root_cap) {
+//         printf("Invalid vspace\n");
+//         return;
+//     }
+
+//     vspaceRoot = cap_vtable_root_get_basePtr(threadRoot);
+//     sp = getRegister(tptr, SP_EL0);
+
+//     /* check for alignment so we don't have to worry about accessing
+//      * words that might be on two different pages */
+//     if (!IS_ALIGNED(sp, seL4_WordSizeBits)) {
+//         printf("SP not aligned\n");
+//         return;
+//     }
+
+//     for (unsigned int i = 0; i < 20; i++) {
+//         word_t address = sp + (i * sizeof(word_t));
+//         readWordFromVSpace_ret_t result = readWordFromVSpace(vspaceRoot,
+//                                                              address);
+//         if (result.status == EXCEPTION_NONE) {
+//             printf("0x%"SEL4_PRIx_word": 0x%"SEL4_PRIx_word"\n",
+//                    address, result.value);
+//         } else {
+//             printf("0x%"SEL4_PRIx_word": INVALID\n", address);
+//         }
+//     }
+// }
+
 /* Add a snapshot of the cycle and event registers to the array. This array needs to become a ring buffer. */
 void add_snapshot() {
     // This will be added to the raw data section
@@ -96,6 +130,7 @@ void add_snapshot() {
     asm volatile("isb; mrs %0, pmevcntr3_el0" : "=r" (new_entry.cnt4));
     asm volatile("isb; mrs %0, pmevcntr4_el0" : "=r" (new_entry.cnt5));
     asm volatile("isb; mrs %0, pmevcntr4_el0" : "=r" (new_entry.cnt5));
+    
     seL4_UserContext regs;
     seL4_Error err = seL4_TCB_ReadRegisters(BASE_TCB_CAP + PD_ID, false, 0, SEL4_USER_CONTEXT_SIZE, &regs);
     if (err) {
@@ -123,6 +158,20 @@ void add_snapshot() {
     temp_sample->period = CYCLE_COUNTER_PERIOD;
     temp_sample->values = 0;
     temp_sample->data = &new_entry;
+
+    // Save the call stack of the interrupting TCB
+    // @kwinter Talk to Ivan about how we can distinguish between which TCB is running, and
+    // how we can get the correct ip/stack. Also need to somehow do this for kernel, 
+    // but I don't think we will have sufficient access here in userspace. 
+
+    uintptr_t fp = regs.x29;
+    uintptr_t lr = regs.x30;
+    uintptr_t sp = regs.sp;
+
+    printf_("This is the frame pointer of the faulting TCB: %p\n", fp);
+    printf_("This is the LR of the faulting TCB: %p\n", lr);
+    printf_("This is the SP of the faulting TCB: %p\n", sp);
+
     ret = enqueue_used(&profiler_ring, buffer, buffer_len, &cookie);
 }
 
@@ -185,7 +234,7 @@ void reset_cnt(uint32_t interrupt_flags) {
 
     if (interrupt_flags & (BIT(1))) {
         printf_("Counter 1 overflowed\n");
-            uint32_t val = 0;
+        uint32_t val = 0;
         if (IRQ_COUNTER1 == 1) {
             val = 0xffffffff - COUNTER1_PERIOD;
         }
@@ -211,7 +260,7 @@ void reset_cnt(uint32_t interrupt_flags) {
     }
 
     if (interrupt_flags & (BIT(4))) {
-        printf_("counter 3 overflowed\n");
+        printf_("counter 4 overflowed\n");
 
         uint32_t val = 0;
         if (IRQ_COUNTER4 == 1) {
@@ -237,49 +286,49 @@ void reset_cnt(uint32_t interrupt_flags) {
 }
 
 /* Configure event counter 0 */
-int configure_cnt0(uint32_t event, uint32_t val) {
+void configure_cnt0(uint32_t event, uint32_t val) {
     asm volatile("isb; msr pmevtyper0_el0, %0" : : "r" (event));
     asm volatile("msr pmevcntr0_el0, %0" : : "r" (val));
     active_counters |= BIT(0);
 }
 
 /* Configure event counter 1 */
-int configure_cnt1(uint32_t event, uint32_t val) {
+void configure_cnt1(uint32_t event, uint32_t val) {
     asm volatile("isb; msr pmevtyper1_el0, %0" : : "r" (event));
     asm volatile("msr pmevcntr1_el0, %0" : : "r" (val));
     active_counters |= BIT(1);
 }
 
 /* Configure event counter 2 */
-int configure_cnt2(uint32_t event, uint32_t val) {
+void configure_cnt2(uint32_t event, uint32_t val) {
     asm volatile("isb; msr pmevtyper2_el0, %0" : : "r" (event));
     asm volatile("msr pmevcntr2_el0, %0" : : "r" (val));
     active_counters |= BIT(2);
 }
 
 /* Configure event counter 3 */
-int configure_cnt3(uint32_t event, uint32_t val) {
+void configure_cnt3(uint32_t event, uint32_t val) {
     asm volatile("isb; msr pmevtyper3_el0, %0" : : "r" (event));
     asm volatile("msr pmevcntr3_el0, %0" : : "r" (val));
     active_counters |= BIT(3);
 }
 
 /* Configure event counter 4 */
-int configure_cnt4(uint32_t event, uint32_t val) {
+void configure_cnt4(uint32_t event, uint32_t val) {
     asm volatile("isb; msr pmevtyper4_el0, %0" : : "r" (event));
     asm volatile("msr pmevcntr4_el0, %0" : : "r" (val));
     active_counters |= BIT(4);
 }
 
 /* Configure event counter 5 */
-int configure_cnt5(uint32_t event, uint32_t val) {
+void configure_cnt5(uint32_t event, uint32_t val) {
     asm volatile("isb; msr pmevtyper5_el0, %0" : : "r" (event));
     asm volatile("msr pmevcntr5_el0, %0" : : "r" (val));
     active_counters |= BIT(5);
 }
 
 /* Initial user PMU configure interface */
-int user_pmu_configure(pmu_config_args_t config_args) {
+void user_pmu_configure(pmu_config_args_t config_args) {
     uint32_t event = config_args.reg_event & ARMV8_PMEVTYPER_EVTCOUNT_MASK;
     // In each of these cases set event for counter, set value of counter.
     switch (config_args.reg_num)
@@ -359,7 +408,6 @@ protected(sel4cp_channel ch, sel4cp_msginfo msginfo)
 }
 
 void init () {
-    snapshot_arr_top = 0;
     int *prof_cnt = (int *) profiler_control;
 
     *prof_cnt = 0;
@@ -389,14 +437,16 @@ void init () {
 
     enable_event_counters();
     configure_cnt2(L1I_CACHE_REFILL, 0xffffff00); 
+    configure_cnt1(L1D_CACHE_REFILL, 0xfffffff0); 
 
     // Notifying our dummy program to start running. This is just an empty infinite loop.
     sel4cp_notify(5);
 }
 
 void notified(sel4cp_channel ch) {
-    // We should only enter the notified function for our IRQ
+    // Channel 0 is the interrupt channel for the PMU.
     if (ch == 0) {
+
         // Halt the PMU
         halt_cnt();
 
@@ -456,6 +506,9 @@ void notified(sel4cp_channel ch) {
             user_pmu_configure(*config);
 
         }
+    } else if (ch == 1) {
+        // This is the irq for the timer, divert to the timer_irq() function
+        timer_irq(ch);
     }
 
 }

@@ -17,8 +17,8 @@ If 1 is set, ALSO set the appropriate sampling period. */
 #define IRQ_COUNTER0 0
 #define COUNTER0_PERIOD 0
 
-#define IRQ_COUNTER1 0
-#define COUNTER1_PERIOD 0
+#define IRQ_COUNTER1 1
+#define COUNTER1_PERIOD 120
 
 #define IRQ_COUNTER2 1
 #define COUNTER2_PERIOD 1200

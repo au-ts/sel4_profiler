@@ -33,8 +33,8 @@ RINGBUFFERDIR=libsharedringbuffer
 
 BOARD_DIR := $(SEL4CP_SDK)/board/$(SEL4CP_BOARD)/$(SEL4CP_CONFIG)
 
-IMAGES := profiler.elf serial.elf dummy_prog.elf dummy_prog2.elf
-CFLAGS := -mcpu=$(CPU) -mstrict-align -ffreestanding -g3 -O3 -Wall  -Wno-unused-function
+IMAGES := profiler.elf serial.elf dummy_prog.elf dummy_prog2.elf 
+CFLAGS := -mcpu=$(CPU) -mstrict-align -ffreestanding -g3 -O3 -Wall  -Wno-unused-function -funwind-tables -fno-omit-frame-pointer
 LDFLAGS := -L$(BOARD_DIR)/lib -Llib
 LIBS := -lsel4cp -Tsel4cp.ld -lc
 
@@ -44,11 +44,13 @@ REPORT_FILE = $(BUILD_DIR)/report.txt
 CFLAGS += -I$(BOARD_DIR)/include \
 	-Iinclude	\
 	-I$(RINGBUFFERDIR)/include \
+	-I$(BOARD_DIR)/include/sys \
 
 SERIAL_OBJS := serial.o libsharedringbuffer/shared_ringbuffer.o
 PROFILER_OBJS := profiler.o serial_server.o printf.o timer.o libsharedringbuffer/shared_ringbuffer.o
 DUMMY_PROG_OBJS := dummy_prog.o
 DUMMY_PROG2_OBJS := dummy_prog2.o
+
 all: directories $(IMAGE_FILE)
 
 $(BUILD_DIR)/%.o: %.c Makefile
