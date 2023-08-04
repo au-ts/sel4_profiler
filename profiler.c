@@ -436,8 +436,8 @@ void init () {
     */
 
     enable_event_counters();
-    configure_cnt2(L1I_CACHE_REFILL, 0xffffff00); 
-    configure_cnt1(L1D_CACHE_REFILL, 0xfffffff0); 
+    // configure_cnt2(L1I_CACHE_REFILL, 0xffffff00); 
+    // configure_cnt1(L1D_CACHE_REFILL, 0xfffffff0); 
 
     // Notifying our dummy program to start running. This is just an empty infinite loop.
     sel4cp_notify(5);
@@ -510,5 +510,20 @@ void notified(sel4cp_channel ch) {
         // This is the irq for the timer, divert to the timer_irq() function
         timer_irq(ch);
     }
+
+}
+
+void fault(sel4cp_id id, sel4cp_msginfo msginfo) {
+    printf_("We are in profiler fault -- This is the id: %d\n", id);
+    size_t label = sel4cp_msginfo_get_label(msginfo);
+
+    if (label == seL4_Fault_PMUEvent) {
+        printf_("we got a PMU event\n");
+
+        uint64_t ip = sel4cp_mr_get(0);
+        printf_("This is the IP from the fault: %lu\n", ip);
+    }
+
+    sel4cp_fault_reply(sel4cp_msginfo_new(0, 0));
 
 }

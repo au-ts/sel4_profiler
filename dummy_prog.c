@@ -18,6 +18,7 @@ void endless_loop() {
     while(1) {
         if (i == 999999999) {
             i = 0;
+            sel4cp_notify(6);
             ticker++;
         } else if (ticker == 8) {
             break;
