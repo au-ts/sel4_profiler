@@ -2,8 +2,6 @@
 
 #define BIT(nr) (1UL << (nr))
 
-// Maybe try and expand the num of buffers in the future
-#define NUM_BUFFERS 500
 
 #define SEL4_USER_CONTEXT_SIZE 0x24
 

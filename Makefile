@@ -33,8 +33,8 @@ RINGBUFFERDIR=libsharedringbuffer
 
 BOARD_DIR := $(SEL4CP_SDK)/board/$(SEL4CP_BOARD)/$(SEL4CP_CONFIG)
 
-IMAGES := profiler.elf serial.elf dummy_prog.elf dummy_prog2.elf 
-CFLAGS := -mcpu=$(CPU) -mstrict-align -ffreestanding -g3 -O3 -Wall  -Wno-unused-function -funwind-tables -fno-omit-frame-pointer
+IMAGES := profiler.elf client.elf serial.elf dummy_prog.elf dummy_prog2.elf 
+CFLAGS := -mcpu=$(CPU) -mstrict-align -ffreestanding -g3 -O3 -Wall  -Wno-unused-function -fno-omit-frame-pointer
 LDFLAGS := -L$(BOARD_DIR)/lib -Llib
 LIBS := -lsel4cp -Tsel4cp.ld -lc
 
@@ -48,6 +48,7 @@ CFLAGS += -I$(BOARD_DIR)/include \
 
 SERIAL_OBJS := serial.o libsharedringbuffer/shared_ringbuffer.o
 PROFILER_OBJS := profiler.o serial_server.o printf.o timer.o libsharedringbuffer/shared_ringbuffer.o
+CLIENT_OBJS := client.o serial_server.o printf.o libsharedringbuffer/shared_ringbuffer.o
 DUMMY_PROG_OBJS := dummy_prog.o
 DUMMY_PROG2_OBJS := dummy_prog2.o
 
@@ -69,6 +70,9 @@ $(BUILD_DIR)/dummy_prog.elf: $(addprefix $(BUILD_DIR)/, $(DUMMY_PROG_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 $(BUILD_DIR)/dummy_prog2.elf: $(addprefix $(BUILD_DIR)/, $(DUMMY_PROG2_OBJS))
+	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
+
+$(BUILD_DIR)/client.elf: $(addprefix $(BUILD_DIR)/, $(CLIENT_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 $(IMAGE_FILE) $(REPORT_FILE): $(addprefix $(BUILD_DIR)/, $(IMAGES)) profiler.system
