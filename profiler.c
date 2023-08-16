@@ -54,7 +54,6 @@ void add_snapshot(sel4cp_id id,uint32_t time, uint64_t pc) {
 
     temp_sample->ip = pc;
     temp_sample->pid = id;
-    temp_sample->tid = id;
     temp_sample->time = time;
     temp_sample->addr = 0;
     temp_sample->id = 0;

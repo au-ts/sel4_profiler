@@ -28,20 +28,18 @@ void serial_dump() {
     while(!dequeue_used(&profiler_ring, &buffer, &size, &cookie)) {
         perf_sample_t *sample = (perf_sample_t *) buffer;
 
-        printf_("####################\n");
+        printf_("{\n");
         // Print out sample
-        printf_("IP: %lx\n", sample->ip);
-        printf_("PID: %d\n", sample->pid);
-        printf_("TID: %d\n", sample->tid);
-        printf_("TIME: %lu\n", sample->time);
-        printf_("ADDR: %lu\n", sample->addr);
-        printf_("ID: %lu\n", sample->id);
-        printf_("STREAM_ID: %lu\n", sample->stream_id);
-        printf_("CPU: %d\n", sample->cpu);
-        printf_("RES: %d\n", sample->res);
-        printf_("PERIOD: %ld\n", sample->period);
-        printf_("####################\n");
-        
+        printf_("\t\"ip\":\"%lx\"\n", sample->ip);
+        printf_("\t\"pid\":\"%d\"\n", sample->pid);
+        printf_("\t\"time\":\"%lu\"\n", sample->time);
+        printf_("\t\"addr\":\"%lu\"\n", sample->addr);
+        printf_("\t\"id\":\"%lu\"\n", sample->id);
+        printf_("\t\"stream_id\":\"%lu\"\n", sample->stream_id);
+        printf_("\t\"cpu\":\"%d\"\n", sample->cpu);
+        printf_("\t\"period\":\"%ld\"\n", sample->period);
+        printf_("}\n");
+
         enqueue_avail(&profiler_ring, buffer, size, cookie);
     }
 }

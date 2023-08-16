@@ -114,20 +114,28 @@ typedef struct comm_event comm_event_t;
 /* We will create one of these samples everytime we interrupt in the profiler */
 struct perf_sample {
     uint64_t ip;                /* Instruction Pointer */
-    uint32_t pid;               /* Process ID */
-    uint32_t tid;               /* Thread ID -- Unused*/
+    union {
+        uint32_t pid;               /* Process ID */
+        uint32_t tid;               /* Thread ID -- Unused*/
+    };
     uint64_t time;              /* Timestamp */
     uint64_t addr;              /* For sampling memory maps/unmaps */
     uint64_t id;                /* Identification @kwinter not sure what this is supposed to identify */
     uint64_t stream_id;
-    uint32_t cpu;               /* used CPU */
-    uint32_t res;
+    union {
+        uint32_t cpu;               /* used CPU */
+        uint32_t res;
+    };
     uint64_t period;            /* Number of events */
     uint64_t values;            /* @kwinter not sure what values this is referring to */    
-    uint64_t nr;                /* @kwinter no documentation on the following fields */
-    uint64_t ips[MAX_INSN];
-    uint32_t size;              /* Perf sample raw */
-    void *data;                 /* Raw data */
+    union {
+        uint64_t nr;                /* @kwinter no documentation on the following fields */
+        uint64_t ips[MAX_INSN];
+    };
+    union {
+        uint32_t size;              /* Perf sample raw */
+        void *data;                 /* Raw data */
+    };
 };
 
 typedef struct perf_sample perf_sample_t;
