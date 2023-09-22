@@ -1,5 +1,5 @@
 #include "serial_server.h"
-#include "serial.h"
+#include "uart.h"
 #include "shared_ringbuffer.h"
 #include <string.h>
 #include <stdlib.h>
@@ -8,18 +8,19 @@
 Need to have access to the same ring buffer mechanisms as the driver, so that we can enqueue
 buffers to be serviced by the driver.*/
 
-uintptr_t rx_avail;
-uintptr_t rx_used;
-uintptr_t tx_avail;
-uintptr_t tx_used;
+uintptr_t rx_free_printf;
+uintptr_t rx_used_printf;
+uintptr_t tx_free_printf;
+uintptr_t tx_used_printf;
 
-uintptr_t shared_dma;
+uintptr_t shared_dma_tx_printf;
+uintptr_t shared_dma_rx_printf;
 
-struct serial_server global_serial_server = {0};
+struct serial_server printf_serial_server = {0};
 
 void putchar_(char character)
 {
-    struct serial_server *local_server = &global_serial_server;
+    struct serial_server *local_server = &printf_serial_server;
 
     // Get a buffer from the tx ring
 
@@ -30,7 +31,7 @@ void putchar_(char character)
     void *cookie = 0;
 
     // Dequeue a buffer from the available ring from the tx buffer
-    int ret = dequeue_avail(&local_server->tx_ring, &buffer, &buffer_len, &cookie);
+    int ret = dequeue_free(&local_server->tx_ring, &buffer, &buffer_len, &cookie);
 
     if(ret != 0) {
         sel4cp_dbg_puts(sel4cp_name);
@@ -81,15 +82,15 @@ void putchar_(char character)
 void init_serial(void) {
     // Here we need to init ring buffers and other data structures
     sel4cp_dbg_puts("Initialising serial in serial server\n");
-    struct serial_server *local_server = &global_serial_server;
+    struct serial_server *local_server = &printf_serial_server;
     
     // Init the shared ring buffers
-    ring_init(&local_server->rx_ring, (ring_buffer_t *)rx_avail, (ring_buffer_t *)rx_used, NULL, 0);
+    ring_init(&local_server->rx_ring, (ring_buffer_t *)rx_free_printf, (ring_buffer_t *)rx_used_printf,  0, 512, 512);
     // We will also need to populate these rings with memory from the shared dma region
     
     // Add buffers to the rx ring
     for (int i = 0; i < NUM_BUFFERS - 1; i++) {
-        int ret = enqueue_avail(&local_server->rx_ring, shared_dma + (i * BUFFER_SIZE), BUFFER_SIZE, NULL);
+        int ret = enqueue_free(&local_server->rx_ring, shared_dma_rx_printf + (i * BUFFER_SIZE), BUFFER_SIZE, NULL);
 
         if (ret != 0) {
             sel4cp_dbg_puts(sel4cp_name);
@@ -97,12 +98,12 @@ void init_serial(void) {
         }
     }
 
-    ring_init(&local_server->tx_ring, (ring_buffer_t *)tx_avail, (ring_buffer_t *)tx_used, NULL, 0);
+    ring_init(&local_server->tx_ring, (ring_buffer_t *)tx_free_printf, (ring_buffer_t *)tx_used_printf, 0, 512, 512);
 
     // Add buffers to the tx ring
     for (int i = 0; i < NUM_BUFFERS - 1; i++) {
         // Have to start at the memory region left of by the rx ring
-        int ret = enqueue_avail(&local_server->tx_ring, shared_dma + ((i + NUM_BUFFERS) * BUFFER_SIZE), BUFFER_SIZE, NULL);
+        int ret = enqueue_free(&local_server->tx_ring, shared_dma_tx_printf + ((i + NUM_BUFFERS) * BUFFER_SIZE), BUFFER_SIZE, NULL);
 
         if (ret != 0) {
             sel4cp_dbg_puts(sel4cp_name);

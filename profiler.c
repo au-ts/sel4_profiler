@@ -17,7 +17,7 @@ uintptr_t uart_base;
 uintptr_t profiler_control;
 
 uintptr_t profiler_ring_used;
-uintptr_t profiler_ring_avail;
+uintptr_t profiler_ring_free;
 uintptr_t profiler_mem;
 
 ring_handle_t profiler_ring;
@@ -44,7 +44,7 @@ void add_snapshot(sel4cp_id id,uint32_t time, uint64_t pc) {
     unsigned int buffer_len = 0;
     void * cookie = 0;
 
-    int ret = dequeue_avail(&profiler_ring, &buffer, &buffer_len, &cookie);
+    int ret = dequeue_free(&profiler_ring, &buffer, &buffer_len, &cookie);
     if (ret != 0) {
         sel4cp_dbg_puts(sel4cp_name);
         sel4cp_dbg_puts("Failed to dequeue from profiler avail ring\n");
@@ -339,12 +339,12 @@ void init () {
     *prof_cnt = 0;
 
     // Init the record buffers
-    ring_init(&profiler_ring, (ring_buffer_t *) profiler_ring_avail, (ring_buffer_t *) profiler_ring_used, NULL, 0);
+    ring_init(&profiler_ring, (ring_buffer_t *) profiler_ring_free, (ring_buffer_t *) profiler_ring_used, 0, 512, 512);
     // init_serial();
     gpt_init();
     
     for (int i = 0; i < NUM_BUFFERS - 1; i++) {
-        int ret = enqueue_avail(&profiler_ring, profiler_mem + (i * sizeof(perf_sample_t)), sizeof(perf_sample_t), NULL);
+        int ret = enqueue_free(&profiler_ring, profiler_mem + (i * sizeof(perf_sample_t)), sizeof(perf_sample_t), NULL);
         
         if (ret != 0) {
             sel4cp_dbg_puts(sel4cp_name);

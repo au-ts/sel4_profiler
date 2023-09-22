@@ -14,7 +14,7 @@ uintptr_t uart_base;
 uintptr_t profiler_control;
 
 uintptr_t profiler_ring_used;
-uintptr_t profiler_ring_avail;
+uintptr_t profiler_ring_free;
 uintptr_t profiler_mem;
 
 ring_handle_t profiler_ring;
@@ -40,7 +40,7 @@ void serial_dump() {
         printf_("\t\"period\":\"%ld\"\n", sample->period);
         printf_("}\n");
 
-        enqueue_avail(&profiler_ring, buffer, size, cookie);
+        enqueue_free(&profiler_ring, buffer, size, cookie);
     }
 }
 
@@ -50,7 +50,7 @@ void init() {
     init_serial();
 
     // Init ring handle between profiler
-    ring_init(&profiler_ring, (ring_buffer_t *) profiler_ring_avail, (ring_buffer_t *) profiler_ring_used, NULL, 0);
+    ring_init(&profiler_ring, (ring_buffer_t *) profiler_ring_free, (ring_buffer_t *) profiler_ring_used, 0, 512, 512);
 }
 
 void notified(sel4cp_channel ch) {

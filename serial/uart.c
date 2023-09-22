@@ -6,7 +6,8 @@
 #include <stdint.h>
 #include <sel4cp.h>
 #include <sel4/sel4.h>
-#include "serial.h"
+#include "uart.h"
+#include "uart_config.h"
 #include "shared_ringbuffer.h"
 
 #define BIT(nr) (1UL << (nr))
@@ -15,16 +16,16 @@
 #define IRQ_CH 1
 #define TX_CH  8
 #define RX_CH  10
-#define INIT   4
 
 /* Memory regions. These all have to be here to keep compiler happy */
 // Ring handle components
-uintptr_t rx_avail;
+uintptr_t rx_free;
 uintptr_t rx_used;
-uintptr_t tx_avail;
+uintptr_t tx_free;
 uintptr_t tx_used;
 uintptr_t shared_dma_vaddr;
 uintptr_t shared_dma_paddr;
+uintptr_t shared_dma_rx_drv;
 // Base of the uart registers
 uintptr_t uart_base;
 
@@ -32,8 +33,7 @@ uintptr_t uart_base;
 ring_handle_t rx_ring;
 ring_handle_t tx_ring;
 
-// Global serial_driver variable
-
+// Global serial driver state
 struct serial_driver global_serial_driver = {0};
 
 /*
@@ -71,10 +71,15 @@ int serial_configure(
     long bps,
     int char_size,
     enum serial_parity parity,
-    int stop_bits)
+    int stop_bits, 
+    int mode, 
+    int echo)
 {
     imx_uart_regs_t *regs = (imx_uart_regs_t *) uart_base;
     
+    global_serial_driver.mode = mode;
+    global_serial_driver.echo = echo;
+
     uint32_t cr2;
     /* Character size */
     cr2 = regs->cr2;
@@ -172,7 +177,6 @@ int putchar(int c) {
 static void
 raw_tx(char *phys, unsigned int len, void *cookie)
 {
-    // sel4cp_dbg_puts("entering raw tx function\n");
     // This is byte by byte for now, switch to DMA use later
     for (int i = 0; i < len || phys[i] != '\0'; i++) {
         // Loop until the fifo queue is ready to transmit
@@ -181,27 +185,18 @@ raw_tx(char *phys, unsigned int len, void *cookie)
 }
 
 void handle_tx() {
-    // sel4cp_dbg_puts("In the handle tx func\n");
     uintptr_t buffer = 0;
     unsigned int len = 0;
     void *cookie = 0;
     // Dequeue something from the Tx ring -> the server will have placed something in here, if its empty then nothing to do
-    // sel4cp_dbg_puts("Dequeuing and printing everything currently in the ring buffer\n");
     while (!driver_dequeue(tx_ring.used_ring, &buffer, &len, &cookie)) {
-        // sel4cp_dbg_puts("in the driver dequeue loop\n");
         // Buffer cointaining the bytes to write to serial
         char *phys = (char * )buffer;
         // Handle the tx
         raw_tx(phys, len, cookie);
-        // Then enqueue this buffer back into the available queue, so that it can be collected and reused by the server
-        enqueue_avail(&tx_ring, buffer, len, &cookie);
+        // Then enqueue this buffer back into the free queue, so that it can be collected and reused by the server
+        enqueue_free(&tx_ring, buffer, len, &cookie);
     }
-    // sel4cp_dbg_puts("Finished handle_tx\n");
-}
-
-// Increment the number of chars that the server has requested us to get.
-void handle_rx() {
-    global_serial_driver.num_to_get_chars++;
 }
 
 
@@ -209,34 +204,43 @@ void handle_irq() {
     /* Here we have interrupted because a character has been inputted. We first want to get the 
     character from the hardware FIFO queue.
 
-    Then we want to dequeue from the rx available ring, and populate it, then add to the rx used queue
+    Then we want to dequeue from the rx free ring, and populate it, then add to the rx used queue
     ready to be processed by the client server
     */
-
-    // sel4cp_dbg_puts("Entering handle irq function\n");
-
     int input = getchar();
+    char input_char = (char) input;
+    sel4cp_irq_ack(IRQ_CH);
+
+    // Not sure if we should be printing this here or elsewhere? What is the expected behaviour?
+    // putchar(input);
 
     if (input == -1) {
-        // sel4cp_dbg_puts(sel4cp_name);
-        // sel4cp_dbg_puts(": invalid input when attempting to getchar\n");
+        sel4cp_dbg_puts(sel4cp_name);
+        sel4cp_dbg_puts(": invalid input when attempting to getchar\n");
         return;
     }
 
-    // Only process the character if we need to, that is the server is waiting on a getchar request
+    int ret = 0;
 
-    /*
-    I'm not too sure if we need to loop here, as we only have one server and one driver, and the 
-    server should be blocking on getchar calls. Additionally, currently the driver has an unlimited budget, 
-    and is running at a higher priority than any of the other PD's so it shouldn't be pre-empted. 
+    if (global_serial_driver.echo == ECHO_EN) {
+        // // Special case for backspace
+        if (input_char == '\b' || input_char == 0x7f) {
+            // Backspace will move the cursor back, and space will erase the character
+            putchar('\b');
+            putchar(' ');
+            putchar('\b');
+        } else if (input_char == '\r') {
+            // Convert the carriage return to a new line
+            putchar('\n');
+        }
+        else {
+            putchar(input);
+        }
+    }
 
-    However, if we have multiple clients waiting on getchars we may have an issue, I need to look 
-    more into the expected behaviour of getchar in these situations.
-    */
-    // sel4cp_dbg_puts("Looping to service all current requests to getchar\n");
+    if (global_serial_driver.mode == RAW_MODE) {
+        // Place characters straight into the buffer
 
-    while (global_serial_driver.num_to_get_chars > 0) {
-        // sel4cp_dbg_puts("In loop\n");
         // Address that we will pass to dequeue to store the buffer address
         uintptr_t buffer = 0;
         // Integer to store the length of the buffer
@@ -244,11 +248,11 @@ void handle_irq() {
 
         void *cookie = 0;
 
-        int ret = dequeue_avail(&rx_ring, &buffer, &buffer_len, &cookie);
+        ret = dequeue_free(&rx_ring, &buffer, &buffer_len, &cookie);
 
         if (ret != 0) {
-            // sel4cp_dbg_puts(sel4cp_name);
-            // sel4cp_dbg_puts(": unable to dequeue from the rx available ring\n");
+            sel4cp_dbg_puts(sel4cp_name);
+            sel4cp_dbg_puts(": unable to dequeue from the rx free ring\n");
             return;
         }
 
@@ -256,64 +260,91 @@ void handle_irq() {
 
         // Now place in the rx used ring
         ret = enqueue_used(&rx_ring, buffer, 1, &cookie);
+        sel4cp_notify(RX_CH);
 
-        if (ret != 0) {
-            // sel4cp_dbg_puts(sel4cp_name);
-            // sel4cp_dbg_puts(": unable to enqueue to the tx available ring\n");
-            return;
+    } else if (global_serial_driver.mode == LINE_MODE) {
+        // Place in a buffer, until we reach a new line, ctrl+d/ctrl+c/enter (check what else can stop)
+        if (global_serial_driver.line_buffer == 0) {
+            // We need to dequeue a buffer to use
+            // Address that we will pass to dequeue to store the buffer address
+            uintptr_t buffer = 0;
+            // Integer to store the length of the buffer
+            unsigned int buffer_len = 0; 
+
+            void *cookie = 0;
+
+            ret = dequeue_free(&rx_ring, &buffer, &buffer_len, &cookie);
+            if (ret != 0) {
+                sel4cp_dbg_puts(sel4cp_name);
+                sel4cp_dbg_puts(": unable to dequeue from the rx free ring\n");
+                return;
+            }
+
+            global_serial_driver.line_buffer = buffer;
+            global_serial_driver.line_buffer_size = 0;
+        } 
+
+        // Check that the buffer is not full, and other exit conditions here
+        if (global_serial_driver.line_buffer_size > BUFFER_SIZE ||
+            input_char == EOT || 
+            input_char == ETX || 
+            input_char == LF ||
+            input_char == SB ||
+            input_char == CR) {
+                char *char_arr = (char * ) global_serial_driver.line_buffer;
+                void *cookie = 0;
+                // Place the line end character into buffer
+                char_arr[global_serial_driver.line_buffer_size] = input_char;
+                global_serial_driver.line_buffer_size += 1;
+                // Enqueue buffer back
+                ret = enqueue_used(&rx_ring, global_serial_driver.line_buffer, global_serial_driver.line_buffer_size, &cookie);
+                // Zero out the driver states
+                global_serial_driver.line_buffer = 0;
+                global_serial_driver.line_buffer_size = 0;
+                sel4cp_notify(RX_CH);
+
+        } else {
+            // Otherwise, add to the character array
+            char *char_arr = (char * ) global_serial_driver.line_buffer;
+    
+            // Conduct any line editing as long as we have stuff in the buffer
+            if (input_char == 0x7f && global_serial_driver.line_buffer_size > 0) {
+                // Remove last character
+                global_serial_driver.line_buffer_size -= 1;
+                char_arr[global_serial_driver.line_buffer_size] = 0;
+            } else {
+                char_arr[global_serial_driver.line_buffer_size] = input;
+                global_serial_driver.line_buffer_size += 1;
+            }
         }
-
-        // We have serviced one getchar request, we can now decrement the count
-        global_serial_driver.num_to_get_chars--;
     }
 
-    // sel4cp_dbg_puts("Finished handling the irq\n");
-}
 
-void init_post() {
-    // sel4cp_dbg_puts(sel4cp_name);
-    // sel4cp_dbg_puts(": init_post function running\n");
 
-    // Init the shared ring buffers
-    ring_init(&rx_ring, (ring_buffer_t *)rx_avail, (ring_buffer_t *)rx_used, NULL, 0);
-    ring_init(&tx_ring, (ring_buffer_t *)tx_avail, (ring_buffer_t *)tx_used, NULL, 0);
-    
-    // Redundant right now, as a channel has not been set up for init calls
-    // sel4cp_notify(INIT);
+    if (ret != 0) {
+        sel4cp_dbg_puts(sel4cp_name);
+        sel4cp_dbg_puts(": unable to enqueue to the tx free ring\n");
+        return;
+    }
 }
 
 // Init function required by CP for every PD
 void init(void) {
-    // sel4cp_dbg_puts(sel4cp_name);
-    // sel4cp_dbg_puts(": elf PD init function running\n");
+    sel4cp_dbg_puts(sel4cp_name);
+    sel4cp_dbg_puts(": elf PD init function running\n");
 
-
-    // Call init_post here to setup the ring buffer regions. The init_post case in the notified
-    // switch statement may be redundant.
-    init_post();
+    // Init the shared ring buffers
+    ring_init(&rx_ring, (ring_buffer_t *)rx_free, (ring_buffer_t *)rx_used, 0, SIZE, SIZE);
+    ring_init(&tx_ring, (ring_buffer_t *)tx_free, (ring_buffer_t *)tx_used, 0, SIZE, SIZE);
 
     imx_uart_regs_t *regs = (imx_uart_regs_t *) uart_base;
 
-    // Software reset results in failed uart init, not too sure why
-    /* Software reset */
-    // regs->cr2 &= ~UART_CR2_SRST;
-    // while (!(regs->cr2 & UART_CR2_SRST));
-
-    global_serial_driver.regs = regs;
-    global_serial_driver.rx_ring = rx_ring;
-    global_serial_driver.tx_ring = tx_ring;
-    global_serial_driver.num_to_get_chars = 0;
-
-    // sel4cp_dbg_puts("Line configuration\n");
-
-    /* Line configuration */
-    int ret = serial_configure(115200, 8, PARITY_NONE, 1);
+    /* Line configuration. Set LINE or RAW mode here, and disable or enable ECHO */
+    int ret = serial_configure(115200, 8, PARITY_NONE, 1, UART_MODE, ECHO_MODE);
 
     if (ret != 0) {
-        // sel4cp_dbg_puts("Error occured during line configuration\n");
+        sel4cp_dbg_puts("Error occured during line configuration\n");
     }
-
-    // sel4cp_dbg_puts("Configured serial, enabling uart\n");
 
     /* Enable the UART */
     regs->cr1 |= UART_CR1_UARTEN;                /* Enable The uart.                  */
@@ -325,33 +356,24 @@ void init(void) {
     regs->fcr &= ~UART_FCR_RXTL_MASK;            /* Clear the rx trigger level value. */
     regs->fcr |= UART_FCR_RXTL(1);               /* Set the rx tigger level to 1.     */
     regs->cr1 |= UART_CR1_RRDYEN;                /* Enable recv interrupt.            */
-
-    // sel4cp_dbg_puts("Enabled the uart, init the ring buffers\n");
-
 }
 
 // Entry point that is invoked on a serial interrupt, or notifications from the server using the TX and RX channels
 void notified(sel4cp_channel ch) {
-    // sel4cp_dbg_puts(sel4cp_name);
-    // sel4cp_dbg_puts(": elf PD notified function running\n");
+    sel4cp_dbg_puts(sel4cp_name);
+    sel4cp_dbg_puts(": elf PD notified function running\n");
 
     switch(ch) {
         case IRQ_CH:
             handle_irq();
-            sel4cp_irq_ack(ch);
             return;
-        case INIT:
-            init_post();
-            break;
         case TX_CH:
-            // sel4cp_dbg_puts("Notified to print something\n");
             handle_tx();
             break;
         case RX_CH:
-            handle_rx();
             break;
         default:
-            // sel4cp_dbg_puts("eth driver: received notification on unexpected channel\n");
+            sel4cp_dbg_puts("serial driver: received notification on unexpected channel\n");
             break;
     }
 }

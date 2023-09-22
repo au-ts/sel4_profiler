@@ -61,6 +61,23 @@
 
 #define UART_REF_CLK 12096000
 
+/* LINE CONFIG */
+#define RAW_MODE 0
+#define LINE_MODE 1
+#define ECHO_DIS 0
+#define ECHO_EN 1
+
+/* LINE CONTROL */
+#define ETX 3   /* ctrl+c */
+#define EOT 4   /* ctrl+d */
+#define BS 8    /* backspace */
+#define LF 10   /* Line feed/new line */
+#define CR 13   /* Carriage return */
+#define NEG 21  /* ctrl+u */
+#define SB 26   /* ctrl+z*/
+#define SP 32   /* Space*/
+#define DL 127  /* Delete */
+
 // Move this into a seperate file in the future
 #define NUM_BUFFERS 512
 #define BUFFER_SIZE 2048
@@ -94,12 +111,13 @@ struct imx_uart_regs {
 typedef volatile struct imx_uart_regs imx_uart_regs_t;
 
 /*
-serial driver struct akin to patrick's implementation*/
+Serial driver global state
+*/
 struct serial_driver {
-    imx_uart_regs_t *regs;
+    int echo;
+    int mode;
 
-    ring_handle_t rx_ring;
-    ring_handle_t tx_ring;
-
-    int num_to_get_chars;
+    /* Values for handling line mode */
+    uintptr_t line_buffer;
+    int line_buffer_size;
 };

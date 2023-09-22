@@ -4,14 +4,34 @@
     <memory_region name="uart" size="0x10_000" phys_addr="0x30890000" />
     <memory_region name="timer" size="0x10_000" phys_addr="0x302d0000" />
 
-    <memory_region name="shared_dma" size="0x200_000" page_size="0x200_000" />
+    <!-- shared dma regions for serial communication -->
+    <memory_region name="shared_dma_tx_printf" size="0x200_000" page_size="0x200_000" />
+    <memory_region name="shared_dma_rx_printf" size="0x200_000" page_size="0x200_000" />
+    <memory_region name="shared_dma_tx_xmodem" size="0x200_000" page_size="0x200_000" />
+    <memory_region name="shared_dma_rx_xmodem" size="0x200_000" page_size="0x200_000" />
+    <memory_region name="shared_dma_tx_drv" size="0x200_000" page_size="0x200_000" />
+    <memory_region name="shared_dma_rx_drv" size="0x200_000" page_size="0x200_000" />
 
-    <!-- shared memory for ring buffer mechanism : serial -->
-    <memory_region name="rx_avail_serial" size="0x200_000" page_size="0x200_000"/>
-    <memory_region name="rx_used_serial" size="0x200_000" page_size="0x200_000"/>
-    <memory_region name="tx_avail_serial" size="0x200_000" page_size="0x200_000"/>
-    <memory_region name="tx_used_serial" size="0x200_000" page_size="0x200_000"/>
-    <memory_region name="profiler_ring_avail" size="0x200_000" page_size="0x200_000"/>
+    <!-- shared memory for ring buffer mechanism : serial driver -->
+    <memory_region name="rx_free_serial_drv" size="0x200_000" page_size="0x200_000"/>
+    <memory_region name="rx_used_serial_drv" size="0x200_000" page_size="0x200_000"/>
+    <memory_region name="tx_free_serial_drv" size="0x200_000" page_size="0x200_000"/>
+    <memory_region name="tx_used_serial_drv" size="0x200_000" page_size="0x200_000"/>
+    
+    <!-- shared memory for ring buffer mechanism : printf client -->
+    <memory_region name="rx_free_printf" size="0x200_000" page_size="0x200_000"/>
+    <memory_region name="rx_used_printf" size="0x200_000" page_size="0x200_000"/>
+    <memory_region name="tx_free_printf" size="0x200_000" page_size="0x200_000"/>
+    <memory_region name="tx_used_printf" size="0x200_000" page_size="0x200_000"/>
+    
+    <!-- shared memory for ring buffer mechanism : xmodem -->
+    <memory_region name="rx_free_xmodem" size="0x200_000" page_size="0x200_000"/>
+    <memory_region name="rx_used_xmodem" size="0x200_000" page_size="0x200_000"/>
+    <memory_region name="tx_free_xmodem" size="0x200_000" page_size="0x200_000"/>
+    <memory_region name="tx_used_xmodem" size="0x200_000" page_size="0x200_000"/>
+
+    <!-- shared memory for ring buffer mechanism : profiler -->
+    <memory_region name="profiler_ring_free" size="0x200_000" page_size="0x200_000"/>
     <memory_region name="profiler_ring_used" size="0x200_000" page_size="0x200_000"/>
     <memory_region name="profiler_mem" size="0x1_000_000" page_size="0x200_000"/>
 
@@ -23,36 +43,13 @@
         <map mr="timer" vaddr="0x5_200_000" perms="rw" cached="false" setvar_vaddr="gpt_regs" />
 
         <map mr="profiler_control" vaddr="0x3_800_000" perms="rw" cached="false" setvar_vaddr="profiler_control"/>
-            <!-- shared memory for ring buffer mechanism -->
-        <!-- <map mr="rx_avail_serial" vaddr="0x4_000_000" perms="rw" cached="true" setvar_vaddr="rx_avail" />
-        <map mr="rx_used_serial" vaddr="0x4_200_000" perms="rw" cached="true" setvar_vaddr="rx_used" />
-        <map mr="tx_avail_serial" vaddr="0x4_400_000" perms="rw" cached="true" setvar_vaddr="tx_avail" />
-        <map mr="tx_used_serial" vaddr="0x4_600_000" perms="rw" cached="true" setvar_vaddr="tx_used" /> -->
-        <map mr="profiler_ring_avail" vaddr="0x2_000_000" perms="rw" cached="true" setvar_vaddr="profiler_ring_avail" />
+            <!-- shared memory for profiler ring buffer mechanism -->
+        <map mr="profiler_ring_free" vaddr="0x2_000_000" perms="rw" cached="true" setvar_vaddr="profiler_ring_free" />
         <map mr="profiler_ring_used" vaddr="0x2_200_000" perms="rw" cached="true" setvar_vaddr="profiler_ring_used" />
-        <!-- <map mr="shared_dma" vaddr="0x2_400_000" perms="rw" cached="true" setvar_vaddr="shared_dma" /> -->
         <map mr="profiler_mem" vaddr="0x2_600_000" perms="rw" cached="true" setvar_vaddr="profiler_mem" />
 
-        <protection_domain name="serial" priority="105" id="1">
-            <program_image path="serial.elf" />
 
-            <map mr="uart" vaddr="0x5_000_000" perms="rw" cached="false" setvar_vaddr="uart_base" />
-            
-            <!-- shared memory for ring buffer mechanism -->
-            <map mr="rx_avail_serial" vaddr="0x4_000_000" perms="rw" cached="true" setvar_vaddr="rx_avail" />
-            <map mr="rx_used_serial" vaddr="0x4_200_000" perms="rw" cached="true" setvar_vaddr="rx_used" />
-            <map mr="tx_avail_serial" vaddr="0x4_400_000" perms="rw" cached="true" setvar_vaddr="tx_avail" />
-            <map mr="tx_used_serial" vaddr="0x4_600_000" perms="rw" cached="true" setvar_vaddr="tx_used" />
-
-            <map mr="shared_dma" vaddr="0x2_400_000" perms="rw" cached="true" setvar_vaddr="shared_dma_vaddr" />
-
-            <!-- we need physical addresses dma region -->
-            <setvar symbol="shared_dma_paddr" region_paddr="shared_dma" />
-            
-            <irq irq="59" id="1" /> <!-- Serial Interrupt (I think - serial@30890000)-->
-
-            <!-- <irq irq="225" id="1" trigger="edge" /> Serial Interrupt -->
-        </protection_domain>
+        <!-- THIS IS THE SYSTEM WE ARE PROFILER AS CHILD PROTECTION DOMAINS -->
 
         <protection_domain name="dummy_prog" priority="100" id="0">
             <program_image path="dummy_prog.elf"/>
@@ -63,40 +60,118 @@
             <program_image path="dummy_prog2.elf"/>
         </protection_domain>
 
+        <!-- THIS IS THE END OF THE SYSTEM WE ARE PROFILING -->
+
         <irq irq="87" id="1" />  <!-- Timer interupt for imx8mm -->
 
-        <!-- This irq is from imx8mm datasheet, + 32 bit offset -->
     </protection_domain>
 
+    <protection_domain name="uart" priority="100" pp="true">
+        <program_image path="uart.elf" />
+
+        <map mr="uart" vaddr="0x5_000_000" perms="rw" cached="false" setvar_vaddr="uart_base" />
+        
+        <!-- shared memory for ring buffer mechanism -->
+        <map mr="rx_free_serial_drv" vaddr="0x4_000_000" perms="rw" cached="true" setvar_vaddr="rx_free" />
+        <map mr="rx_used_serial_drv" vaddr="0x4_200_000" perms="rw" cached="true" setvar_vaddr="rx_used" />
+        <map mr="tx_free_serial_drv" vaddr="0x4_400_000" perms="rw" cached="true" setvar_vaddr="tx_free" />
+        <map mr="tx_used_serial_drv" vaddr="0x4_600_000" perms="rw" cached="true" setvar_vaddr="tx_used" />
+
+        <map mr="shared_dma_tx_drv" vaddr="0x2_200_000" perms="rw" cached="true" setvar_vaddr="shared_dma_vaddr" />
+        <map mr="shared_dma_rx_drv" vaddr="0x2_600_000" perms="rw" cached="true" setvar_vaddr="shared_dma_rx_drv" />
+
+        <!-- we need physical addresses dma region -->
+        <setvar symbol="shared_dma_paddr" region_paddr="shared_dma_tx_drv" />
+        
+        <irq irq="59" id="1" /> <!-- Serial Interrupt (I think - serial@30890000)-->
+
+    </protection_domain>
+
+    <protection_domain name="mux_tx" priority="99" pp="true">
+        <program_image path="mux_tx.elf" />
+
+         <!-- shared memory for driver/mux ring buffer mechanism -->
+        <map mr="tx_free_serial_drv" vaddr="0x4_400_000" perms="rw" cached="true" setvar_vaddr="tx_free_drv" />
+        <map mr="tx_used_serial_drv" vaddr="0x4_600_000" perms="rw" cached="true" setvar_vaddr="tx_used_drv" />
+
+        <!-- shared memory for mux/client ring buffer mechanism -->
+        <map mr="tx_free_serial_printf" vaddr="0x3_400_000" perms="rw" cached="true" setvar_vaddr="tx_free_printf" />
+        <map mr="tx_used_serial_printf" vaddr="0x3_600_000" perms="rw" cached="true" setvar_vaddr="tx_used_printf" />
+        <map mr="tx_free_serial_xmodem" vaddr="0x3_800_000" perms="rw" cached="true" setvar_vaddr="tx_free_xmodem" />
+        <map mr="tx_used_serial_xmodem" vaddr="0x4_000_000" perms="rw" cached="true" setvar_vaddr="tx_used_xmodem" />
+
+        <map mr="shared_dma_tx_drv" vaddr="0x2_200_000" perms="rw" cached="true" setvar_vaddr="shared_dma_tx_drv" />
+
+        <map mr="shared_dma_tx_printf" vaddr="0x2_400_000" perms="rw" cached="true" setvar_vaddr="shared_dma_tx_printf" />
+        <map mr="shared_dma_tx_xmodem" vaddr="0x2_600_000" perms="rw" cached="true" setvar_vaddr="shared_dma_tx_xmodem" />
+
+    </protection_domain>            
+
+    <protection_domain name="mux_rx" priority="98" pp="true">
+        <program_image path="mux_rx.elf" />
+
+         <!-- shared memory for driver/mux ring buffer mechanism -->
+        <map mr="rx_free_serial_drv" vaddr="0x4_000_000" perms="rw" cached="true" setvar_vaddr="rx_free_drv" />
+        <map mr="rx_used_serial_drv" vaddr="0x4_200_000" perms="rw" cached="true" setvar_vaddr="rx_used_drv" />
+
+        <!-- shared memory for mux/client ring buffer mechanism -->
+        <map mr="rx_free_serial_printf" vaddr="0x4_800_000" perms="rw" cached="true" setvar_vaddr="rx_free_printf" />
+        <map mr="rx_used_serial_printf" vaddr="0x5_000_000" perms="rw" cached="true" setvar_vaddr="rx_used_printf" />
+        <map mr="rx_free_serial_xmodem" vaddr="0x3_000_000" perms="rw" cached="true" setvar_vaddr="rx_free_xmodem" />
+        <map mr="rx_used_serial_xmodem" vaddr="0x3_200_000" perms="rw" cached="true" setvar_vaddr="rx_used_xmodem" />
+
+        <map mr="shared_dma_rx_drv" vaddr="0x2_600_000" perms="rw" cached="true" setvar_vaddr="shared_dma_rx_drv" />
+        <map mr="shared_dma_rx_printf" vaddr="0x2_800_000" perms="rw" cached="true" setvar_vaddr="shared_dma_rx_cli" />
+        <map mr="shared_dma_rx_xmodem" vaddr="0x2_000_000" perms="rw" cached="true" setvar_vaddr="shared_dma_rx_cli2" />
+
+    </protection_domain>
 
     <protection_domain name="client" priority="102">
         <program_image path="client.elf"/>
         <map mr="uart" vaddr="0x5_000_000" perms="rw" cached="false" setvar_vaddr="uart_base" />
         <!-- Memory regions shared with the profiler -->
-        <map mr="profiler_ring_avail" vaddr="0x2_000_000" perms="rw" cached="true" setvar_vaddr="profiler_ring_avail" />
+        <map mr="profiler_ring_free" vaddr="0x2_000_000" perms="rw" cached="true" setvar_vaddr="profiler_ring_free" />
         <map mr="profiler_ring_used" vaddr="0x2_200_000" perms="rw" cached="true" setvar_vaddr="profiler_ring_used" />
-        <map mr="shared_dma" vaddr="0x2_400_000" perms="rw" cached="true" setvar_vaddr="shared_dma" />
         <map mr="profiler_mem" vaddr="0x2_600_000" perms="rw" cached="true" setvar_vaddr="profiler_mem" />
-        <!-- Memory regions for serial driver -->
-        <map mr="rx_avail_serial" vaddr="0x4_000_000" perms="rw" cached="true" setvar_vaddr="rx_avail" />
-        <map mr="rx_used_serial" vaddr="0x4_200_000" perms="rw" cached="true" setvar_vaddr="rx_used" />
-        <map mr="tx_avail_serial" vaddr="0x4_400_000" perms="rw" cached="true" setvar_vaddr="tx_avail" />
-        <map mr="tx_used_serial" vaddr="0x4_600_000" perms="rw" cached="true" setvar_vaddr="tx_used" />
+        
+        <!-- Memory regions for printf -->
+        <map mr="rx_free_printf" vaddr="0x4_000_000" perms="rw" cached="true" setvar_vaddr="rx_free_printf" />
+        <map mr="rx_used_printf" vaddr="0x4_200_000" perms="rw" cached="true" setvar_vaddr="rx_used_printf" />
+        <map mr="tx_free_printf" vaddr="0x4_400_000" perms="rw" cached="true" setvar_vaddr="tx_free_printf" />
+        <map mr="tx_used_printf" vaddr="0x4_600_000" perms="rw" cached="true" setvar_vaddr="tx_used_printf" />
+        <map mr="shared_dma_tx_printf" vaddr="0x2_400_000" perms="rw" cached="true" setvar_vaddr="shared_dma_tx_printf" />
+        <map mr="shared_dma_rx_printf" vaddr="0x2_400_000" perms="rw" cached="true" setvar_vaddr="shared_dma_rx_printf" />
+
+        <!-- Memory regions for xmodem -->
+        <map mr="rx_free_xmodem" vaddr="0x4_000_000" perms="rw" cached="true" setvar_vaddr="rx_free_xmodem" />
+        <map mr="rx_used_xmodem" vaddr="0x4_200_000" perms="rw" cached="true" setvar_vaddr="rx_used_xmodem" />
+        <map mr="tx_free_xmodem" vaddr="0x4_400_000" perms="rw" cached="true" setvar_vaddr="tx_free_xmodem" />
+        <map mr="tx_used_xmodem" vaddr="0x4_600_000" perms="rw" cached="true" setvar_vaddr="tx_used_xmodem" />
+        <map mr="shared_dma_tx_xmodem" vaddr="0x2_400_000" perms="rw" cached="true" setvar_vaddr="shared_dma_tx_xmodem" />
+        <map mr="shared_dma_rx_xmodem" vaddr="0x2_400_000" perms="rw" cached="true" setvar_vaddr="shared_dma_rx_xmodem" />
 
     </protection_domain>
 
     <!-- These following channels are needed for communication between the server and driver -->
 
-    <channel>
-        <!-- Channel to be used for the printf communication -->
-        <end pd="serial" id="8" />
-        <end pd="client" id="9" />
+ <channel>
+        <end pd="client" id="9"/>
+        <end pd="mux_tx" id="1"/>
     </channel>
 
     <channel>
-        <!-- Channel to be used for the getchar communication -->
-        <end pd="serial" id="10" />
+        <end pd="uart" id="8"/>
+        <end pd="mux_tx" id="9"/>
+    </channel>
+
+   <channel>
         <end pd="client" id="11"/>
+        <end pd="mux_rx" id="1"/>
+    </channel>
+
+    <channel>
+        <end pd="uart" id="10"/>
+        <end pd="mux_rx" id="11"/>
     </channel>
 
     <channel>

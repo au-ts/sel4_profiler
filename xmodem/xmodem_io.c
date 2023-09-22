@@ -1,5 +1,5 @@
 #include "serial_server.h"
-#include "serial.h"
+#include "uart.h"
 #include "shared_ringbuffer.h"
 #include <string.h>
 #include <stdlib.h>
@@ -8,17 +8,19 @@
 Need to have access to the same ring buffer mechanisms as the driver, so that we can enqueue
 buffers to be serviced by the driver.*/
 
-uintptr_t rx_avail;
-uintptr_t rx_used;
-uintptr_t tx_avail;
-uintptr_t tx_used;
+uintptr_t rx_free_xmodem;
+uintptr_t rx_used_xmodem;
+uintptr_t tx_free_xmodem;
+uintptr_t tx_used_xmodem;
 
-uintptr_t shared_dma;
+uintptr_t shared_dma_tx_xmodem;
+uintptr_t shared_dma_rx_xmodem;
 
-struct serial_server global_serial_server = {0};
+
+struct serial_server xmodem_serial_server = {0};
 
 void _outbyte(int c) {
-    struct serial_server *local_server = &global_serial_server;
+    struct serial_server *local_server = &xmodem_serial_server;
 
     // Get a buffer from the tx ring
 
@@ -29,7 +31,7 @@ void _outbyte(int c) {
     void *cookie = 0;
 
     // Dequeue a buffer from the available ring from the tx buffer
-    int ret = dequeue_avail(&local_server->tx_ring, &buffer, &buffer_len, &cookie);
+    int ret = dequeue_free(&local_server->tx_ring, &buffer, &buffer_len, &cookie);
 
     if(ret != 0) {
         sel4cp_dbg_puts(sel4cp_name);
@@ -80,7 +82,7 @@ void _outbuff(char *buff, unsigned int len) {
     /* Similair to _outbyte, but we will copy over the entire buffer at a time, rather than bytes.
     Check to see how many ring buffers we will need, and if the supplied buffer will fit before 
     dequeueing from the rings. */
-    struct serial_server *local_server = &global_serial_server;
+    struct serial_server *local_server = &xmodem_serial_server;
 
     int buffs_required = 0;
     
@@ -108,7 +110,7 @@ void _outbuff(char *buff, unsigned int len) {
         void *cookie = 0;
 
         // Dequeue a buffer from the available ring from the tx buffer
-        int ret = dequeue_avail(&local_server->tx_ring, &buffer, &buffer_len, &cookie);
+        int ret = dequeue_free(&local_server->tx_ring, &buffer, &buffer_len, &cookie);
 
         if(ret != 0) {
             sel4cp_dbg_puts(sel4cp_name);
@@ -155,7 +157,7 @@ int _inbyte(unsigned int timeout) {
     // the chars_for_clients value.
     sel4cp_notify(SERVER_GETCHAR_CHANNEL);
 
-    struct serial_server *local_server = &global_serial_server;
+    struct serial_server *local_server = &xmodem_serial_server;
 
     /* Now that we have notified the driver, we can attempt to dequeue from the used ring.
     When the driver has processed an interrupt, it will add the inputted character to the used ring.*/
@@ -181,7 +183,7 @@ int _inbyte(unsigned int timeout) {
 
     /* Now that we are finished with the used buffer, we can add it back to the free ring*/
 
-    int ret = enqueue_avail(&local_server->rx_ring, buffer, buffer_len, NULL);
+    int ret = enqueue_free(&local_server->rx_ring, buffer, buffer_len, NULL);
 
     if (ret != 0) {
         sel4cp_dbg_puts(sel4cp_name);
@@ -195,15 +197,15 @@ int _inbyte(unsigned int timeout) {
 void init_xmodem_io(void) {
     // Here we need to init ring buffers and other data structures
     sel4cp_dbg_puts("Initialising serial in serial server\n");
-    struct serial_server *local_server = &global_serial_server;
+    struct serial_server *local_server = &xmodem_serial_server;
     
     // Init the shared ring buffers
-    ring_init(&local_server->rx_ring, (ring_buffer_t *)rx_avail, (ring_buffer_t *)rx_used, NULL, 0);
+    ring_init(&local_server->rx_ring, (ring_buffer_t *)rx_free_xmodem, (ring_buffer_t *)rx_used_xmodem, 0, 512, 512);
     // We will also need to populate these rings with memory from the shared dma region
     
     // Add buffers to the rx ring
     for (int i = 0; i < NUM_BUFFERS - 1; i++) {
-        int ret = enqueue_avail(&local_server->rx_ring, shared_dma + (i * BUFFER_SIZE), BUFFER_SIZE, NULL);
+        int ret = enqueue_free(&local_server->rx_ring, shared_dma_rx_xmodem + (i * BUFFER_SIZE), BUFFER_SIZE, NULL);
 
         if (ret != 0) {
             sel4cp_dbg_puts(sel4cp_name);
@@ -211,12 +213,12 @@ void init_xmodem_io(void) {
         }
     }
 
-    ring_init(&local_server->tx_ring, (ring_buffer_t *)tx_avail, (ring_buffer_t *)tx_used, NULL, 0);
+    ring_init(&local_server->tx_ring, (ring_buffer_t *)tx_free_xmodem, (ring_buffer_t *)tx_used_xmodem, 0, 512, 512);
 
     // Add buffers to the tx ring
     for (int i = 0; i < NUM_BUFFERS - 1; i++) {
         // Have to start at the memory region left of by the rx ring
-        int ret = enqueue_avail(&local_server->tx_ring, shared_dma + ((i + NUM_BUFFERS) * BUFFER_SIZE), BUFFER_SIZE, NULL);
+        int ret = enqueue_free(&local_server->tx_ring, shared_dma_tx_xmodem + ((i + NUM_BUFFERS) * BUFFER_SIZE), BUFFER_SIZE, NULL);
 
         if (ret != 0) {
             sel4cp_dbg_puts(sel4cp_name);

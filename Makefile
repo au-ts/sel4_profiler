@@ -29,8 +29,9 @@ LD := $(TOOLCHAIN)-ld
 AS := $(TOOLCHAIN)-as
 SEL4CP_TOOL ?= $(SEL4CP_SDK)/bin/sel4cp
 
-RINGBUFFERDIR=libsharedringbuffer
+RINGBUFFERDIR=libserialsharedringbuffer
 XMODEMDIR=xmodem
+SERIALDIR=serial
 
 BOARD_DIR := $(SEL4CP_SDK)/board/$(SEL4CP_BOARD)/$(SEL4CP_CONFIG)
 
@@ -47,10 +48,11 @@ CFLAGS += -I$(BOARD_DIR)/include \
 	-I$(RINGBUFFERDIR)/include \
 	-I$(BOARD_DIR)/include/sys \
 	-I$(XMODEMDIR)/include \
+	-I$(SERIALDIR)/include \
 
-SERIAL_OBJS := serial.o libsharedringbuffer/shared_ringbuffer.o
-PROFILER_OBJS := profiler.o serial_server.o printf.o timer.o libsharedringbuffer/shared_ringbuffer.o
-CLIENT_OBJS := client.o serial_server.o printf.o libsharedringbuffer/shared_ringbuffer.o xmodem/crc16.o xmodem/xmodem_io.o xmodem/xmodem.o
+SERIAL_OBJS := serial/uart.o libserialsharedringbuffer/shared_ringbuffer.o
+PROFILER_OBJS := profiler.o serial_server.o printf.o timer.o libserialsharedringbuffer/shared_ringbuffer.o
+CLIENT_OBJS := client.o serial_server.o printf.o libserialsharedringbuffer/shared_ringbuffer.o xmodem/crc16.o xmodem/xmodem_io.o xmodem/xmodem.o
 DUMMY_PROG_OBJS := dummy_prog.o
 DUMMY_PROG2_OBJS := dummy_prog2.o
 
@@ -87,8 +89,9 @@ $(IMAGE_FILE) $(REPORT_FILE): $(addprefix $(BUILD_DIR)/, $(IMAGES)) profiler.sys
 
 #Make the Directories
 directories:
-	$(info $(shell mkdir -p $(BUILD_DIR)/libsharedringbuffer))	\
+	$(info $(shell mkdir -p $(BUILD_DIR)/libserialsharedringbuffer))	\
 	$(info $(shell mkdir -p $(BUILD_DIR)/xmodem))	\
+	$(info $(shell mkdir -p $(BUILD_DIR)/serial))	\
 
 clean:
 	rm -f *.o *.elf .depend*

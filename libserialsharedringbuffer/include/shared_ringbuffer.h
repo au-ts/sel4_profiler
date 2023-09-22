@@ -9,12 +9,10 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <sel4cp.h>
+#include "util.h"
 #include "fence.h"
 
-#define SIZE 511
-
-/* Function pointer to be used to 'notify' components on either end of the shared memory */
-typedef void (*notify_fn)(void);
+#define SIZE 512
 
 /* Buffer descriptor */
 typedef struct buff_desc {
@@ -27,28 +25,29 @@ typedef struct buff_desc {
 typedef struct ring_buffer {
     uint32_t write_idx;
     uint32_t read_idx;
+    uint32_t size;
+    bool notify_writer;
+    bool notify_reader;
+    bool plugged;
     buff_desc_t buffers[SIZE];
 } ring_buffer_t;
 
 /* A ring handle for enqueing/dequeuing into  */
 typedef struct ring_handle {
+    ring_buffer_t *free_ring;
     ring_buffer_t *used_ring;
-    ring_buffer_t *avail_ring;
-    /* Function to be used to signal that work is queued in the used_ring */
-    notify_fn notify;
 } ring_handle_t;
 
 /**
  * Initialise the shared ring buffer.
  *
  * @param ring ring handle to use.
- * @param avail pointer to available ring in shared memory.
+ * @param free pointer to free ring in shared memory.
  * @param used pointer to 'used' ring in shared memory.
- * @param notify function pointer used to notify the other user.
  * @param buffer_init 1 indicates the read and write indices in shared memory need to be initialised.
  *                    0 inidicates they do not. Only one side of the shared memory regions needs to do this.
  */
-void ring_init(ring_handle_t *ring, ring_buffer_t *avail, ring_buffer_t *used, notify_fn notify, int buffer_init);
+void ring_init(ring_handle_t *ring, ring_buffer_t *free, ring_buffer_t *used, int buffer_init, uint32_t free_size, uint32_t used_size);
 
 /**
  * Check if the ring buffer is empty.
@@ -59,7 +58,7 @@ void ring_init(ring_handle_t *ring, ring_buffer_t *avail, ring_buffer_t *used, n
  */
 static inline int ring_empty(ring_buffer_t *ring)
 {
-    return !((ring->write_idx - ring->read_idx) % SIZE);
+    return !((ring->write_idx - ring->read_idx) % ring->size);
 }
 
 /**
@@ -71,23 +70,14 @@ static inline int ring_empty(ring_buffer_t *ring)
  */
 static inline int ring_full(ring_buffer_t *ring)
 {
-    return !((ring->write_idx - ring->read_idx + 1) % SIZE);
+    assert((ring->write_idx - ring->read_idx) >= 0);
+    return !((ring->write_idx - ring->read_idx + 1) % ring->size);
 }
 
 static inline int ring_size(ring_buffer_t *ring)
 {
+    assert((ring->write_idx - ring->read_idx) >= 0);
     return (ring->write_idx - ring->read_idx);
-}
-
-/**
- * Notify the other user of changes to the shared ring buffers.
- *
- * @param ring the ring handle used.
- *
- */
-static inline void notify(ring_handle_t *ring)
-{
-    return ring->notify();
 }
 
 /**
@@ -102,17 +92,17 @@ static inline void notify(ring_handle_t *ring)
  */
 static inline int enqueue(ring_buffer_t *ring, uintptr_t buffer, unsigned int len, void *cookie)
 {
+    assert(buffer != 0);
     if (ring_full(ring)) {
-        sel4cp_dbg_puts("Ring full");
         return -1;
     }
 
-    ring->buffers[ring->write_idx % SIZE].encoded_addr = buffer;
-    ring->buffers[ring->write_idx % SIZE].len = len;
-    ring->buffers[ring->write_idx % SIZE].cookie = cookie;
-    ring->write_idx++;
+    ring->buffers[ring->write_idx % ring->size].encoded_addr = buffer;
+    ring->buffers[ring->write_idx % ring->size].len = len;
+    ring->buffers[ring->write_idx % ring->size].cookie = cookie;
 
     THREAD_MEMORY_RELEASE();
+    ring->write_idx++;
 
     return 0;
 }
@@ -130,13 +120,14 @@ static inline int enqueue(ring_buffer_t *ring, uintptr_t buffer, unsigned int le
 static inline int dequeue(ring_buffer_t *ring, uintptr_t *addr, unsigned int *len, void **cookie)
 {
     if (ring_empty(ring)) {
-        //sel4cp_dbg_puts("Ring is empty");
         return -1;
     }
 
-    *addr = ring->buffers[ring->read_idx % SIZE].encoded_addr;
-    *len = ring->buffers[ring->read_idx % SIZE].len;
-    *cookie = ring->buffers[ring->read_idx % SIZE].cookie;
+    assert(ring->buffers[ring->read_idx % ring->size].encoded_addr != 0);
+
+    *addr = ring->buffers[ring->read_idx % ring->size].encoded_addr;
+    *len = ring->buffers[ring->read_idx % ring->size].len;
+    *cookie = ring->buffers[ring->read_idx % ring->size].cookie;
 
     THREAD_MEMORY_RELEASE();
     ring->read_idx++;
@@ -145,19 +136,20 @@ static inline int dequeue(ring_buffer_t *ring, uintptr_t *addr, unsigned int *le
 }
 
 /**
- * Enqueue an element into an available ring buffer.
- * This indicates the buffer address parameter is currently available for use.
+ * Enqueue an element into an free ring buffer.
+ * This indicates the buffer address parameter is currently free for use.
  *
  * @param ring Ring handle to enqueue into.
  * @param buffer address into shared memory where data is stored.
  * @param len length of data inside the buffer above.
  * @param cookie optional pointer to data required on dequeueing.
  *
- * @return -1 when ring is empty, 0 on success.
+ * @return -1 when ring is full, 0 on success.
  */
-static inline int enqueue_avail(ring_handle_t *ring, uintptr_t addr, unsigned int len, void *cookie)
+static inline int enqueue_free(ring_handle_t *ring, uintptr_t addr, unsigned int len, void *cookie)
 {
-    return enqueue(ring->avail_ring, addr, len, cookie);
+    assert(addr);
+    return enqueue(ring->free_ring, addr, len, cookie);
 }
 
 /**
@@ -169,15 +161,16 @@ static inline int enqueue_avail(ring_handle_t *ring, uintptr_t addr, unsigned in
  * @param len length of data inside the buffer above.
  * @param cookie optional pointer to data required on dequeueing.
  *
- * @return -1 when ring is empty, 0 on success.
+ * @return -1 when ring is full, 0 on success.
  */
 static inline int enqueue_used(ring_handle_t *ring, uintptr_t addr, unsigned int len, void *cookie)
 {
+    assert(addr);
     return enqueue(ring->used_ring, addr, len, cookie);
 }
 
 /**
- * Dequeue an element from an available ring buffer.
+ * Dequeue an element from the free ring buffer.
  *
  * @param ring Ring handle to dequeue from.
  * @param buffer pointer to the address of where to store buffer address.
@@ -186,9 +179,9 @@ static inline int enqueue_used(ring_handle_t *ring, uintptr_t addr, unsigned int
  *
  * @return -1 when ring is empty, 0 on success.
  */
-static inline int dequeue_avail(ring_handle_t *ring, uintptr_t *addr, unsigned int *len, void **cookie)
+static inline int dequeue_free(ring_handle_t *ring, uintptr_t *addr, unsigned int *len, void **cookie)
 {
-    return dequeue(ring->avail_ring, addr, len, cookie);
+    return dequeue(ring->free_ring, addr, len, cookie);
 }
 
 /**
@@ -206,6 +199,36 @@ static inline int dequeue_used(ring_handle_t *ring, uintptr_t *addr, unsigned in
     return dequeue(ring->used_ring, addr, len, cookie);
 }
 
+/** 
+ * Set the plug of a ring to true.
+ * 
+ * @param ring Ring handle to plug.
+*/
+static inline void ring_plug(ring_buffer_t *ring) {
+    ring->plugged = true;
+}
+
+/** 
+ * Set the plug of a ring to false.
+ * 
+ * @param ring Ring handle to unplug.
+*/
+static inline void ring_unplug(ring_buffer_t *ring) {
+    ring->plugged = false;
+}
+
+
+/**
+ * Check the current value of the plug.
+ * 
+ * @param ring Ring handle to check plug.
+ * 
+ * @return true when ring is plugged, false when unplugged.
+*/
+static inline bool ring_plugged(ring_buffer_t *ring) {
+    return ring->plugged;
+}
+
 /**
  * Dequeue an element from a ring buffer.
  * This function is intended for use by the driver, to collect a pointer
@@ -220,13 +243,13 @@ static inline int dequeue_used(ring_handle_t *ring, uintptr_t *addr, unsigned in
  */
 static int driver_dequeue(ring_buffer_t *ring, uintptr_t *addr, unsigned int *len, void **cookie)
 {
-    if (!((ring->write_idx - ring->read_idx) % SIZE)) {
+    if (ring_empty(ring)) {
         return -1;
     }
 
-    *addr = ring->buffers[ring->read_idx % SIZE].encoded_addr;
-    *len = ring->buffers[ring->read_idx % SIZE].len;
-    *cookie = &ring->buffers[ring->read_idx % SIZE];
+    *addr = ring->buffers[ring->read_idx % ring->size].encoded_addr;
+    *len = ring->buffers[ring->read_idx % ring->size].len;
+    *cookie = &ring->buffers[ring->read_idx % ring->size];
 
     THREAD_MEMORY_RELEASE();
     ring->read_idx++;
