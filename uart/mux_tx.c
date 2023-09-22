@@ -14,7 +14,7 @@
 #define CLI_CH 10
 #define DRV_CH 9
 
-#define NUM_CLIENTS 2
+#define NUM_CLIENTS 1
 
 /* Memory regions as defined in the system file */
 

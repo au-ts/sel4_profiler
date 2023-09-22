@@ -1,6 +1,7 @@
 #include "serial_server.h"
 #include "uart.h"
 #include "shared_ringbuffer.h"
+#include "util.h"
 #include <string.h>
 #include <stdlib.h>
 
@@ -35,7 +36,7 @@ void putchar_(char character)
 
     if(ret != 0) {
         sel4cp_dbg_puts(sel4cp_name);
-        sel4cp_dbg_puts(": serial server printf, unable to dequeue from tx ring, tx ring empty\n");
+        sel4cp_dbg_puts(": serial server printf, unable to dequeue from tx ring, tx ring empty. Putchar_\n");
         return -1;
     }
 

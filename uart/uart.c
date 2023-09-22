@@ -360,9 +360,6 @@ void init(void) {
 
 // Entry point that is invoked on a serial interrupt, or notifications from the server using the TX and RX channels
 void notified(sel4cp_channel ch) {
-    sel4cp_dbg_puts(sel4cp_name);
-    sel4cp_dbg_puts(": elf PD notified function running\n");
-
     switch(ch) {
         case IRQ_CH:
             handle_irq();

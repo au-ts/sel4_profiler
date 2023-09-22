@@ -1,8 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <system>
-    <!-- <memory_region name="uart" size="0x1_000" phys_addr="0xff803000" /> -->
     <memory_region name="uart" size="0x10_000" phys_addr="0x30890000" />
-    <memory_region name="timer" size="0x10_000" phys_addr="0x302d0000" />
 
     <!-- shared dma regions for serial communication -->
     <memory_region name="shared_dma_tx_client" size="0x200_000" page_size="0x200_000" />
@@ -32,7 +30,6 @@
     <protection_domain name="profiler" priority="103">
         <program_image path="profiler.elf" />
         <map mr="uart" vaddr="0x5_000_000" perms="rw" cached="false" setvar_vaddr="uart_base" />
-        <map mr="timer" vaddr="0x5_200_000" perms="rw" cached="false" setvar_vaddr="gpt_regs" />
 
         <map mr="profiler_control" vaddr="0x3_800_000" perms="rw" cached="false" setvar_vaddr="profiler_control"/>
             <!-- shared memory for profiler ring buffer mechanism -->
@@ -54,11 +51,9 @@
 
         <!-- THIS IS THE END OF THE SYSTEM WE ARE PROFILING -->
 
-        <irq irq="87" id="1" />  <!-- Timer interupt for imx8mm -->
-
     </protection_domain>
 
-    <protection_domain name="uart" priority="100" pp="true">
+    <protection_domain name="uart" priority="107" pp="true">
         <program_image path="uart.elf" />
 
         <map mr="uart" vaddr="0x5_000_000" perms="rw" cached="false" setvar_vaddr="uart_base" />
@@ -79,7 +74,7 @@
 
     </protection_domain>
 
-    <protection_domain name="mux_tx" priority="99" pp="true">
+    <protection_domain name="mux_tx" priority="106" pp="true">
         <program_image path="mux_tx.elf" />
 
          <!-- shared memory for driver/mux ring buffer mechanism -->
@@ -96,7 +91,7 @@
 
     </protection_domain>            
 
-    <protection_domain name="mux_rx" priority="98" pp="true">
+    <protection_domain name="mux_rx" priority="105" pp="true">
         <program_image path="mux_rx.elf" />
 
          <!-- shared memory for driver/mux ring buffer mechanism -->
@@ -112,7 +107,7 @@
 
     </protection_domain>
 
-    <protection_domain name="client" priority="102">
+    <protection_domain name="client" priority="104">
         <program_image path="client.elf"/>
         <map mr="uart" vaddr="0x5_000_000" perms="rw" cached="false" setvar_vaddr="uart_base" />
         <!-- Memory regions shared with the profiler -->
@@ -126,7 +121,7 @@
         <map mr="tx_free_client" vaddr="0x4_400_000" perms="rw" cached="true" setvar_vaddr="tx_free_client" />
         <map mr="tx_used_client" vaddr="0x4_600_000" perms="rw" cached="true" setvar_vaddr="tx_used_client" />
         <map mr="shared_dma_tx_client" vaddr="0x2_400_000" perms="rw" cached="true" setvar_vaddr="shared_dma_tx_client" />
-        <map mr="shared_dma_rx_client" vaddr="0x2_400_000" perms="rw" cached="true" setvar_vaddr="shared_dma_rx_client" />
+        <map mr="shared_dma_rx_client" vaddr="0x2_800_000" perms="rw" cached="true" setvar_vaddr="shared_dma_rx_client" />
 
     </protection_domain>
 
@@ -153,8 +148,13 @@
     </channel>
 
     <channel>
-        <end pd="profiler" id="5"/>
-        <end pd="dummy_prog" id="5"/>
+        <end pd="profiler" id="1"/>
+        <end pd="dummy_prog" id="1"/>
+    </channel>
+
+    <channel>
+        <end pd="profiler" id="2"/>
+        <end pd="dummy_prog" id="2"/>
     </channel>
 
     <channel>

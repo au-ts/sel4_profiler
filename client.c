@@ -54,10 +54,12 @@ void init() {
 }
 
 void notified(sel4cp_channel ch) {
+    sel4cp_dbg_puts("Getting notified to dump\n");
     // Notified to empty profiler sample buffers
     if (ch == CLIENT_CH) {
         // Determine how to dump buffers
         if (CLIENT_CONFIG == 0) {
+            sel4cp_dbg_puts("Dumping over serial\n");
             // Print over serial
             serial_dump();
         }

@@ -1,7 +1,7 @@
 #pragma once
 
 // Maybe try and expand the num of buffers in the future
-#define NUM_BUFFERS 20
+#define NUM_BUFFERS 512
 
 #define CLIENT_CH 7
 

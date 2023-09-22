@@ -47,7 +47,7 @@ void add_snapshot(sel4cp_id id,uint32_t time, uint64_t pc) {
     int ret = dequeue_free(&profiler_ring, &buffer, &buffer_len, &cookie);
     if (ret != 0) {
         sel4cp_dbg_puts(sel4cp_name);
-        sel4cp_dbg_puts("Failed to dequeue from profiler avail ring\n");
+        sel4cp_dbg_puts("Failed to dequeue from profiler free ring\n");
         return;
     }
     perf_sample_t *temp_sample = (perf_sample_t *) buffer;
@@ -75,14 +75,15 @@ void add_snapshot(sel4cp_id id,uint32_t time, uint64_t pc) {
 
     // Check if the buffers are full (for testing dumping when we have 10 buffers)
     // Notify the client that we need to dump
-    if (ring_size(profiler_ring.used_ring) == 5) {
+    if (ring_size(profiler_ring.used_ring) == NUM_BUFFERS - 1) {
         sel4cp_notify(CLIENT_CH);
     }
 }
 
 
 
-/* Check if the PMU has overflowed */
+/* Check if the PMU has overflowed. The following functions are currently 
+only used for debugging purposes. */
 static inline int pmu_has_overflowed(uint32_t pmovsr)
 {
 	return pmovsr & ARMV8_OVSR_MASK;
@@ -121,32 +122,24 @@ void halt_cnt() {
     mask = 0;
     mask |= (1 << 31);
     asm volatile("MSR PMCNTENSET_EL0, %0" : : "r" (value & ~mask));
+
+    // Purge buffers 
+    sel4cp_notify(CLIENT_CH);
+
 }
 
 /* Resume the PMU */
 void resume_cnt() {
-    uint64_t init_cnt = 0;
     uint64_t val;
 
 	asm volatile("mrs %0, pmcr_el0" : "=r" (val));
 
-	val |= BIT(2);
     val |= BIT(0);
 
     asm volatile("isb; msr pmcr_el0, %0" : : "r" (val));
 
-    asm volatile("msr pmccntr_el0, %0" : : "r" (init_cnt));
+    asm volatile("MSR PMCNTENSET_EL0, %0" : : "r" (BIT(31)));
 
-}
-
-void reset_cycle_cnt() {
-    uint64_t init_cnt = 0;
-
-    if (IRQ_CYCLE_COUNTER == 1) {
-        init_cnt = 0xffffffffffffffff - CYCLE_COUNTER_PERIOD;
-    }
-
-    asm volatile("msr pmccntr_el0, %0" : : "r" (init_cnt));
 }
 
 /* Reset the cycle counter to the sampling period. This needs to be changed
@@ -209,9 +202,21 @@ void reset_cnt(uint32_t interrupt_flags) {
     }
 
     if (interrupt_flags & (BIT(31))) {
-        reset_cycle_cnt();
+        uint64_t init_cnt = 0;
+        if (IRQ_CYCLE_COUNTER == 1) {
+            init_cnt = 0xffffffffffffffff - CYCLE_COUNTER_PERIOD;
+        }
+
+        asm volatile("msr pmccntr_el0, %0" : : "r" (init_cnt));
     }
 }
+
+/* Configure cycle counter*/
+void configure_clkcnt(uint64_t val) {
+    uint64_t init_cnt = 0xffffffffffffffff - val;
+    asm volatile("msr pmccntr_el0, %0" : : "r" (init_cnt));
+}
+
 
 /* Configure event counter 0 */
 void configure_cnt0(uint32_t event, uint32_t val) {
@@ -340,8 +345,6 @@ void init () {
 
     // Init the record buffers
     ring_init(&profiler_ring, (ring_buffer_t *) profiler_ring_free, (ring_buffer_t *) profiler_ring_used, 0, 512, 512);
-    // init_serial();
-    gpt_init();
     
     for (int i = 0; i < NUM_BUFFERS - 1; i++) {
         int ret = enqueue_free(&profiler_ring, profiler_mem + (i * sizeof(perf_sample_t)), sizeof(perf_sample_t), NULL);
@@ -360,55 +363,48 @@ void init () {
 
     configure_cnt0(L1I_CACHE_REFILL, 0xfffffff); 
     */
-
     configure_cnt2(L1I_CACHE_REFILL, 0xffffff00); 
     configure_cnt1(L1D_CACHE_REFILL, 0xfffffff0); 
-
-    // Notifying our dummy program to start running. This is just an empty infinite loop.
-    sel4cp_notify(5);
 }
 
 void notified(sel4cp_channel ch) {
-    if (ch == 5) {
+    if (ch == 1) {
         /* WIP: Need to ensure that the shared mem isn't updated by the client before 
         we can get to this section */
-        pmu_config_args_t *config = (pmu_config_args_t *) profiler_control;
-        if (config->notif_opt == PROFILER_START) {
-            config->notif_opt = PROFILER_READY;
-            // Notfication to start PMU
-            resume_cnt();
-        } else if (config->notif_opt == PROFILER_STOP) {
-            config->notif_opt = PROFILER_READY;
-            // Notification to stop PMU
-            halt_cnt();
-            // purge any structures left in the array
-            sel4cp_notify(CLIENT_CH);
-        } else if (config->notif_opt == PROFILER_CONFIGURE) {
-            config->notif_opt = PROFILER_READY;
-            user_pmu_configure(*config);
+        // pmu_config_args_t *config = (pmu_config_args_t *) profiler_control;
+        // if (config->notif_opt == PROFILER_START) {
+        //     config->notif_opt = PROFILER_READY;
+        //     // Notfication to start PMU
+        sel4cp_dbg_puts("Starting PMU\n");
+        configure_clkcnt(CYCLE_COUNTER_PERIOD);
+        resume_cnt();
+    //     } else if (config->notif_opt == PROFILER_STOP) {
+    //         config->notif_opt = PROFILER_READY;
+    //         // Notification to stop PMU
+    //         halt_cnt();
+    //         // purge any structures left in the array
+    //         sel4cp_notify(CLIENT_CH);
+    //     } else if (config->notif_opt == PROFILER_CONFIGURE) {
+    //         config->notif_opt = PROFILER_READY;
+    //         user_pmu_configure(*config);
 
-        }
-    } else if (ch == 1) {
-        // This is the irq for the timer, divert to the timer_irq() function
-        timer_irq(ch);
+    //     }
+    } else if (ch == 2) {
+        sel4cp_dbg_puts("Halting pmu\n");
+        halt_cnt();
     }
 
 }
 
 void fault(sel4cp_id id, sel4cp_msginfo msginfo) {
     size_t label = sel4cp_msginfo_get_label(msginfo);
-
     if (label == seL4_Fault_PMUEvent) {
-        // Need to figure out how to get the whole 64 bit PC??
         uint64_t pc = sel4cp_mr_get(0);
         uint32_t ccnt_lower = sel4cp_mr_get(1);
         uint32_t ccnt_upper = sel4cp_mr_get(2);
         uint32_t pmovsr = sel4cp_mr_get(3);
         uint64_t time = ((uint64_t) ccnt_upper << 32) | ccnt_lower;
-        // Halt the PMU -- MOVE THIS TO THE KERNEL
-        // halt_cnt();
-
-
+  
         // Only add a snapshot if the counter we are sampling on is in the interrupt flag
         // @kwinter Change this to deal with new counter definitions
         if (pmovsr & (IRQ_CYCLE_COUNTER << 31) ||
@@ -421,17 +417,6 @@ void fault(sel4cp_id id, sel4cp_msginfo msginfo) {
             add_snapshot(id, time, pc);
         }
 
-        // Check if an overflow has occured
-        // if(pmu_has_overflowed(pmovsr)) {
-        //     //printf_("PMU has overflowed\n");
-        // } else {
-        //     //printf_("PMU hasn't overflowed\n");
-        // }
-        
-        // Reset any counters that overflowed.
-
-        // @kwinter Need a way to count how many times a certain counter has overflowed, if we 
-        // are not sampling on it. Add this to the raw data section of the perf sample.
         reset_cnt(pmovsr);
 
         // Resume counters
