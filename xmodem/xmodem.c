@@ -38,7 +38,7 @@
  */
 
 #include "crc16.h"
-#include "xmodem_io.h"
+#include "serial_server.h"
 
 #include <stdlib.h>
 

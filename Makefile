@@ -31,11 +31,11 @@ SEL4CP_TOOL ?= $(SEL4CP_SDK)/bin/sel4cp
 
 RINGBUFFERDIR=libserialsharedringbuffer
 XMODEMDIR=xmodem
-SERIALDIR=serial
+UARTDIR=uart
 
 BOARD_DIR := $(SEL4CP_SDK)/board/$(SEL4CP_BOARD)/$(SEL4CP_CONFIG)
 
-IMAGES := profiler.elf client.elf serial.elf dummy_prog.elf dummy_prog2.elf 
+IMAGES := profiler.elf client.elf uart.elf mux_rx.elf mux_tx.elf dummy_prog.elf dummy_prog2.elf 
 CFLAGS := -mcpu=$(CPU) -mstrict-align -ffreestanding -g3 -O3 -Wall  -Wno-unused-function -fno-omit-frame-pointer
 LDFLAGS := -L$(BOARD_DIR)/lib -Llib
 LIBS := -lsel4cp -Tsel4cp.ld -lc
@@ -48,11 +48,13 @@ CFLAGS += -I$(BOARD_DIR)/include \
 	-I$(RINGBUFFERDIR)/include \
 	-I$(BOARD_DIR)/include/sys \
 	-I$(XMODEMDIR)/include \
-	-I$(SERIALDIR)/include \
+	-I$(UARTDIR)/include \
 
-SERIAL_OBJS := serial/uart.o libserialsharedringbuffer/shared_ringbuffer.o
-PROFILER_OBJS := profiler.o serial_server.o printf.o timer.o libserialsharedringbuffer/shared_ringbuffer.o
-CLIENT_OBJS := client.o serial_server.o printf.o libserialsharedringbuffer/shared_ringbuffer.o xmodem/crc16.o xmodem/xmodem_io.o xmodem/xmodem.o
+UART_OBJS := uart/uart.o libserialsharedringbuffer/shared_ringbuffer.o
+MUX_TX_OBJS := uart/mux_tx.o libserialsharedringbuffer/shared_ringbuffer.o
+MUX_RX_OBJS := uart/mux_rx.o libserialsharedringbuffer/shared_ringbuffer.o
+PROFILER_OBJS := profiler.o timer.o libserialsharedringbuffer/shared_ringbuffer.o
+CLIENT_OBJS := client.o serial_server.o printf.o libserialsharedringbuffer/shared_ringbuffer.o xmodem/crc16.o xmodem/xmodem.o
 DUMMY_PROG_OBJS := dummy_prog.o
 DUMMY_PROG2_OBJS := dummy_prog2.o
 
@@ -67,7 +69,13 @@ $(BUILD_DIR)/%.o: %.s Makefile
 $(BUILD_DIR)/profiler.elf: $(addprefix $(BUILD_DIR)/, $(PROFILER_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-$(BUILD_DIR)/serial.elf: $(addprefix $(BUILD_DIR)/, $(SERIAL_OBJS))
+$(BUILD_DIR)/uart.elf: $(addprefix $(BUILD_DIR)/, $(UART_OBJS))
+	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
+
+$(BUILD_DIR)/mux_rx.elf: $(addprefix $(BUILD_DIR)/, $(MUX_RX_OBJS))
+	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
+
+$(BUILD_DIR)/mux_tx.elf: $(addprefix $(BUILD_DIR)/, $(MUX_TX_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 $(BUILD_DIR)/dummy_prog.elf: $(addprefix $(BUILD_DIR)/, $(DUMMY_PROG_OBJS))
@@ -91,7 +99,7 @@ $(IMAGE_FILE) $(REPORT_FILE): $(addprefix $(BUILD_DIR)/, $(IMAGES)) profiler.sys
 directories:
 	$(info $(shell mkdir -p $(BUILD_DIR)/libserialsharedringbuffer))	\
 	$(info $(shell mkdir -p $(BUILD_DIR)/xmodem))	\
-	$(info $(shell mkdir -p $(BUILD_DIR)/serial))	\
+	$(info $(shell mkdir -p $(BUILD_DIR)/uart))	\
 
 clean:
 	rm -f *.o *.elf .depend*

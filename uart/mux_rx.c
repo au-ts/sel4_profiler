@@ -22,14 +22,11 @@ uintptr_t rx_free_drv;
 uintptr_t rx_used_drv;
 
 // Transmit rings with the client
-uintptr_t rx_free_printf;
-uintptr_t rx_used_printf;
-uintptr_t rx_free_xmodem;
-uintptr_t rx_used_xmodem;
+uintptr_t rx_free_client;
+uintptr_t rx_used_client;
 
 uintptr_t shared_dma_rx_drv;
-uintptr_t shared_dma_rx_printf;
-uintptr_t shared_dma_rx_xmodem;
+uintptr_t shared_dma_rx_client;
 
 // Have an array of client rings. 
 ring_handle_t rx_ring[NUM_CLIENTS];
@@ -232,8 +229,7 @@ void handle_rx() {
 
 void init (void) {
     // We want to init the client rings here. Currently this only inits one client
-    ring_init(&rx_ring[0], (ring_buffer_t *)rx_free_printf, (ring_buffer_t *)rx_used_printf, 0, 512, 512);
-    ring_init(&rx_ring[1], (ring_buffer_t *)rx_free_xmodem, (ring_buffer_t *)rx_used_xmodem, 0, 512, 512);
+    ring_init(&rx_ring[0], (ring_buffer_t *)rx_free_client, (ring_buffer_t *)rx_used_client, 0, 512, 512);
 
     ring_init(&drv_rx_ring, (ring_buffer_t *)rx_free_drv, (ring_buffer_t *)rx_used_drv, 0, 512, 512);
 

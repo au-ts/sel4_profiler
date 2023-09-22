@@ -23,14 +23,11 @@ uintptr_t tx_free_drv;
 uintptr_t tx_used_drv;
 
 // Transmit rings with the client
-uintptr_t tx_free_printf;
-uintptr_t tx_used_printf;
-uintptr_t tx_free_xmodem;
-uintptr_t tx_used_xmodem;
+uintptr_t tx_free_client;
+uintptr_t tx_used_client;
 
 uintptr_t shared_dma_tx_drv;
-uintptr_t shared_dma_tx_printf;
-uintptr_t shared_dma_tx_xmodem;
+uintptr_t shared_dma_tx_client;
 
 // Have an array of client rings. 
 ring_handle_t tx_ring[NUM_CLIENTS];
@@ -89,8 +86,7 @@ int handle_tx(int curr_client) {
 
 void init (void) {
     // We want to init the client rings here. Currently this only inits one client
-    ring_init(&tx_ring[0], (ring_buffer_t *)tx_free_printf, (ring_buffer_t *)tx_used_printf, 0, 512, 512);
-    ring_init(&tx_ring[1], (ring_buffer_t *)tx_free_xmodem, (ring_buffer_t *)tx_used_xmodem, 0, 512, 512);
+    ring_init(&tx_ring[0], (ring_buffer_t *)tx_free_client, (ring_buffer_t *)tx_used_client, 0, 512, 512);
     ring_init(&drv_tx_ring, (ring_buffer_t *)tx_free_drv, (ring_buffer_t *)tx_used_drv, 0, 512, 512);
 
     // Add buffers to the drv tx ring from our shared dma region
