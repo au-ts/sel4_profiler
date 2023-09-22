@@ -2,6 +2,7 @@
 
 #define BIT(nr) (1UL << (nr))
 
+#define MAX_INSN 10
 
 #define SEL4_USER_CONTEXT_SIZE 0x24
 

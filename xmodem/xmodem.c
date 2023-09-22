@@ -40,6 +40,8 @@
 #include "crc16.h"
 #include "xmodem_io.h"
 
+#include <stdlib.h>
+
 #define SOH  0x01
 #define STX  0x02
 #define EOT  0x04
@@ -230,7 +232,8 @@ int xmodemTransmit(unsigned char *src, int srcsz)
 					// 	_outbyte(xbuff[i]);
 					// }
 
-                    //
+                    // Send the entire buffer
+                    _outbuff(xbuff, 130);
 					if ((c = _inbyte(DLY_1S)) >= 0 ) {
 						switch (c) {
 						case ACK:

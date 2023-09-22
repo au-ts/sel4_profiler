@@ -91,7 +91,7 @@ void _outbuff(char *buff, unsigned int len) {
         buffs_required = (len/BUFFER_SIZE) + 1;
     }
 
-    if ((NUM_BUFFERS - (&local_server->tx_ring)) < buffs_required) {
+    if ((NUM_BUFFERS - ring_size(&local_server->tx_ring)) < buffs_required) {
         sel4cp_dbg_puts("Not enough buffers availble in _outbuff\n");
         return;
     }
@@ -149,12 +149,50 @@ void _outbuff(char *buff, unsigned int len) {
     return 0;
 }
 
-int _inbyte(unsigned int timeout) {
 
+int _inbyte(unsigned int timeout) {
+    // Notify the driver that we want to get a character. In Patrick's design, this increments 
+    // the chars_for_clients value.
+    sel4cp_notify(SERVER_GETCHAR_CHANNEL);
+
+    struct serial_server *local_server = &global_serial_server;
+
+    /* Now that we have notified the driver, we can attempt to dequeue from the used ring.
+    When the driver has processed an interrupt, it will add the inputted character to the used ring.*/
+    
+    // Address that we will pass to dequeue to store the buffer address
+    uintptr_t buffer = 0;
+    // Integer to store the length of the buffer
+    unsigned int buffer_len = 0; 
+
+    void *cookie = 0;
+
+    while (dequeue_used(&local_server->rx_ring, &buffer, &buffer_len, &cookie) != 0) {
+        /* The ring is currently empty, as there is no character to get. 
+        We will spin here until we have gotten a character. As the driver is a higher priority than us, 
+        it should be able to pre-empt this loop
+        */
+        asm("nop");
+    }
+
+    // We are only getting one character at a time, so we just need to cast the buffer to an int
+
+    char got_char = *((char *) buffer);
+
+    /* Now that we are finished with the used buffer, we can add it back to the free ring*/
+
+    int ret = enqueue_avail(&local_server->rx_ring, buffer, buffer_len, NULL);
+
+    if (ret != 0) {
+        sel4cp_dbg_puts(sel4cp_name);
+        sel4cp_dbg_puts(": getchar - unable to enqueue used buffer back into free ring\n");
+    }
+
+    return (int) got_char;
 }
 
 // Init function required by sel4cp, initialise serial datastructres for server here
-void init_serial(void) {
+void init_xmodem_io(void) {
     // Here we need to init ring buffers and other data structures
     sel4cp_dbg_puts("Initialising serial in serial server\n");
     struct serial_server *local_server = &global_serial_server;
