@@ -155,7 +155,6 @@ void handle_rx() {
 
     // This is for our RAW mode, char by char
     if (UART_MODE == RAW_MODE) {
-        sel4cp_dbg_puts("In raw mode mux rx\n");
         char got_char = chars[0];
 
         // We have now gotten a character, deal with the input direction switch
@@ -194,7 +193,6 @@ void handle_rx() {
             }
         }
     } else if (UART_MODE == LINE_MODE) {
-        sel4cp_dbg_puts("In line mode mux rx\n");
         // This is for LINE mode, placing buffers at a time
         
         /* Check if the first character is an '@'. The following character

@@ -7,6 +7,7 @@
 #include "perf.h"
 #include "printf.h"
 #include "profiler.h"
+#include "xmodem.h"
 #include "shared_ringbuffer.h"
 #include "serial_server.h"
 
@@ -19,7 +20,7 @@ uintptr_t profiler_mem;
 
 ring_handle_t profiler_ring;
 
-void serial_dump() {
+void print_dump() {
     uintptr_t buffer = 0;
     unsigned int size = 0;
     void *cookie = 0;
@@ -44,6 +45,23 @@ void serial_dump() {
     }
 }
 
+void xmodem_dump() {
+    uintptr_t buffer = 0;
+    unsigned int size = 0;
+    void *cookie = 0;
+
+    // Dequeue from the profiler used ring
+    // while(!dequeue_used(&profiler_ring, &buffer, &size, &cookie)) {
+        dequeue_used(&profiler_ring, &buffer, &size, &cookie);
+        perf_sample_t *sample = (perf_sample_t *) buffer;
+        int ret = xmodemTransmit(&buffer, 128);
+        sel4cp_dbg_puts("This is the ret of xmodem: ");
+        puthex64(ret);
+        sel4cp_dbg_puts("\n");
+        enqueue_free(&profiler_ring, buffer, size, cookie);
+    // }   
+}
+
 void init() {
     // Init serial here 
     // Currently handled by profiler, but eventually remove everything from there
@@ -54,14 +72,15 @@ void init() {
 }
 
 void notified(sel4cp_channel ch) {
-    sel4cp_dbg_puts("Getting notified to dump\n");
     // Notified to empty profiler sample buffers
     if (ch == CLIENT_CH) {
         // Determine how to dump buffers
         if (CLIENT_CONFIG == 0) {
-            sel4cp_dbg_puts("Dumping over serial\n");
             // Print over serial
-            serial_dump();
+            print_dump();
+        } else if (CLIENT_CONFIG == 1) {
+            // Send over serial using xmodem protocol
+            xmodem_dump();
         }
     }
 }

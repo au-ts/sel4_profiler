@@ -75,7 +75,7 @@ void add_snapshot(sel4cp_id id,uint32_t time, uint64_t pc) {
 
     // Check if the buffers are full (for testing dumping when we have 10 buffers)
     // Notify the client that we need to dump
-    if (ring_size(profiler_ring.used_ring) == NUM_BUFFERS - 1) {
+    if (ring_size(profiler_ring.used_ring) == 1) {
         sel4cp_notify(CLIENT_CH);
     }
 }

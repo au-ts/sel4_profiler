@@ -211,9 +211,6 @@ void handle_irq() {
     char input_char = (char) input;
     sel4cp_irq_ack(IRQ_CH);
 
-    // Not sure if we should be printing this here or elsewhere? What is the expected behaviour?
-    // putchar(input);
-
     if (input == -1) {
         sel4cp_dbg_puts(sel4cp_name);
         sel4cp_dbg_puts(": invalid input when attempting to getchar\n");

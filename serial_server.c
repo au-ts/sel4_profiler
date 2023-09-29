@@ -80,64 +80,6 @@ void putchar_(char character)
 }
 
 /* XMODEM FUNCTIONS */
-void _outbyte(int c) {
-    struct serial_server *local_server = &client_serial_server;
-
-    // Get a buffer from the tx ring
-
-    // Address that we will pass to dequeue to store the buffer address
-    uintptr_t buffer = 0;
-    // Integer to store the length of the buffer
-    unsigned int buffer_len = 0; 
-    void *cookie = 0;
-
-    // Dequeue a buffer from the available ring from the tx buffer
-    int ret = dequeue_free(&local_server->tx_ring, &buffer, &buffer_len, &cookie);
-
-    if(ret != 0) {
-        sel4cp_dbg_puts(sel4cp_name);
-        sel4cp_dbg_puts(": serial server printf, unable to dequeue from tx ring, tx ring empty\n");
-        return -1;
-    }
-
-    // Need to copy over the string into the buffer, if it is less than the buffer length
-    int print_len = 1;
-
-    if(print_len > BUFFER_SIZE) {
-        sel4cp_dbg_puts(sel4cp_name);
-        sel4cp_dbg_puts(": print string too long for buffer\n");
-        return -1;
-    }
-
-    // Copy over the string to be printed to the buffer
-    memcpy((char *) buffer, c, print_len);
-
-    // We then need to add this buffer to the transmit used ring structure
-
-    bool is_empty = ring_empty(local_server->tx_ring.used_ring);
-
-    ret = enqueue_used(&local_server->tx_ring, buffer, print_len, &cookie);
-
-    if(ret != 0) {
-        sel4cp_dbg_puts(sel4cp_name);
-        sel4cp_dbg_puts(": serial server printf, unable to enqueue to tx used ring\n");
-        return -1;
-    }
-
-    /*
-    First we will check if the transmit used ring is empty. If not empty, then the driver was processing
-    the used ring, however it was not finished, potentially running out of budget and being pre-empted. 
-    Therefore, we can just add the buffer to the used ring, and wait for the driver to resume. However if 
-    empty, then we can notify the driver to start processing the used ring.
-    */
-
-    if(is_empty) {
-        // Notify the driver through the printf channel
-        sel4cp_notify(SERVER_PRINT_CHANNEL);
-    }
-
-    return 0;
-}
 
 void _outbuff(char *buff, unsigned int len) {
     /* Similair to _outbyte, but we will copy over the entire buffer at a time, rather than bytes.
@@ -154,10 +96,12 @@ void _outbuff(char *buff, unsigned int len) {
         buffs_required = (len/BUFFER_SIZE) + 1;
     }
 
-    if ((NUM_BUFFERS - ring_size(&local_server->tx_ring)) < buffs_required) {
-        sel4cp_dbg_puts("Not enough buffers availble in _outbuff\n");
-        return;
-    }
+    // TO-DO: Fix this calculation
+
+    // if ((NUM_BUFFERS - ring_size(&local_server->tx_ring)) < buffs_required) {
+    //     sel4cp_dbg_puts("Not enough buffers availble in _outbuff\n");
+    //     return;
+    // }
     
     // To track if we need to notify our driver after we have finished copying buffers across
     bool is_empty = false;

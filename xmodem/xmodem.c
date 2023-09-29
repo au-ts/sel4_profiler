@@ -29,11 +29,11 @@
  */
 
 /* this code needs standard functions memcpy() and memset()
-   and input/output functions _inbyte() and _outbyte().
+   and input/output functions _inbyte() and putchar_().
 
    the prototypes of the input/output functions are:
      int _inbyte(unsigned short timeout); // msec timeout
-     void _outbyte(int c);
+     void putchar_(int c);
 
  */
 
@@ -93,7 +93,7 @@ int xmodemReceive(unsigned char *dest, int destsz)
 
 	for(;;) {
 		for( retry = 0; retry < 16; ++retry) {
-			if (trychar) _outbyte(trychar);
+			if (trychar) putchar_(trychar);
 			if ((c = _inbyte((DLY_1S)<<1)) >= 0) {
 				switch (c) {
 				case SOH:
@@ -104,12 +104,12 @@ int xmodemReceive(unsigned char *dest, int destsz)
 					goto start_recv;
 				case EOT:
 					flushinput();
-					_outbyte(ACK);
+					putchar_(ACK);
 					return len; /* normal end */
 				case CAN:
 					if ((c = _inbyte(DLY_1S)) == CAN) {
 						flushinput();
-						_outbyte(ACK);
+						putchar_(ACK);
 						return -1; /* canceled by remote */
 					}
 					break;
@@ -120,9 +120,9 @@ int xmodemReceive(unsigned char *dest, int destsz)
 		}
 		if (trychar == 'C') { trychar = NAK; continue; }
 		flushinput();
-		_outbyte(CAN);
-		_outbyte(CAN);
-		_outbyte(CAN);
+		putchar_(CAN);
+		putchar_(CAN);
+		putchar_(CAN);
 		return -2; /* sync error */
 
 	start_recv:
@@ -150,17 +150,17 @@ int xmodemReceive(unsigned char *dest, int destsz)
 			}
 			if (--retrans <= 0) {
 				flushinput();
-				_outbyte(CAN);
-				_outbyte(CAN);
-				_outbyte(CAN);
+				putchar_(CAN);
+				putchar_(CAN);
+				putchar_(CAN);
 				return -3; /* too many retry error */
 			}
-			_outbyte(ACK);
+			putchar_(ACK);
 			continue;
 		}
 	reject:
 		flushinput();
-		_outbyte(NAK);
+		putchar_(NAK);
 	}
 }
 
@@ -171,7 +171,6 @@ int xmodemTransmit(unsigned char *src, int srcsz)
 	unsigned char packetno = 1;
 	int i, c, len = 0;
 	int retry;
-
 	for(;;) {
 		for( retry = 0; retry < 16; ++retry) {
 			if ((c = _inbyte((DLY_1S)<<1)) >= 0) {
@@ -184,8 +183,9 @@ int xmodemTransmit(unsigned char *src, int srcsz)
 					goto start_trans;
 				case CAN:
 					if ((c = _inbyte(DLY_1S)) == CAN) {
-						_outbyte(ACK);
+						putchar_(ACK);
 						flushinput();
+                        sel4cp_dbg_puts("Cancelled by remote\n");
 						return -1; /* canceled by remote */
 					}
 					break;
@@ -194,10 +194,11 @@ int xmodemTransmit(unsigned char *src, int srcsz)
 				}
 			}
 		}
-		_outbyte(CAN);
-		_outbyte(CAN);
-		_outbyte(CAN);
+		putchar_(CAN);
+		putchar_(CAN);
+		putchar_(CAN);
 		flushinput();
+        sel4cp_dbg_puts("No sync\n");
 		return -2; /* no sync */
 
 		for(;;) {
@@ -229,22 +230,26 @@ int xmodemTransmit(unsigned char *src, int srcsz)
 					xbuff[bufsz+3] = ccks;
 				}
 				for (retry = 0; retry < MAXRETRANS; ++retry) {
-					// for (i = 0; i < bufsz+4+(crc?1:0); ++i) {
-					// 	_outbyte(xbuff[i]);
-					// }
-
+                    sel4cp_dbg_puts("Sending via putchar_\n");
+					for (i = 0; i < bufsz+4+(crc?1:0); ++i) {
+						putchar_(xbuff[i]);
+					}
+                    sel4cp_dbg_puts("Sent via putchar_\n");
                     // Send the entire buffer
-                    _outbuff(xbuff, 130);
+                    // _outbuff(xbuff, bufsz+4+(crc?1:0));
+                    // sel4cp_dbg_puts("sent via outbuff\n");
 					if ((c = _inbyte(DLY_1S)) >= 0 ) {
 						switch (c) {
 						case ACK:
+                            sel4cp_dbg_puts("recv ack in start trans\n");
 							++packetno;
 							len += bufsz;
 							goto start_trans;
 						case CAN:
 							if ((c = _inbyte(DLY_1S)) == CAN) {
-								_outbyte(ACK);
+								putchar_(ACK);
 								flushinput();
+                                sel4cp_dbg_puts("Cancelled by remote\n");
 								return -1; /* canceled by remote */
 							}
 							break;
@@ -254,22 +259,27 @@ int xmodemTransmit(unsigned char *src, int srcsz)
 						}
 					}
 				}
-				_outbyte(CAN);
-				_outbyte(CAN);
-				_outbyte(CAN);
+				putchar_(CAN);
+				putchar_(CAN);
+				putchar_(CAN);
 				flushinput();
+                sel4cp_dbg_puts("Xmit error\n");
 				return -4; /* xmit error */
 			}
 			else {
+                sel4cp_dbg_puts("Sending end of transmit\n");
 				for (retry = 0; retry < 10; ++retry) {
-					_outbyte(EOT);
+					putchar_(EOT);
 					if ((c = _inbyte((DLY_1S)<<1)) == ACK) break;
 				}
-				flushinput();
+                sel4cp_dbg_puts("recv second ack");
+				// flushinput();
+                sel4cp_dbg_puts("We good\n");
 				return (c == ACK)?len:-5;
 			}
 		}
 	}
+    sel4cp_dbg_puts("Finished xmode transmit\n");
 }
 
 #ifdef TEST_XMODEM_RECEIVE

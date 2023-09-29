@@ -8,5 +8,6 @@
 /* CLIENT CONFIG OPTIONS
     Specify how to dump sample buffers
     0 - Print over serial
+    1 - Use the xmodem protocol to send over serial
 */
-#define CLIENT_CONFIG 0
+#define CLIENT_CONFIG 1
