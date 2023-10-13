@@ -74,8 +74,8 @@
 
     </protection_domain>
 
-    <protection_domain name="mux_tx" priority="106" pp="true">
-        <program_image path="mux_tx.elf" />
+    <protection_domain name="uart_mux_tx" priority="106" pp="true">
+        <program_image path="uart_mux_tx.elf" />
 
          <!-- shared memory for driver/mux ring buffer mechanism -->
         <map mr="tx_free_serial_drv" vaddr="0x4_400_000" perms="rw" cached="true" setvar_vaddr="tx_free_drv" />
@@ -91,8 +91,8 @@
 
     </protection_domain>            
 
-    <protection_domain name="mux_rx" priority="105" pp="true">
-        <program_image path="mux_rx.elf" />
+    <protection_domain name="uart_mux_rx" priority="105" pp="true">
+        <program_image path="uart_mux_rx.elf" />
 
          <!-- shared memory for driver/mux ring buffer mechanism -->
         <map mr="rx_free_serial_drv" vaddr="0x4_000_000" perms="rw" cached="true" setvar_vaddr="rx_free_drv" />
@@ -129,22 +129,22 @@
 
  <channel>
         <end pd="client" id="9"/>
-        <end pd="mux_tx" id="1"/>
+        <end pd="uart_mux_tx" id="1"/>
     </channel>
 
     <channel>
         <end pd="uart" id="8"/>
-        <end pd="mux_tx" id="9"/>
+        <end pd="uart_mux_tx" id="9"/>
     </channel>
 
    <channel>
         <end pd="client" id="11"/>
-        <end pd="mux_rx" id="1"/>
+        <end pd="uart_mux_rx" id="1"/>
     </channel>
 
     <channel>
         <end pd="uart" id="10"/>
-        <end pd="mux_rx" id="11"/>
+        <end pd="uart_mux_rx" id="11"/>
     </channel>
 
     <channel>
