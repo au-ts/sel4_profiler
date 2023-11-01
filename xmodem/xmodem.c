@@ -42,6 +42,7 @@
 #include "xmodem.h"
 
 #include <stdlib.h>
+#include <string.h>
 
 #define SOH  0x01
 #define STX  0x02

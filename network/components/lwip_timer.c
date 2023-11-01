@@ -16,7 +16,7 @@ set_timeout(void)
     sel4cp_ppcall(TIMER_CH, sel4cp_msginfo_new(SET_TIMEOUT, 1));
 }
 
-u32_t 
+uint32_t 
 sys_now(void)
 {
     sel4cp_ppcall(TIMER_CH, sel4cp_msginfo_new(GET_TIME, 0));
