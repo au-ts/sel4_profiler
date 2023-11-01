@@ -13,8 +13,7 @@ uintptr_t rx_used_drv;
 
 uintptr_t rx_free_cli0;
 uintptr_t rx_used_cli0;
-uintptr_t rx_free_cli1;
-uintptr_t rx_used_cli1;
+
 uintptr_t rx_free_arp;
 uintptr_t rx_used_arp;
 
@@ -22,7 +21,7 @@ uintptr_t shared_dma_vaddr;
 uintptr_t shared_dma_paddr;
 uintptr_t uart_base;
 
-#define NUM_CLIENTS 3
+#define NUM_CLIENTS 2
 #define DMA_SIZE 0x200000
 #define DRIVER_CH 3
 
@@ -254,20 +253,13 @@ void init(void)
     state.mac_addrs[0][4] = 0;
     state.mac_addrs[0][5] = 0;
 
-    state.mac_addrs[1][0] = 0x52;
-    state.mac_addrs[1][1] = 0x54;
-    state.mac_addrs[1][2] = 0x1;
-    state.mac_addrs[1][3] = 0;
-    state.mac_addrs[1][4] = 0;
-    state.mac_addrs[1][5] = 0x1;
-
     // and for broadcast. 
-    state.mac_addrs[2][0] = 0xff;
-    state.mac_addrs[2][1] = 0xff;
-    state.mac_addrs[2][2] = 0xff;
-    state.mac_addrs[2][3] = 0xff;
-    state.mac_addrs[2][4] = 0xff;
-    state.mac_addrs[2][5] = 0xff;
+    state.mac_addrs[1][0] = 0xff;
+    state.mac_addrs[1][1] = 0xff;
+    state.mac_addrs[1][2] = 0xff;
+    state.mac_addrs[1][3] = 0xff;
+    state.mac_addrs[1][4] = 0xff;
+    state.mac_addrs[1][5] = 0xff;
     // This is the legitimate hw address for imx8mm
     // (can be useful when debugging). 
     /*state.mac_addrs[0][0] = 0;
@@ -281,8 +273,7 @@ void init(void)
     ring_init(&state.rx_ring_drv, (ring_buffer_t *)rx_free_drv, (ring_buffer_t *)rx_used_drv, 1, NUM_BUFFERS, NUM_BUFFERS);
 
     ring_init(&state.rx_ring_clients[0], (ring_buffer_t *)rx_free_cli0, (ring_buffer_t *)rx_used_cli0, 1, NUM_BUFFERS, NUM_BUFFERS);
-    ring_init(&state.rx_ring_clients[1], (ring_buffer_t *)rx_free_cli1, (ring_buffer_t *)rx_used_cli1, 1, NUM_BUFFERS, 16);
-    ring_init(&state.rx_ring_clients[2], (ring_buffer_t *)rx_free_arp, (ring_buffer_t *)rx_used_arp, 1, NUM_BUFFERS, NUM_BUFFERS);
+    ring_init(&state.rx_ring_clients[1], (ring_buffer_t *)rx_free_arp, (ring_buffer_t *)rx_used_arp, 1, NUM_BUFFERS, NUM_BUFFERS);
 
     /* Enqueue free buffers for the driver to access */
     for (int i = 0; i < NUM_BUFFERS - 1; i++) {

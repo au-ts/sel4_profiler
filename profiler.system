@@ -81,20 +81,20 @@
 
         <!-- THIS IS THE SYSTEM WE ARE PROFILING AS CHILD PROTECTION DOMAINS -->
 
-        <protection_domain name="dummy_prog" priority="100" id="0">
+        <!-- <protection_domain name="dummy_prog" priority="50" id="0">
             <program_image path="dummy_prog.elf"/>
                 <map mr="profiler_control" vaddr="0x3_800_000" perms="rw" cached="false" setvar_vaddr="profiler_control"/>
         </protection_domain>
 
-        <protection_domain name="dummy_prog2" priority="100" id="14">
+        <protection_domain name="dummy_prog2" priority="50" id="14">
             <program_image path="dummy_prog2.elf"/>
-        </protection_domain>
+        </protection_domain> -->
 
         <!-- THIS IS THE END OF THE SYSTEM WE ARE PROFILING -->
 
         <!-- UART System -->
 
-        <protection_domain name="uart" priority="107" pp="true" id="10">
+        <protection_domain name="uart" priority="97" pp="true" id="10">
             <program_image path="uart.elf" />
 
             <map mr="uart" vaddr="0x5_000_000" perms="rw" cached="false" setvar_vaddr="uart_base" />
@@ -115,7 +115,7 @@
 
         </protection_domain>
 
-        <protection_domain name="uart_mux_tx" priority="106" pp="true" id="11">
+        <protection_domain name="uart_mux_tx" priority="96" pp="true" id="11">
             <program_image path="uart_mux_tx.elf" />
 
             <!-- shared memory for driver/mux ring buffer mechanism -->
@@ -132,7 +132,7 @@
 
         </protection_domain>            
 
-        <protection_domain name="uart_mux_rx" priority="105" pp="true" id="12">
+        <protection_domain name="uart_mux_rx" priority="95" pp="true" id="12">
             <program_image path="uart_mux_rx.elf" />
 
             <!-- shared memory for driver/mux ring buffer mechanism -->
@@ -313,7 +313,7 @@
         <end pd="uart_mux_rx" id="11"/>
     </channel>
 
-    <channel>
+    <!-- <channel>
         <end pd="profiler" id="10"/>
         <end pd="dummy_prog" id="10"/>
     </channel>
@@ -326,7 +326,7 @@
     <channel>
         <end pd="dummy_prog2" id="6"/>
         <end pd="dummy_prog" id="6"/>
-    </channel>
+    </channel> -->
 
     <channel>
         <end pd="profiler" id="7"/>

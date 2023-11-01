@@ -417,7 +417,7 @@ static void get_mac(void)
     state.mac[2] = 0x1;
     state.mac[3] = 0;
     state.mac[4] = 0;
-    if (!strcmp(sel4cp_name, "client0")) {
+    if (!strcmp(sel4cp_name, "eth_client")) {
         state.mac[5] = 0;
     } else {
         state.mac[5] = 0x1;
@@ -493,7 +493,7 @@ void init(void)
     }
 
     setup_utilization_socket();
-
+    
     request_used_ntfn(&state.rx_ring);
     request_used_ntfn(&state.tx_ring);
 

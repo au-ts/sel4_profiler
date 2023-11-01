@@ -6,15 +6,12 @@ uintptr_t tx_free_drv;
 uintptr_t tx_used_drv;
 uintptr_t tx_free_cli0;
 uintptr_t tx_used_cli0;
-uintptr_t tx_free_cli1;
-uintptr_t tx_used_cli1;
 uintptr_t tx_free_arp;
 uintptr_t tx_used_arp;
 
 uintptr_t shared_dma_vaddr_cli0;
 uintptr_t shared_dma_paddr_cli0;
-uintptr_t shared_dma_vaddr_cli1;
-uintptr_t shared_dma_paddr_cli1;
+
 uintptr_t shared_dma_vaddr_arp;
 uintptr_t shared_dma_paddr_arp;
 uintptr_t uart_base;
@@ -22,7 +19,7 @@ uintptr_t uart_base;
 #define CLIENT_0 0
 #define CLIENT_1 1
 #define ARP 2
-#define NUM_CLIENTS 3
+#define NUM_CLIENTS 2
 #define TIMER_CH 4
 #define DRIVER 3
 #define NUM_BUFFERS 512
@@ -58,9 +55,6 @@ get_phys_addr(uintptr_t virtual)
     if (virtual >= shared_dma_vaddr_cli0 && virtual < shared_dma_vaddr_cli0 + DMA_SIZE) {
         offset = virtual - shared_dma_vaddr_cli0;
         base = shared_dma_paddr_cli0;
-    } else if (virtual >= shared_dma_vaddr_cli1 && virtual < shared_dma_vaddr_cli1 + DMA_SIZE) {
-        offset = virtual - shared_dma_vaddr_cli1;
-        base = shared_dma_paddr_cli1;
     } else if (virtual >= shared_dma_vaddr_arp && virtual < shared_dma_vaddr_arp + DMA_SIZE) {
         offset = virtual - shared_dma_vaddr_arp;
         base = shared_dma_paddr_arp;
@@ -80,10 +74,7 @@ get_virt_addr(uintptr_t phys)
     if (phys >= shared_dma_paddr_cli0 && phys < shared_dma_paddr_cli0 + DMA_SIZE) {
         offset = phys - shared_dma_paddr_cli0;
         base = shared_dma_vaddr_cli0;
-    } else if (phys >= shared_dma_paddr_cli1 && phys < shared_dma_paddr_cli1 + DMA_SIZE) {
-        offset = phys - shared_dma_paddr_cli1;
-        base = shared_dma_vaddr_cli1;
-    }else if (phys >= shared_dma_paddr_arp && phys < shared_dma_paddr_arp + DMA_SIZE) {
+    } else if (phys >= shared_dma_paddr_arp && phys < shared_dma_paddr_arp + DMA_SIZE) {
         offset = phys - shared_dma_paddr_arp;
         base = shared_dma_vaddr_arp;
     } else {
@@ -100,8 +91,6 @@ get_client(uintptr_t addr)
     int client;
     if (addr >= shared_dma_vaddr_cli0 && addr < shared_dma_vaddr_cli0 + DMA_SIZE) {
         client = CLIENT_0;
-    } else if (addr >= shared_dma_vaddr_cli1 && addr < shared_dma_vaddr_cli1 + DMA_SIZE) {
-        client = CLIENT_1;
     } else if (addr >= shared_dma_vaddr_arp && addr < shared_dma_vaddr_arp + DMA_SIZE) {
         client = ARP;
     } else {
@@ -247,8 +236,7 @@ void init(void)
     // FIX ME: Use the notify function pointer to put the notification in?
     ring_init(&state.tx_ring_drv, (ring_buffer_t *)tx_free_drv, (ring_buffer_t *)tx_used_drv, 1, NUM_BUFFERS, NUM_BUFFERS);
     ring_init(&state.tx_ring_clients[0], (ring_buffer_t *)tx_free_cli0, (ring_buffer_t *)tx_used_cli0, 1, NUM_BUFFERS, NUM_BUFFERS);
-    ring_init(&state.tx_ring_clients[1], (ring_buffer_t *)tx_free_cli1, (ring_buffer_t *)tx_used_cli1, 1, NUM_BUFFERS, NUM_BUFFERS);
-    ring_init(&state.tx_ring_clients[2], (ring_buffer_t *)tx_free_arp, (ring_buffer_t *)tx_used_arp, 1, NUM_BUFFERS, NUM_BUFFERS);
+    ring_init(&state.tx_ring_clients[1], (ring_buffer_t *)tx_free_arp, (ring_buffer_t *)tx_used_arp, 1, NUM_BUFFERS, NUM_BUFFERS);
 
     /* Enqueue free transmit buffers to all clients. */
     int err;
@@ -261,14 +249,8 @@ void init(void)
     }
 
     for (int i = 0; i < NUM_BUFFERS - 1; i++) {
-        addr = shared_dma_vaddr_cli1 + (BUF_SIZE * i);
-        err = enqueue_free(&state.tx_ring_clients[1], addr, BUF_SIZE, NULL);
-        assert(!err);
-    }
-
-    for (int i = 0; i < NUM_BUFFERS - 1; i++) {
         addr = shared_dma_vaddr_arp + (BUF_SIZE * i);
-        err = enqueue_free(&state.tx_ring_clients[2], addr, BUF_SIZE, NULL);
+        err = enqueue_free(&state.tx_ring_clients[1], addr, BUF_SIZE, NULL);
         assert(!err);
     }
 
@@ -276,7 +258,6 @@ void init(void)
     // when a used buffer becomes available to be sent. 
     state.tx_ring_clients[0].used_ring->notify_reader = true;
     state.tx_ring_clients[1].used_ring->notify_reader = true;
-    state.tx_ring_clients[2].used_ring->notify_reader = true;
 
     state.client_usage[0].last_time = 0;//
     state.client_usage[0].max_bandwidth = 100000000; // theoretically no limit
@@ -286,10 +267,6 @@ void init(void)
     state.client_usage[1].max_bandwidth = 1000000; // 100Mbps for the TIME_WINDOW
     state.client_usage[1].curr_bandwidth = 0;
     state.client_usage[1].pending_timeout = false;
-    state.client_usage[2].last_time = 0;//
-    state.client_usage[2].max_bandwidth = 100000000;
-    state.client_usage[2].curr_bandwidth = 0;
-    state.client_usage[2].pending_timeout = false;
 
     return;
 }

@@ -106,7 +106,7 @@ NETIFFILES=$(LWIP)/netif/ethernet.c
 
 # LWIPFILES: All the above.
 LWIPFILES=$(NETWORK_COMPONENTS)/lwip.c $(NETWORK_COMPONENTS)/lwip_timer.c cache.c $(COREFILES) $(CORE4FILES) $(NETIFFILES)
-LWIP_OBJS := $(LWIPFILES:.c=.o) $(NETWORK_COMPONENTS)/lwip.o $(ETH_RING_BUFFER)/shared_ringbuffer.o $(NETWORK_COMPONENTS)/utilization_socket.o 
+LWIP_OBJS := $(LWIPFILES:.c=.o) $(NETWORK_COMPONENTS)/lwip.o $(ETH_RING_BUFFER)/shared_ringbuffer.o $(NETWORK_COMPONENTS)/utilization_socket.o $(NETWORK_COMPONENTS)/udp_echo_socket.o
 
 ETH_OBJS := $(ETHERNET_DRIVER)/ethernet.o $(ETH_RING_BUFFER)/shared_ringbuffer.o
 ETH_MUX_RX_OBJS := $(NETWORK_COMPONENTS)/mux_rx.o $(ETH_RING_BUFFER)/shared_ringbuffer.o
