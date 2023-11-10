@@ -1,4 +1,4 @@
-# seL4-sample-converter
+# toperf tool
 - This repository serves as a tool to convert from seL4 sample packets to a format that perf can interpret
 
 - By utilising the pre-existing perf infrastructure we're able to take advantage of the many perf tools, as well as open source tools like flamegraph
