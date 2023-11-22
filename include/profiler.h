@@ -55,6 +55,13 @@
 #define CHAIN 0x1e                  /* Odd performance counter chain mode */
 #define BUS_ACCESS_LD 0x60          /* Bus access - Read */
 
+/* Different profiler states */
+enum profiler_states {
+    PROF_INIT,
+    PROF_START,
+    PROF_HALT
+};
+
 /* TO-DO: There are more events as defined in the cortex a55 spec. Add these here. */
 
 struct pmu_config_args {

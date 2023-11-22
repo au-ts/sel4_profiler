@@ -8,8 +8,8 @@
 #include "serial_server.h"
 #include "printf.h"
 
-#define PROFILER_CH_START 1
-#define PROFILER_CH_END 2
+#define PROFILER_CH_START 10
+#define PROFILER_CH_END 20
 
 uintptr_t profiler_control;
 
@@ -30,7 +30,7 @@ void endless_loop() {
 }
 
 void init() {
-    sel4cp_notify(PROFILER_CH_START);
+    // sel4cp_notify(PROFILER_CH_START);
     endless_loop();
     sel4cp_notify(PROFILER_CH_END);
 }

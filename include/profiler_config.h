@@ -12,7 +12,7 @@ A PD TO TRACK PC) */
 If 1 is set, ALSO set the appropriate sampling period. */
 
 #define IRQ_CYCLE_COUNTER 1
-#define CYCLE_COUNTER_PERIOD 120000000
+#define CYCLE_COUNTER_PERIOD 1200000
 
 #define IRQ_COUNTER0 0
 #define COUNTER0_PERIOD 0

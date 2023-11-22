@@ -33,7 +33,6 @@ uintptr_t tx_free;
 uintptr_t tx_used;
 uintptr_t shared_dma_vaddr_rx;
 uintptr_t shared_dma_vaddr_tx;
-uintptr_t uart_base;
 
 static bool notify_tx = false;
 static bool notify_rx = false;
@@ -417,7 +416,7 @@ static void get_mac(void)
     state.mac[2] = 0x1;
     state.mac[3] = 0;
     state.mac[4] = 0;
-    if (!strcmp(sel4cp_name, "eth_client")) {
+    if (!strcmp(sel4cp_name, "client")) {
         state.mac[5] = 0;
     } else {
         state.mac[5] = 0x1;
@@ -445,7 +444,7 @@ void dump_log(void)
     }
 }
 
-void init(void)
+void init_lwip(void)
 {
     /* Set up shared memory regions */
     ring_init(&state.rx_ring, (ring_buffer_t *)rx_free, (ring_buffer_t *)rx_used, 1, NUM_BUFFERS, NUM_BUFFERS);
@@ -515,7 +514,7 @@ void init(void)
     print(": elf PD init complete\n");
 }
 
-void notified(sel4cp_channel ch)
+void notified_lwip(sel4cp_channel ch)
 {
     switch(ch) {
         case RX_CH:

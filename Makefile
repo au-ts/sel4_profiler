@@ -42,7 +42,7 @@ UARTDIR=uart
 
 BOARD_DIR := $(SEL4CP_SDK)/board/$(SEL4CP_BOARD)/$(SEL4CP_CONFIG)
 
-IMAGES := profiler.elf client.elf uart.elf uart_mux_rx.elf uart_mux_tx.elf dummy_prog.elf dummy_prog2.elf eth.elf lwip.elf eth_mux_rx.elf eth_mux_tx.elf eth_copy.elf arp.elf timer.elf
+IMAGES := profiler.elf client.elf uart.elf uart_mux_rx.elf uart_mux_tx.elf dummy_prog.elf dummy_prog2.elf eth.elf eth_mux_rx.elf eth_mux_tx.elf eth_copy.elf arp.elf timer.elf
 CFLAGS := -mcpu=$(CPU) -mstrict-align -ffreestanding -g3 -O3 -Wall  -Wno-unused-function -fno-omit-frame-pointer
 LDFLAGS := -L$(BOARD_DIR)/lib -Llib
 LIBS := -lsel4cp -Tsel4cp.ld -lc
@@ -93,20 +93,21 @@ CORE4FILES=$(LWIP)/core/ipv4/autoip.c \
 	$(LWIP)/core/ipv4/ip4.c \
 	$(LWIP)/core/ipv4/ip4_addr.c
 
-UART_OBJS := uart/uart.o libserialsharedringbuffer/shared_ringbuffer.o
-UART_MUX_TX_OBJS := uart/mux_tx.o libserialsharedringbuffer/shared_ringbuffer.o
-UART_MUX_RX_OBJS := uart/mux_rx.o libserialsharedringbuffer/shared_ringbuffer.o
-PROFILER_OBJS := profiler.o libserialsharedringbuffer/shared_ringbuffer.o
-CLIENT_OBJS := client.o serial_server.o printf.o libserialsharedringbuffer/shared_ringbuffer.o xmodem/crc16.o xmodem/xmodem.o
-DUMMY_PROG_OBJS := dummy_prog.o
-DUMMY_PROG2_OBJS := dummy_prog2.o
-
 # NETIFFILES: Files implementing various generic network interface functions
 NETIFFILES=$(LWIP)/netif/ethernet.c
 
 # LWIPFILES: All the above.
 LWIPFILES=$(NETWORK_COMPONENTS)/lwip.c $(NETWORK_COMPONENTS)/lwip_timer.c cache.c $(COREFILES) $(CORE4FILES) $(NETIFFILES)
 LWIP_OBJS := $(LWIPFILES:.c=.o) $(NETWORK_COMPONENTS)/lwip.o $(ETH_RING_BUFFER)/shared_ringbuffer.o $(NETWORK_COMPONENTS)/utilization_socket.o
+
+UART_OBJS := uart/uart.o libserialsharedringbuffer/shared_ringbuffer.o
+UART_MUX_TX_OBJS := uart/mux_tx.o libserialsharedringbuffer/shared_ringbuffer.o
+UART_MUX_RX_OBJS := uart/mux_rx.o libserialsharedringbuffer/shared_ringbuffer.o
+PROFILER_OBJS := profiler.o libserialsharedringbuffer/shared_ringbuffer.o
+CLIENT_OBJS := client.o serial_server.o printf.o libserialsharedringbuffer/shared_ringbuffer.o xmodem/crc16.o xmodem/xmodem.o $(LWIPFILES:.c=.o) $(NETWORK_COMPONENTS)/lwip.o $(NETWORK_COMPONENTS)/utilization_socket.o
+DUMMY_PROG_OBJS := dummy_prog.o
+DUMMY_PROG2_OBJS := dummy_prog2.o
+
 
 ETH_OBJS := $(ETHERNET_DRIVER)/ethernet.o $(ETH_RING_BUFFER)/shared_ringbuffer.o
 ETH_MUX_RX_OBJS := $(NETWORK_COMPONENTS)/mux_rx.o $(ETH_RING_BUFFER)/shared_ringbuffer.o
@@ -158,8 +159,8 @@ $(BUILD_DIR)/client.elf: $(addprefix $(BUILD_DIR)/, $(CLIENT_OBJS))
 $(BUILD_DIR)/eth.elf: $(addprefix $(BUILD_DIR)/, $(ETH_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-$(BUILD_DIR)/lwip.elf: $(addprefix $(BUILD_DIR)/, $(LWIP_OBJS))
-	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
+# $(BUILD_DIR)/lwip.elf: $(addprefix $(BUILD_DIR)/, $(LWIP_OBJS))
+# 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 $(BUILD_DIR)/eth_mux_rx.elf: $(addprefix $(BUILD_DIR)/, $(ETH_MUX_RX_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@

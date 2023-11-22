@@ -16,13 +16,10 @@
 #include "lwip/ip.h"
 #include "lwip/pbuf.h"
 #include "lwip/tcp.h"
-
+#include "lwip/udp.h"
 #include "socket.h"
 #include "util.h"
-
-#define START_PMU 4
-#define STOP_PMU 5
-
+#include "client.h"
 /* This file implements a TCP based utilization measurment process that starts
  * and stops utilization measurements based on a client's requests.
  * The protocol used to communicate is as follows:
@@ -51,22 +48,20 @@
 
 static struct tcp_pcb *utiliz_socket;
 uintptr_t data_packet;
-uintptr_t cyclecounters_vaddr;
 
-#define WHOAMI "100 IPBENCH V1.0\n"
+#define WHOAMI "100 SEL4 PROFILING CLIENT\n"
 #define HELLO "HELLO\n"
 #define OK_READY "200 OK (Ready to go)\n"
-#define LOAD "LOAD cpu_target_lukem\n"
 #define OK "200 OK\n"
-#define SETUP "SETUP args::\"\"\n"
 #define START "START\n"
 #define STOP "STOP\n"
 #define QUIT "QUIT\n"
-#define RESPONSE "220 VALID DATA (Data to follow)\n"    \
-    "Content-length: %d\n"                              \
-    "%s\n"
-#define IDLE_FORMAT ",%ld,%ld"
 #define ERROR "400 ERROR\n"
+#define MAPPINGS "MAPPINGS\n"
+
+// TODO: NEED TO HAVE A BETTER WAY OF INJECTING THE MAPPINGS FROM THE SYSTEM DESCRIPTION
+// #define MAPPINGS_STR "\"pd_mappings\": {\n\"dummy_prog\": 0 \n},\n"
+#define MAPPINGS_STR "dummy_prog: 0\ndummy_prog1: 1"
 
 #define msg_match(msg, match) (strncmp(msg, match, strlen(match))==0)
 
@@ -84,37 +79,9 @@ uint64_t idle_ccount_start;
 uint64_t idle_overflow_start;
 
 
-static inline void my_reverse(char s[])
-{
-    unsigned int i, j;
-    char c;
-
-    for (i = 0, j = strlen(s)-1; i<j; i++, j--) {
-        c = s[i];
-        s[i] = s[j];
-        s[j] = c;
-    }
-}
-
-static inline void my_itoa(uint64_t n, char s[])
-{
-    unsigned int i;
-    uint64_t sign;
-
-    if ((sign = n) < 0)  /* record sign */
-        n = -n;          /* make n positive */
-    i = 0;
-    do {       /* generate digits in reverse order */
-        s[i++] = n % 10 + '0';   /* get next digit */
-    } while ((n /= 10) > 0);     /* delete it */
-    if (sign < 0)
-        s[i++] = '-';
-    s[i] = '\0';
-    my_reverse(s);
-}
-
 static err_t utilization_sent_callback(void *arg, struct tcp_pcb *pcb, u16_t len)
 {
+    sel4cp_dbg_puts("sent callback\n");
     return ERR_OK;
 }
 
@@ -135,60 +102,19 @@ static err_t utilization_recv_callback(void *arg, struct tcp_pcb *pcb, struct pb
         if (error) {
             sel4cp_dbg_puts("Failed to send OK_READY message through utilization peer");
         }
-    } else if (msg_match(data_packet_str, LOAD)) {
-        error = tcp_write(pcb, OK, strlen(OK), TCP_WRITE_FLAG_COPY);
-        if (error) {
-            sel4cp_dbg_puts("Failed to send OK message through utilization peer");
-        }
-    } else if (msg_match(data_packet_str, SETUP)) {
-        error = tcp_write(pcb, OK, strlen(OK), TCP_WRITE_FLAG_COPY);
-        if (error) {
-            sel4cp_dbg_puts("Failed to send OK message through utilization peer");
-        }
     } else if (msg_match(data_packet_str, START)) {
         print(sel4cp_name);
         print(" measurement starting... \n");
-
+        sel4cp_notify(START_PMU);
     } else if (msg_match(data_packet_str, STOP)) {
         print(sel4cp_name);
         print(" measurement finished \n");;
-
-        // uint64_t total = 0, idle = 0;
-
-        // if (!strcmp(sel4cp_name, "client0")) {
-        //     total = bench->ts - start;
-        //     total += ULONG_MAX * (bench->overflows - idle_overflow_start);
-        //     idle = bench->ccount - idle_ccount_start;
-        // }
-
-        // char tbuf[16];
-        // my_itoa(total, tbuf);
-
-        // char ibuf[16];
-        // my_itoa(idle, ibuf);
-
-        // char buffer[100];
-
-        // int len = strlen(tbuf) + strlen(ibuf) + 2;
-        // char lbuf[16];
-        // my_itoa(len, lbuf);
-
-        // strcat(strcpy(buffer, "220 VALID DATA (Data to follow)\nContent-length: "), lbuf);
-        // strcat(buffer, "\n,");
-        // strcat(buffer, ibuf);
-        // strcat(buffer, ",");
-        // strcat(buffer, tbuf);
-
-        // // sel4cp_dbg_puts(buffer);
-        // error = tcp_write(pcb, buffer, strlen(buffer), TCP_WRITE_FLAG_COPY);
-
-        // tcp_shutdown(pcb, 0, 1);
-
-        // if (!strcmp(sel4cp_name, "client0")) { 
-        //     //sel4cp_notify(STOP_PMU);
-        // }
-    } else if (msg_match(data_packet_str, QUIT)) {
-        /* Do nothing for now */
+        sel4cp_notify(STOP_PMU);
+    } else if (msg_match(data_packet_str, MAPPINGS)) {
+        error = tcp_write(pcb, MAPPINGS_STR, strlen(MAPPINGS_STR), TCP_WRITE_FLAG_COPY);
+        if (error) {
+            sel4cp_dbg_puts("Failed to send OK message through utilization peer");
+        }
     } else {
         sel4cp_dbg_puts("Received a message that we can't handle ");
         sel4cp_dbg_puts(data_packet_str);
@@ -211,9 +137,40 @@ static err_t utilization_accept_callback(void *arg, struct tcp_pcb *newpcb, err_
     }
     tcp_sent(newpcb, utilization_sent_callback);
     tcp_recv(newpcb, utilization_recv_callback);
-
+    utiliz_socket = newpcb;
     return ERR_OK;
 }
+
+int send_tcp(void *buff) {
+
+    err_t error = tcp_write(utiliz_socket, buff, strlen(buff), TCP_WRITE_FLAG_COPY);
+    if (error) {
+        print("Failed to send message through utilization peer: ");
+        put8(error);
+        print("\n");
+        if (error == -1) {
+            print("MEM ERROR\n");
+        }
+        return 1;
+    }
+
+    error = tcp_output(utiliz_socket);
+    if (error) {
+        print("Failed to output via tcp through utilization peer: ");
+        put8(error);
+        print("\n");
+    }
+
+    return 0;
+}
+
+int tcp_sent_callback(tcp_sent_fn callback) {
+    tcp_sent(utiliz_socket, callback);
+}  
+
+int tcp_reset_callback() {
+    tcp_sent(utiliz_socket, utilization_sent_callback);
+}  
 
 int setup_utilization_socket(void)
 {
