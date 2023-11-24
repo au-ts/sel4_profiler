@@ -21,7 +21,7 @@
 ### Example json sample file:
 ```
 {
-    "pd_mappings": {
+    "elf_tcb_mappings": {
         "a.elf": 0
     },
     "samples": [
@@ -50,7 +50,7 @@
 }
 ```
 
-- pd_mappings: an object that maps elf paths to pds expected by perf
+- elf_tcb_mappings: an object that maps elf paths to pds expected by perf
 - samples: contains a list of objects with the following fields:
     - ip: the instruction pointer of the cpu when the sample was recorded
     - pd: the protection domain that the sample was recorded in

@@ -6,7 +6,7 @@ use crate::sample::Sel4Sample;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SamplesFile {
-    pub pd_mappings: HashMap<String, u32>,
+    pub elf_tcb_mappings: HashMap<String, u32>,
     pub samples: Vec<Sel4Sample>,
 }
 
