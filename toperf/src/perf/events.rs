@@ -4,21 +4,24 @@ use crate::sample::Sel4Sample;
 
 use std::{mem, io::Write, fmt, ffi::CStr};
 
-const CPUMODE_UNKNOWN: u16 = 0 << 0;
+// Below are the constants for the 'misc' bits of a perf event header.
+// Unused constants are left uncommented.
+
+// const CPUMODE_UNKNOWN: u16 = 0 << 0;
 const CPUMODE_KERNEL: u16 = 1 << 0;
 const CPUMODE_USER: u16 = 2 << 0;
-const CPUMODE_HYPERVISOR: u16 = 3 << 0;
-const CPUMODE_GUEST_KERNEL: u16 = 4 << 0;
-const CPUMODE_GUEST_USER: u16 = 5 << 0;
-const PROC_MAP_PARSE_TIMEOUT: u16 = 1 << 12;
-const MMAP_DATA: u16 = 1 << 13;
+// const CPUMODE_HYPERVISOR: u16 = 3 << 0;
+// const CPUMODE_GUEST_KERNEL: u16 = 4 << 0;
+// const CPUMODE_GUEST_USER: u16 = 5 << 0;
+// const PROC_MAP_PARSE_TIMEOUT: u16 = 1 << 12;
+// const MMAP_DATA: u16 = 1 << 13;
 const COMM_EXEC: u16 = 1 << 13;
-const FORK_EXEC: u16 = 1 << 13;
-const SWITCH_OUT: u16 = 1 << 13;
-const EXACT_IP: u16 = 1 << 14;
-const SWITCH_OUT_PREEMPT: u16 = 1 << 14;
-const MMAP_BUILD_ID: u16 = 1 << 14;
-const EXT_RESERVED: u16 = 1 << 15;
+// const FORK_EXEC: u16 = 1 << 13;
+// const SWITCH_OUT: u16 = 1 << 13;
+// const EXACT_IP: u16 = 1 << 14;
+// const SWITCH_OUT_PREEMPT: u16 = 1 << 14;
+// const MMAP_BUILD_ID: u16 = 1 << 14;
+// const EXT_RESERVED: u16 = 1 << 15;
 
 const PATH_MAX: usize = 4096;
 const COMM_MAX: usize = 32;
@@ -133,7 +136,7 @@ impl CommEvent {
     pub fn new(pid: u32, application: &str) -> CommEvent {
         let header = EventHeader {
             event_type: EventType::Comm,
-            misc: 0x4002,
+            misc: CPUMODE_KERNEL | COMM_EXEC,
             size: mem::size_of::<CommEvent>() as u16,
         };
 
