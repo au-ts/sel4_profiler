@@ -24,24 +24,18 @@
  * and stops utilization measurements based on a client's requests.
  * The protocol used to communicate is as follows:
  * - Client connects
- * - Server sends: 100 IPBENCH V1.0\n
+ * - Server sends: 100 SEL4 PROFILING CLIENT\n
  * - Client sends: HELLO\n
  * - Server sends: 200 OK (Ready to go)\n
- * - Client sends: LOAD cpu_target_lukem\n
- * - Server sends: 200 OK\n
- * - Client sends: SETUP args::""\n
- * - Server sends: 200 OK\n
  * - Client sends: START\n
  * - Client sends: STOP\n
- * - Server sends: 220 VALID DATA (Data to follow)\n
- *                                Content-length: %d\n
- *                                ${content}\n
+ * - Client sends: START\n
+ * - Client sends: EXIT\n
  * - Server closes socket.
  *
- * It is also possible for client to send QUIT\n during operation.
  *
  * The server starts recording utilization stats when it receives START and
- * finishes recording when it receives STOP.
+ * finishes recording when it receives STOP or EXIT.
  *
  * Only one client can be connected.
  */
@@ -58,9 +52,9 @@ uintptr_t data_packet;
 #define QUIT "QUIT\n"
 #define ERROR "400 ERROR\n"
 #define MAPPINGS "MAPPINGS\n"
+#define REFRESH "REFRESH\n"
 
 // TODO: NEED TO HAVE A BETTER WAY OF INJECTING THE MAPPINGS FROM THE SYSTEM DESCRIPTION
-// #define MAPPINGS_STR "\"pd_mappings\": {\n\"dummy_prog\": 0 \n},\n"
 #define MAPPINGS_STR "dummy_prog: 0\ndummy_prog1: 1"
 
 #define msg_match(msg, match) (strncmp(msg, match, strlen(match))==0)
@@ -115,6 +109,9 @@ static err_t utilization_recv_callback(void *arg, struct tcp_pcb *pcb, struct pb
         if (error) {
             sel4cp_dbg_puts("Failed to send OK message through utilization peer");
         }
+    } else if (msg_match(data_packet_str, REFRESH)) {
+        // This is just to refresh the socket from the linux client side
+        return ERR_OK;
     } else {
         sel4cp_dbg_puts("Received a message that we can't handle ");
         sel4cp_dbg_puts(data_packet_str);

@@ -150,7 +150,7 @@
 
         <!-- Ethernet System -->
 
-        <protection_domain name="eth" priority="101" pp="true" id="1" budget="100" period="400">
+        <protection_domain name="eth" priority="101" pp="true" id="1" budget="200" period="400">
             <program_image path="eth.elf" />
             <map mr="eth0" vaddr="0x2_000_000" perms="rw" cached="false"/>
 
@@ -316,7 +316,7 @@
 
     <channel>
         <end pd="profiler" id="20"/>
-        <end pd="dummy_prog" id="20"/>
+        <end pd="client" id="20"/>
     </channel>
 
     <channel>

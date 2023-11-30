@@ -81,12 +81,14 @@ void add_sample(sel4cp_id id, uint32_t time, uint64_t pc, uint32_t pmovsr) {
     // Notify the client that we need to dump. If we are dumping, do not 
     // restart the PMU until we have managed to purge all buffers over the network.
     if (ring_empty(profiler_ring.free_ring)) {
+        reset_cnt(pmovsr);
+        halt_cnt();
+        sel4cp_dbg_puts("Dumping from add snapshot\n");
         sel4cp_notify(CLIENT_CH);
     } else {
+        reset_cnt(pmovsr);
         resume_cnt();
     }
-
-
 }
 
 
@@ -371,7 +373,7 @@ void notified(sel4cp_channel ch) {
         profiler_state = PROF_HALT;
         halt_cnt();
         // Purge any buffers that may be leftover
-        sel4cp_notify(CLIENT_HALT);
+        sel4cp_notify(CLIENT_CH);
     } else if (ch == 30) {
         // Only resume if profiler state is in 'START' state
         if (profiler_state == PROF_START) {
@@ -389,6 +391,7 @@ void fault(sel4cp_id id, sel4cp_msginfo msginfo) {
         uint32_t ccnt_upper = sel4cp_mr_get(2);
         uint32_t pmovsr = sel4cp_mr_get(3);
         uint64_t time = ((uint64_t) ccnt_upper << 32) | ccnt_lower;
+        // profiler_handle_fault(pc, ccnt_lower, ...);
   
         // Only add a snapshot if the counter we are sampling on is in the interrupt flag
         // @kwinter Change this to deal with new counter definitions
@@ -400,10 +403,10 @@ void fault(sel4cp_id id, sel4cp_msginfo msginfo) {
             pmovsr & (IRQ_COUNTER4 << 4) ||
             pmovsr & (IRQ_COUNTER5 << 5)) {
             add_sample(id, time, pc, pmovsr);
+        } else {
+            reset_cnt(pmovsr);
+            resume_cnt();
         }
-
-        reset_cnt(pmovsr);
-
         // Resume counters
         // resume_cnt();
     }

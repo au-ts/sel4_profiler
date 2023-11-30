@@ -21,7 +21,7 @@ void endless_loop() {
             i = 0;
             sel4cp_notify(6);
             ticker++;
-        } else if (ticker == 1) {
+        } else if (ticker == 5) {
             break;
         }
         
@@ -30,9 +30,7 @@ void endless_loop() {
 }
 
 void init() {
-    // sel4cp_notify(PROFILER_CH_START);
     endless_loop();
-    sel4cp_notify(PROFILER_CH_END);
 }
 
 void notified (sel4cp_channel ch) {

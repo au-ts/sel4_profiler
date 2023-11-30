@@ -15,6 +15,7 @@
 
 #define START_PMU 10
 #define STOP_PMU 20
+#define RESUME_PMU 30
 
 enum client_state {
     CLIENT_IDLE,

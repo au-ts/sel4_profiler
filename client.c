@@ -104,12 +104,11 @@ static err_t eth_dump_callback(void *arg, struct tcp_pcb *pcb, uint16_t len)
     // Check if we are done sending buffers. 
     // If we are done, set client state to idle and signal profiler to restart profiling
     if (ring_empty(profiler_ring.used_ring)) {
-        sel4cp_dbg_puts("Eth dump finish\n");
+        tcp_reset_callback();
         client_state = CLIENT_IDLE;
         sel4cp_notify(30);
     } else if (!dequeue_used(&profiler_ring, &buffer, &size, &cookie)) {
         // Dequeue from the profiler used ring
-        // sel4cp_dbg_puts("Sending another buffer in callback\n");
         pmu_sample_t *sample = (pmu_sample_t *) buffer;
         char sample_string[100];
 
@@ -148,7 +147,6 @@ static err_t eth_dump_callback(void *arg, struct tcp_pcb *pcb, uint16_t len)
 }
 
 void eth_dump_start() {
-    sel4cp_dbg_puts("Eth dump start\n");
     // Set the callback
     tcp_sent_callback(eth_dump_callback);
     uintptr_t buffer = 0;
@@ -156,7 +154,11 @@ void eth_dump_start() {
     void *cookie = 0;
 
     // Dequeue from the profiler used ring
-    if (!dequeue_used(&profiler_ring, &buffer, &size, &cookie)) {
+    if (ring_empty(profiler_ring.used_ring)) {
+        // If we are done dumping the buffers, we can resume the PMU
+        client_state = CLIENT_IDLE;
+        sel4cp_notify(RESUME_PMU);
+    } else if (!dequeue_used(&profiler_ring, &buffer, &size, &cookie)) {
         // sel4cp_dbg_puts("Sending initial buffer\n");
         pmu_sample_t *sample = (pmu_sample_t *) buffer;
         char sample_string[100];
@@ -185,8 +187,6 @@ void eth_dump_start() {
         strcat(sample_string, "\n},");
 
         enqueue_free(&profiler_ring, buffer, size, cookie);
-
-        // sel4cp_dbg_puts("Sending buffers over network\n");
 
         send_tcp(&sample_string);
     }
@@ -225,25 +225,6 @@ void notified(sel4cp_channel ch) {
             if (client_state == CLIENT_IDLE) {
                 client_state = CLIENT_DUMP;
                 eth_dump_start();
-            }
-        }
-
-    } else if (ch == CLIENT_HALT) {
-        sel4cp_dbg_puts("Halting client\n");
-        /* This is the same as the first case. However, we also 
-        send a message stating that we are halting profiling.*/
-        if (CLIENT_CONFIG == 0) {
-            // Print over serial
-            print_dump();
-        } else if (CLIENT_CONFIG == 1) {
-            // Send over serial using xmodem protocol
-            xmodem_dump();
-        } else if (CLIENT_CONFIG == 2) {
-            // Send over TCP
-            if (client_state == CLIENT_IDLE) {
-                client_state = CLIENT_DUMP;
-                eth_dump_start();
-                send_tcp("QUIT");
             }
         }
     } else if(CLIENT_CONFIG == 2) {
