@@ -22,10 +22,6 @@ uintptr_t profiler_mem;
 
 ring_handle_t profiler_ring;
 
-/* This global bit string allows us to keep track of what event counters
-are being used. We use this bit string when enabling/disabling the PMU */
-uint32_t active_counters = (BIT(31)); 
-
 /* State of profiler */
 int profiler_state;
 
@@ -83,7 +79,6 @@ void add_sample(sel4cp_id id, uint32_t time, uint64_t pc, uint32_t pmovsr) {
     if (ring_empty(profiler_ring.free_ring)) {
         reset_cnt(pmovsr);
         halt_cnt();
-        sel4cp_dbg_puts("Dumping from add snapshot\n");
         sel4cp_notify(CLIENT_CH);
     } else {
         reset_cnt(pmovsr);
@@ -207,45 +202,39 @@ void configure_clkcnt(uint64_t val) {
 void configure_cnt0(uint32_t event, uint32_t val) {
     asm volatile("isb; msr pmevtyper0_el0, %0" : : "r" (event));
     asm volatile("msr pmevcntr0_el0, %0" : : "r" (val));
-    active_counters |= BIT(0);
 }
 
 /* Configure event counter 1 */
 void configure_cnt1(uint32_t event, uint32_t val) {
     asm volatile("isb; msr pmevtyper1_el0, %0" : : "r" (event));
     asm volatile("msr pmevcntr1_el0, %0" : : "r" (val));
-    active_counters |= BIT(1);
 }
 
 /* Configure event counter 2 */
 void configure_cnt2(uint32_t event, uint32_t val) {
     asm volatile("isb; msr pmevtyper2_el0, %0" : : "r" (event));
     asm volatile("msr pmevcntr2_el0, %0" : : "r" (val));
-    active_counters |= BIT(2);
 }
 
 /* Configure event counter 3 */
 void configure_cnt3(uint32_t event, uint32_t val) {
     asm volatile("isb; msr pmevtyper3_el0, %0" : : "r" (event));
     asm volatile("msr pmevcntr3_el0, %0" : : "r" (val));
-    active_counters |= BIT(3);
 }
 
 /* Configure event counter 4 */
 void configure_cnt4(uint32_t event, uint32_t val) {
     asm volatile("isb; msr pmevtyper4_el0, %0" : : "r" (event));
     asm volatile("msr pmevcntr4_el0, %0" : : "r" (val));
-    active_counters |= BIT(4);
 }
 
 /* Configure event counter 5 */
 void configure_cnt5(uint32_t event, uint32_t val) {
     asm volatile("isb; msr pmevtyper5_el0, %0" : : "r" (event));
     asm volatile("msr pmevcntr5_el0, %0" : : "r" (val));
-    active_counters |= BIT(5);
 }
 
-/* Initial user PMU configure interface */
+/* Initial user PMU configure interface. This is called during a PPC. With the root/child abstraction, PPC's do not currently work. */
 void user_pmu_configure(pmu_config_args_t config_args) {
     uint32_t event = config_args.reg_event & ARMV8_PMEVTYPER_EVTCOUNT_MASK;
     // In each of these cases set event for counter, set value of counter.
@@ -407,8 +396,6 @@ void fault(sel4cp_id id, sel4cp_msginfo msginfo) {
             reset_cnt(pmovsr);
             resume_cnt();
         }
-        // Resume counters
-        // resume_cnt();
     }
 
     sel4cp_fault_reply(sel4cp_msginfo_new(0, 0));
