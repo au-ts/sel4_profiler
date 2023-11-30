@@ -77,21 +77,21 @@ void print_dump() {
     }
 }
 
+// TODO: Fix xmodem implementation. 
 void xmodem_dump() {
     uintptr_t buffer = 0;
     unsigned int size = 0;
     void *cookie = 0;
 
     // Dequeue from the profiler used ring
-    // while(!dequeue_used(&profiler_ring, &buffer, &size, &cookie)) {
+    while(!dequeue_used(&profiler_ring, &buffer, &size, &cookie)) {
         dequeue_used(&profiler_ring, &buffer, &size, &cookie);
-        pmu_sample_t *sample = (pmu_sample_t *) buffer;
-        int ret = xmodemTransmit(&buffer, 128);
+        int ret = xmodemTransmit((unsigned char *) buffer, 128);
         sel4cp_dbg_puts("This is the ret of xmodem: ");
         puthex64(ret);
         sel4cp_dbg_puts("\n");
         enqueue_free(&profiler_ring, buffer, size, cookie);
-    // }   
+    }   
 }
 
 static err_t eth_dump_callback(void *arg, struct tcp_pcb *pcb, uint16_t len)

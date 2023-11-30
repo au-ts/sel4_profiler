@@ -4,8 +4,6 @@
     <memory_region name="eth0" size="0x10_000" phys_addr="0x30be0000" />
     <memory_region name="timer" size="0x10_000" phys_addr="0x302d0000" />
 
-    <memory_region name="shared_dma" size="0x200_000" page_size="0x200_000" />
-    
     <!-- shared dma regions for serial communication -->
     <memory_region name="shared_dma_tx_client" size="0x200_000" page_size="0x200_000" />
     <memory_region name="shared_dma_rx_client" size="0x200_000" page_size="0x200_000" />
@@ -65,8 +63,6 @@
     <memory_region name="tx_cookies" size="0x200_000" page_size="0x200_000"/>
 
     <memory_region name="data_packet" size="0x1000"/>
-
-    <memory_region name="cyclecounters" size="0x1000"/>
 
     <protection_domain name="profiler" priority="96">
         <program_image path="profiler.elf" />

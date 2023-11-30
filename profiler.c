@@ -25,68 +25,6 @@ ring_handle_t profiler_ring;
 /* State of profiler */
 int profiler_state;
 
-/* Add a snapshot of the cycle and event registers to the array. This array needs to become a ring buffer. */
-void add_sample(sel4cp_id id, uint32_t time, uint64_t pc, uint32_t pmovsr) {    
-    uintptr_t buffer = 0;
-    unsigned int buffer_len = 0;
-    void * cookie = 0;
-
-    int ret = dequeue_free(&profiler_ring, &buffer, &buffer_len, &cookie);
-    if (ret != 0) {
-        sel4cp_dbg_puts(sel4cp_name);
-        sel4cp_dbg_puts("Failed to dequeue from profiler free ring\n");
-        return;
-    }
-    pmu_sample_t *temp_sample = (pmu_sample_t *) buffer;
-    
-    // Find which counter overflowed, and the corresponding period
-
-    uint64_t period = 0;
-
-    if (pmovsr & (IRQ_CYCLE_COUNTER << 31)) {
-        period = CYCLE_COUNTER_PERIOD;
-    } else if (pmovsr & (IRQ_COUNTER0 << 0)) {
-        period = COUNTER0_PERIOD;
-    } else if (pmovsr & (IRQ_COUNTER1 << 1)) {
-        period = COUNTER1_PERIOD;
-    } else if (pmovsr & (IRQ_COUNTER2 << 2)) {
-        period = COUNTER2_PERIOD;
-    } else if (pmovsr & (IRQ_COUNTER3 << 3)) {
-        period = COUNTER3_PERIOD;
-    } else if (pmovsr & (IRQ_COUNTER4 << 4)) {
-        period = COUNTER4_PERIOD;
-    } else if (pmovsr & (IRQ_COUNTER5 << 5)) {
-        period = COUNTER5_PERIOD;
-    }
-
-    temp_sample->ip = pc;
-    temp_sample->pid = id;
-    temp_sample->time = time;
-    temp_sample->cpu = 0;
-    temp_sample->period = period;
-
-    ret = enqueue_used(&profiler_ring, buffer, buffer_len, &cookie);
-
-    if (ret != 0) {
-        sel4cp_dbg_puts(sel4cp_name);
-        sel4cp_dbg_puts("Failed to dequeue from profiler used ring\n");
-        return;
-    }
-
-    // Check if the buffers are full (for testing dumping when we have 10 buffers)
-    // Notify the client that we need to dump. If we are dumping, do not 
-    // restart the PMU until we have managed to purge all buffers over the network.
-    if (ring_empty(profiler_ring.free_ring)) {
-        reset_cnt(pmovsr);
-        halt_cnt();
-        sel4cp_notify(CLIENT_CH);
-    } else {
-        reset_cnt(pmovsr);
-        resume_cnt();
-    }
-}
-
-
 /* Halt the PMU */
 void halt_cnt() {
     uint32_t value = 0;
@@ -232,6 +170,67 @@ void configure_cnt4(uint32_t event, uint32_t val) {
 void configure_cnt5(uint32_t event, uint32_t val) {
     asm volatile("isb; msr pmevtyper5_el0, %0" : : "r" (event));
     asm volatile("msr pmevcntr5_el0, %0" : : "r" (val));
+}
+
+/* Add a snapshot of the cycle and event registers to the array. This array needs to become a ring buffer. */
+void add_sample(sel4cp_id id, uint32_t time, uint64_t pc, uint32_t pmovsr) {    
+    uintptr_t buffer = 0;
+    unsigned int buffer_len = 0;
+    void * cookie = 0;
+
+    int ret = dequeue_free(&profiler_ring, &buffer, &buffer_len, &cookie);
+    if (ret != 0) {
+        sel4cp_dbg_puts(sel4cp_name);
+        sel4cp_dbg_puts("Failed to dequeue from profiler free ring\n");
+        return;
+    }
+    pmu_sample_t *temp_sample = (pmu_sample_t *) buffer;
+    
+    // Find which counter overflowed, and the corresponding period
+
+    uint64_t period = 0;
+
+    if (pmovsr & (IRQ_CYCLE_COUNTER << 31)) {
+        period = CYCLE_COUNTER_PERIOD;
+    } else if (pmovsr & (IRQ_COUNTER0 << 0)) {
+        period = COUNTER0_PERIOD;
+    } else if (pmovsr & (IRQ_COUNTER1 << 1)) {
+        period = COUNTER1_PERIOD;
+    } else if (pmovsr & (IRQ_COUNTER2 << 2)) {
+        period = COUNTER2_PERIOD;
+    } else if (pmovsr & (IRQ_COUNTER3 << 3)) {
+        period = COUNTER3_PERIOD;
+    } else if (pmovsr & (IRQ_COUNTER4 << 4)) {
+        period = COUNTER4_PERIOD;
+    } else if (pmovsr & (IRQ_COUNTER5 << 5)) {
+        period = COUNTER5_PERIOD;
+    }
+
+    temp_sample->ip = pc;
+    temp_sample->pid = id;
+    temp_sample->time = time;
+    temp_sample->cpu = 0;
+    temp_sample->period = period;
+
+    ret = enqueue_used(&profiler_ring, buffer, buffer_len, &cookie);
+
+    if (ret != 0) {
+        sel4cp_dbg_puts(sel4cp_name);
+        sel4cp_dbg_puts("Failed to dequeue from profiler used ring\n");
+        return;
+    }
+
+    // Check if the buffers are full (for testing dumping when we have 10 buffers)
+    // Notify the client that we need to dump. If we are dumping, do not 
+    // restart the PMU until we have managed to purge all buffers over the network.
+    if (ring_empty(profiler_ring.free_ring)) {
+        reset_cnt(pmovsr);
+        halt_cnt();
+        sel4cp_notify(CLIENT_CH);
+    } else {
+        reset_cnt(pmovsr);
+        resume_cnt();
+    }
 }
 
 /* Initial user PMU configure interface. This is called during a PPC. With the root/child abstraction, PPC's do not currently work. */

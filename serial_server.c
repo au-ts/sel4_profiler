@@ -37,7 +37,7 @@ void putchar_(char character)
     if(ret != 0) {
         sel4cp_dbg_puts(sel4cp_name);
         sel4cp_dbg_puts(": serial server printf, unable to dequeue from tx ring, tx ring empty. Putchar_\n");
-        return -1;
+        return;
     }
 
     // Need to copy over the string into the buffer, if it is less than the buffer length
@@ -46,7 +46,7 @@ void putchar_(char character)
     if(print_len > BUFFER_SIZE) {
         sel4cp_dbg_puts(sel4cp_name);
         sel4cp_dbg_puts(": print string too long for buffer\n");
-        return -1;
+        return;
     }
 
     // Copy over the string to be printed to the buffer
@@ -61,7 +61,7 @@ void putchar_(char character)
     if(ret != 0) {
         sel4cp_dbg_puts(sel4cp_name);
         sel4cp_dbg_puts(": serial server printf, unable to enqueue to tx used ring\n");
-        return -1;
+        return;
     }
 
     /*
@@ -76,7 +76,7 @@ void putchar_(char character)
         sel4cp_notify(SERVER_PRINT_CHANNEL);
     }
 
-    return 0;
+    return;
 }
 
 /* XMODEM FUNCTIONS */
@@ -120,7 +120,7 @@ void _outbuff(char *buff, unsigned int len) {
         if(ret != 0) {
             sel4cp_dbg_puts(sel4cp_name);
             sel4cp_dbg_puts(": serial server printf, unable to dequeue from tx ring, tx ring empty\n");
-            return -1;
+            return;
         }
 
         // Need to copy over the string into the buffer, if it is less than the buffer length
@@ -129,7 +129,7 @@ void _outbuff(char *buff, unsigned int len) {
         if(print_len > BUFFER_SIZE) {
             sel4cp_dbg_puts(sel4cp_name);
             sel4cp_dbg_puts(": print string too long for buffer\n");
-            return -1;
+            return;
         }
 
         // Copy over the string to be printed to the buffer
@@ -144,7 +144,7 @@ void _outbuff(char *buff, unsigned int len) {
         if(ret != 0) {
             sel4cp_dbg_puts(sel4cp_name);
             sel4cp_dbg_puts(": serial server printf, unable to enqueue to tx used ring\n");
-            return -1;
+            return;
         }
     }
 
@@ -153,7 +153,7 @@ void _outbuff(char *buff, unsigned int len) {
         sel4cp_notify(SERVER_PRINT_CHANNEL);
     }
 
-    return 0;
+    return;
 }
 
 

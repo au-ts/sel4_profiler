@@ -161,11 +161,11 @@ int send_tcp(void *buff) {
     return 0;
 }
 
-int tcp_sent_callback(tcp_sent_fn callback) {
+void tcp_sent_callback(tcp_sent_fn callback) {
     tcp_sent(utiliz_socket, callback);
 }  
 
-int tcp_reset_callback() {
+void tcp_reset_callback() {
     tcp_sent(utiliz_socket, utilization_sent_callback);
 }  
 
