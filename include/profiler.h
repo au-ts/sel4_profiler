@@ -2,6 +2,7 @@
 
 #define BIT(nr) (1UL << (nr))
 
+#define MAX_INSN 10
 
 #define SEL4_USER_CONTEXT_SIZE 0x24
 
@@ -54,6 +55,13 @@
 #define CHAIN 0x1e                  /* Odd performance counter chain mode */
 #define BUS_ACCESS_LD 0x60          /* Bus access - Read */
 
+/* Different profiler states */
+enum profiler_states {
+    PROF_INIT,
+    PROF_START,
+    PROF_HALT
+};
+
 /* TO-DO: There are more events as defined in the cortex a55 spec. Add these here. */
 
 struct pmu_config_args {
@@ -65,3 +73,14 @@ struct pmu_config_args {
 };
 
 typedef struct pmu_config_args pmu_config_args_t;
+
+struct pmu_sample {
+    uint64_t ip;            /* Instruction pointer */
+    uint32_t pid;           /* Process ID */
+    uint64_t time;          /* Timestamp */
+    uint32_t cpu;           /* CPU affinity */
+    uint64_t period;        /* Number of events per sample */
+    uint64_t ips[MAX_INSN]; /* Call stack - MAX_INSN = 10 */
+};
+
+typedef struct pmu_sample pmu_sample_t;
