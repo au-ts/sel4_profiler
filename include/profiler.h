@@ -2,7 +2,7 @@
 
 #define BIT(nr) (1UL << (nr))
 
-#define MAX_INSN 10
+#define MAX_INSN 4
 
 #define SEL4_USER_CONTEXT_SIZE 0x24
 
@@ -74,13 +74,13 @@ struct pmu_config_args {
 
 typedef struct pmu_config_args pmu_config_args_t;
 
-struct pmu_sample {
+struct seL4_pmu_sample {
     uint64_t ip;            /* Instruction pointer */
     uint32_t pid;           /* Process ID */
     uint64_t time;          /* Timestamp */
     uint32_t cpu;           /* CPU affinity */
     uint64_t period;        /* Number of events per sample */
-    uint64_t ips[MAX_INSN]; /* Call stack - MAX_INSN = 10 */
+    uint64_t ips[MAX_INSN]; /* Call stack - MAX_INSN = 4 */
 };
 
-typedef struct pmu_sample pmu_sample_t;
+typedef struct seL4_pmu_sample pmu_sample_t;

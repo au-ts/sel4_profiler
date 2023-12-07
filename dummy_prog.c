@@ -29,6 +29,15 @@ void endless_loop() {
     }
 }
 
+void endless_loop_stage1() {
+    for (int i = 1; i < 999999999999; i++) {
+        if (i % 120000 == 0) {
+            endless_loop();
+            i = 0;
+        }
+    }
+}
+
 void init() {
     endless_loop();
 }

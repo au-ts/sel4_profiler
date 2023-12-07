@@ -39,11 +39,12 @@ NETWORK_COMPONENTS=network/components
 RINGBUFFERDIR=libserialsharedringbuffer
 XMODEMDIR=xmodem
 UARTDIR=uart
+NANOPBDIR=nanopb
 
 BOARD_DIR := $(SEL4CP_SDK)/board/$(SEL4CP_BOARD)/$(SEL4CP_CONFIG)
 
 IMAGES := profiler.elf client.elf uart.elf uart_mux_rx.elf uart_mux_tx.elf dummy_prog.elf dummy_prog2.elf eth.elf eth_mux_rx.elf eth_mux_tx.elf eth_copy.elf arp.elf timer.elf
-CFLAGS := -mcpu=$(CPU) -mstrict-align -ffreestanding -g3 -O3 -Wall  -Wno-unused-function -fno-omit-frame-pointer
+CFLAGS := -mcpu=$(CPU) -mstrict-align -ffreestanding -g -O0 -Wall  -Wno-unused-function -fno-omit-frame-pointer
 LDFLAGS := -L$(BOARD_DIR)/lib -Llib
 LIBS := -lsel4cp -Tsel4cp.ld -lc
 
@@ -104,7 +105,7 @@ UART_OBJS := uart/uart.o libserialsharedringbuffer/shared_ringbuffer.o
 UART_MUX_TX_OBJS := uart/mux_tx.o libserialsharedringbuffer/shared_ringbuffer.o
 UART_MUX_RX_OBJS := uart/mux_rx.o libserialsharedringbuffer/shared_ringbuffer.o
 PROFILER_OBJS := profiler.o libserialsharedringbuffer/shared_ringbuffer.o
-CLIENT_OBJS := client.o serial_server.o printf.o libserialsharedringbuffer/shared_ringbuffer.o xmodem/crc16.o xmodem/xmodem.o $(LWIPFILES:.c=.o) $(NETWORK_COMPONENTS)/lwip.o $(NETWORK_COMPONENTS)/utilization_socket.o
+CLIENT_OBJS := client.o serial_server.o printf.o libserialsharedringbuffer/shared_ringbuffer.o xmodem/crc16.o xmodem/xmodem.o $(LWIPFILES:.c=.o) $(NETWORK_COMPONENTS)/lwip.o $(NETWORK_COMPONENTS)/utilization_socket.o $(NANOPBDIR)/pmu_sample.pb.o $(NANOPBDIR)/pb_common.o $(NANOPBDIR)/pb_encode.o
 DUMMY_PROG_OBJS := dummy_prog.o
 DUMMY_PROG2_OBJS := dummy_prog2.o
 

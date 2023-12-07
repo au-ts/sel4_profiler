@@ -24,4 +24,5 @@ void init() {
 void notified (sel4cp_channel ch) {
     sel4cp_dbg_puts("in dummy prog 2\n");
     big_loop();
+    sel4cp_dbg_puts("we have finished prog2\n");
 }
