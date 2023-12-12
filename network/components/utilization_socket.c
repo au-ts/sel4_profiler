@@ -11,7 +11,7 @@
  */
 
 #include <string.h>
-#include <sel4cp.h>
+#include <microkit.h>
 
 #include "lwip/ip.h"
 #include "lwip/pbuf.h"
@@ -75,7 +75,7 @@ uint64_t idle_overflow_start;
 
 static err_t utilization_sent_callback(void *arg, struct tcp_pcb *pcb, u16_t len)
 {
-    sel4cp_dbg_puts("sent callback\n");
+    microkit_dbg_puts("sent callback\n");
     return ERR_OK;
 }
 
@@ -94,31 +94,31 @@ static err_t utilization_recv_callback(void *arg, struct tcp_pcb *pcb, struct pb
     if (msg_match(data_packet_str, HELLO)) {
         error = tcp_write(pcb, OK_READY, strlen(OK_READY), TCP_WRITE_FLAG_COPY);
         if (error) {
-            sel4cp_dbg_puts("Failed to send OK_READY message through utilization peer");
+            microkit_dbg_puts("Failed to send OK_READY message through utilization peer");
         }
     } else if (msg_match(data_packet_str, START)) {
-        print(sel4cp_name);
+        print(microkit_name);
         print(" measurement starting... \n");
-        sel4cp_notify(START_PMU);
+        microkit_notify(START_PMU);
     } else if (msg_match(data_packet_str, STOP)) {
-        print(sel4cp_name);
+        print(microkit_name);
         print(" measurement finished \n");;
-        sel4cp_notify(STOP_PMU);
+        microkit_notify(STOP_PMU);
     } else if (msg_match(data_packet_str, MAPPINGS)) {
         error = tcp_write(pcb, MAPPINGS_STR, strlen(MAPPINGS_STR), TCP_WRITE_FLAG_COPY);
         if (error) {
-            sel4cp_dbg_puts("Failed to send OK message through utilization peer");
+            microkit_dbg_puts("Failed to send OK message through utilization peer");
         }
     } else if (msg_match(data_packet_str, REFRESH)) {
         // This is just to refresh the socket from the linux client side
         return ERR_OK;
     } else {
-        sel4cp_dbg_puts("Received a message that we can't handle ");
-        sel4cp_dbg_puts(data_packet_str);
-        sel4cp_dbg_puts("\n");
+        microkit_dbg_puts("Received a message that we can't handle ");
+        microkit_dbg_puts(data_packet_str);
+        microkit_dbg_puts("\n");
         error = tcp_write(pcb, ERROR, strlen(ERROR), TCP_WRITE_FLAG_COPY);
         if (error) {
-            sel4cp_dbg_puts("Failed to send OK message through utilization peer");
+            microkit_dbg_puts("Failed to send OK message through utilization peer");
         }
     }
 

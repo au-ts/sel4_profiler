@@ -1,6 +1,6 @@
 #pragma once
 
-#include <sel4cp.h>
+#include <microkit.h>
 #include "lwip/ip.h"
 #include "lwip/pbuf.h"
 #include "lwip/tcp.h"
@@ -16,7 +16,7 @@
 int setup_utilization_socket(void);
 
 void init_lwip(void);
-void notified_lwip(sel4cp_channel ch);
+void notified_lwip(microkit_channel ch);
 int send_tcp(void *buff);
 void tcp_sent_callback(tcp_sent_fn callback);
 void tcp_reset_callback();

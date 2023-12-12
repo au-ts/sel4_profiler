@@ -4,7 +4,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include <sel4cp.h>
+#include <microkit.h>
 #include <sel4/sel4.h>
 #include "uart.h"
 #include "uart_config.h"
@@ -114,7 +114,7 @@ int serial_configure(
     }
     /* Apply the changes */
     regs->cr2 = cr2;
-    // sel4cp_dbg_puts("finished configuring the line, setting the baud rate\n");
+    // microkit_dbg_puts("finished configuring the line, setting the baud rate\n");
     /* Now set the board rate */
     imx_uart_set_baud(bps);
     return 0;
@@ -209,11 +209,11 @@ void handle_irq() {
     */
     int input = getchar();
     char input_char = (char) input;
-    sel4cp_irq_ack(IRQ_CH);
+    microkit_irq_ack(IRQ_CH);
 
     if (input == -1) {
-        sel4cp_dbg_puts(sel4cp_name);
-        sel4cp_dbg_puts(": invalid input when attempting to getchar\n");
+        microkit_dbg_puts(microkit_name);
+        microkit_dbg_puts(": invalid input when attempting to getchar\n");
         return;
     }
 
@@ -248,8 +248,8 @@ void handle_irq() {
         ret = dequeue_free(&rx_ring, &buffer, &buffer_len, &cookie);
 
         if (ret != 0) {
-            sel4cp_dbg_puts(sel4cp_name);
-            sel4cp_dbg_puts(": unable to dequeue from the rx free ring\n");
+            microkit_dbg_puts(microkit_name);
+            microkit_dbg_puts(": unable to dequeue from the rx free ring\n");
             return;
         }
 
@@ -257,7 +257,7 @@ void handle_irq() {
 
         // Now place in the rx used ring
         ret = enqueue_used(&rx_ring, buffer, 1, &cookie);
-        sel4cp_notify(RX_CH);
+        microkit_notify(RX_CH);
 
     } else if (global_serial_driver.mode == LINE_MODE) {
         // Place in a buffer, until we reach a new line, ctrl+d/ctrl+c/enter (check what else can stop)
@@ -272,8 +272,8 @@ void handle_irq() {
 
             ret = dequeue_free(&rx_ring, &buffer, &buffer_len, &cookie);
             if (ret != 0) {
-                sel4cp_dbg_puts(sel4cp_name);
-                sel4cp_dbg_puts(": unable to dequeue from the rx free ring\n");
+                microkit_dbg_puts(microkit_name);
+                microkit_dbg_puts(": unable to dequeue from the rx free ring\n");
                 return;
             }
 
@@ -298,7 +298,7 @@ void handle_irq() {
                 // Zero out the driver states
                 global_serial_driver.line_buffer = 0;
                 global_serial_driver.line_buffer_size = 0;
-                sel4cp_notify(RX_CH);
+                microkit_notify(RX_CH);
 
         } else {
             // Otherwise, add to the character array
@@ -319,16 +319,16 @@ void handle_irq() {
 
 
     if (ret != 0) {
-        sel4cp_dbg_puts(sel4cp_name);
-        sel4cp_dbg_puts(": unable to enqueue to the tx free ring\n");
+        microkit_dbg_puts(microkit_name);
+        microkit_dbg_puts(": unable to enqueue to the tx free ring\n");
         return;
     }
 }
 
 // Init function required by CP for every PD
 void init(void) {
-    sel4cp_dbg_puts(sel4cp_name);
-    sel4cp_dbg_puts(": elf PD init function running\n");
+    microkit_dbg_puts(microkit_name);
+    microkit_dbg_puts(": elf PD init function running\n");
 
     // Init the shared ring buffers
     ring_init(&rx_ring, (ring_buffer_t *)rx_free, (ring_buffer_t *)rx_used, 0, SIZE, SIZE);
@@ -340,7 +340,7 @@ void init(void) {
     int ret = serial_configure(115200, 8, PARITY_NONE, 1, UART_MODE, ECHO_MODE);
 
     if (ret != 0) {
-        sel4cp_dbg_puts("Error occured during line configuration\n");
+        microkit_dbg_puts("Error occured during line configuration\n");
     }
 
     /* Enable the UART */
@@ -356,7 +356,7 @@ void init(void) {
 }
 
 // Entry point that is invoked on a serial interrupt, or notifications from the server using the TX and RX channels
-void notified(sel4cp_channel ch) {
+void notified(microkit_channel ch) {
     switch(ch) {
         case IRQ_CH:
             handle_irq();
@@ -367,7 +367,7 @@ void notified(sel4cp_channel ch) {
         case RX_CH:
             break;
         default:
-            sel4cp_dbg_puts("serial driver: received notification on unexpected channel\n");
+            microkit_dbg_puts("serial driver: received notification on unexpected channel\n");
             break;
     }
 }

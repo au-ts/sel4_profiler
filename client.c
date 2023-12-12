@@ -1,7 +1,7 @@
 /* Test client for dumping profiler buffers when full */
 
 #include <stdint.h>
-#include <sel4cp.h>
+#include <microkit.h>
 #include <sel4/sel4.h>
 #include "client.h"
 #include "perf.h"
@@ -87,16 +87,16 @@ void xmodem_dump() {
     while(!dequeue_used(&profiler_ring, &buffer, &size, &cookie)) {
         dequeue_used(&profiler_ring, &buffer, &size, &cookie);
         int ret = xmodemTransmit((unsigned char *) buffer, 128);
-        sel4cp_dbg_puts("This is the ret of xmodem: ");
+        microkit_dbg_puts("This is the ret of xmodem: ");
         puthex64(ret);
-        sel4cp_dbg_puts("\n");
+        microkit_dbg_puts("\n");
         enqueue_free(&profiler_ring, buffer, size, cookie);
     }   
 }
 
 static err_t eth_dump_callback(void *arg, struct tcp_pcb *pcb, uint16_t len)
 {
-    // sel4cp_dbg_puts("Eth dump callback\n");
+    // microkit_dbg_puts("Eth dump callback\n");
     uintptr_t buffer = 0;
     unsigned int size = 0;
     void *cookie = 0;
@@ -106,7 +106,7 @@ static err_t eth_dump_callback(void *arg, struct tcp_pcb *pcb, uint16_t len)
     if (ring_empty(profiler_ring.used_ring)) {
         tcp_reset_callback();
         client_state = CLIENT_IDLE;
-        sel4cp_notify(30);
+        microkit_notify(30);
     } else if (!dequeue_used(&profiler_ring, &buffer, &size, &cookie)) {
         // Dequeue from the profiler used ring
         pmu_sample_t *sample = (pmu_sample_t *) buffer;
@@ -137,7 +137,7 @@ static err_t eth_dump_callback(void *arg, struct tcp_pcb *pcb, uint16_t len)
 
         enqueue_free(&profiler_ring, buffer, size, cookie);
 
-        // sel4cp_dbg_puts("Sending buffers over network\n");
+        // microkit_dbg_puts("Sending buffers over network\n");
 
         send_tcp(&sample_string);
     }
@@ -157,9 +157,9 @@ void eth_dump_start() {
     if (ring_empty(profiler_ring.used_ring)) {
         // If we are done dumping the buffers, we can resume the PMU
         client_state = CLIENT_IDLE;
-        sel4cp_notify(RESUME_PMU);
+        microkit_notify(RESUME_PMU);
     } else if (!dequeue_used(&profiler_ring, &buffer, &size, &cookie)) {
-        // sel4cp_dbg_puts("Sending initial buffer\n");
+        // microkit_dbg_puts("Sending initial buffer\n");
         pmu_sample_t *sample = (pmu_sample_t *) buffer;
         char sample_string[100];
 
@@ -209,7 +209,7 @@ void init() {
     ring_init(&profiler_ring, (ring_buffer_t *) profiler_ring_free, (ring_buffer_t *) profiler_ring_used, 0, 512, 512);
 }
 
-void notified(sel4cp_channel ch) {
+void notified(microkit_channel ch) {
     // Notified to empty profiler sample buffers
     if (ch == CLIENT_CH) {
         // Determine how to dump buffers
