@@ -18,10 +18,10 @@ struct Args {
 }
 
 fn main() -> std::io::Result<()> {
+    let args = Args::parse();
+
     let mut file = File::create("perf.data")?;
     let mut perf_file = PerfFile::new()?;
-
-    let args = Args::parse();
 
     // add samples from samples file
     let samples_file = sample_parser::parse_samples(args.samples_path)?;
