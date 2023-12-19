@@ -1,6 +1,6 @@
 use serde::{Serialize, Deserialize};
 
-pub const CALL_STACK_DEPTH: usize = 10;
+pub const CALL_STACK_DEPTH: usize = 4;
 
 #[repr(C)]
 #[derive(Debug, Serialize, Deserialize)]
@@ -21,5 +21,5 @@ pub struct Sel4Sample {
     pub period: u64,
 
     // // call stack - provides a trace of addresses for functions called
-    // pub ips: [u64; CALL_STACK_DEPTH],
+    pub ips: [u64; CALL_STACK_DEPTH],
 }

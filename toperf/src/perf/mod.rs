@@ -33,7 +33,7 @@ impl PerfFile {
         attribute.attr.sample_period_or_freq = 4000;
 
         // include all sample information
-        attribute.attr.sample_type = SampleType::IP | SampleType::TID | SampleType::TIME | SampleType::CPU | SampleType::PERIOD;
+        attribute.attr.sample_type = SampleType::IP | SampleType::TID | SampleType::TIME | SampleType::CPU | SampleType::PERIOD | SampleType::CALLCHAIN;
 
         attribute.attr.attr_flags = AttributeFlags::DISABLED
             | AttributeFlags::INHERIT
@@ -41,7 +41,8 @@ impl PerfFile {
             | AttributeFlags::COMM
             | AttributeFlags::FREQ
             | AttributeFlags::SAMPLE_ID_ALL
-            | AttributeFlags::COMM_EXEC;
+            | AttributeFlags::COMM_EXEC
+            | AttributeFlags::EXCLUDE_CALLCHAIN_KERNEL;
 
         Ok(PerfFile {
             header,

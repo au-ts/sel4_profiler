@@ -1,6 +1,6 @@
 // this file outlines structures related to the data section of the file
 
-use crate::sample::Sel4Sample;
+use crate::sample::{Sel4Sample, CALL_STACK_DEPTH};
 
 use std::{mem, io::Write, fmt, ffi::CStr};
 
@@ -71,6 +71,15 @@ pub enum EventType {
 
 #[repr(C)]
 #[derive(Debug)]
+pub struct SampleIpCallchain {
+    pub nr: u64,
+    // TODO: it is a bit less than ideal for us to hard-code this
+    // to CALL_STACK_DEPTH. Ideally it would be a run-time value.
+    pub ips: [u64; CALL_STACK_DEPTH],
+}
+
+#[repr(C)]
+#[derive(Debug)]
 pub struct SampleEvent {
     header: EventHeader,
 
@@ -84,6 +93,7 @@ pub struct SampleEvent {
     pub time: u64,
     pub cpu: u32,
     pub period: u64,
+    pub callchain: SampleIpCallchain,
 }
 
 impl SampleEvent {
@@ -94,6 +104,12 @@ impl SampleEvent {
             size: mem::size_of::<SampleEvent>() as u16,
         };
 
+        // TODO: check that sample.ips.len matches CALL_STACK_DEPTH
+        let callchain = SampleIpCallchain {
+            nr: sample.ips.len() as u64,
+            ips: sample.ips,
+        };
+
         SampleEvent {
             header,
             ip: sample.ip,
@@ -102,6 +118,7 @@ impl SampleEvent {
             time: sample.timestamp,
             cpu: sample.cpu,
             period: sample.period,
+            callchain: callchain,
         }
     }
 }
@@ -119,7 +136,14 @@ impl fmt::Display for SampleEvent {
         writeln!(f, " time: {}", self.time)?;
         writeln!(f, " cpu: {}", self.cpu)?;
         writeln!(f, " period: {}", self.period)?;
-        Ok(())
+        writeln!(f, " callchain:")?;
+        writeln!(f, "  nr: {}", self.callchain.nr)?;
+        writeln!(f, "  ips: [")?;
+        for ip in self.callchain.ips {
+            writeln!(f, "    {:#018x},", ip)?;
+        }
+        writeln!(f, "  ]")?;
+        Ok(()) 
     }
 }
 
@@ -198,9 +222,9 @@ impl MmapEvent {
             header,
             pid,
             tid: pid,
-            start: 0,
-            len: 4096,
-            pgoff: 4096,
+            start: 2031616,
+            len: 52768000,
+            pgoff: 0,
             filename,
         }
     }
