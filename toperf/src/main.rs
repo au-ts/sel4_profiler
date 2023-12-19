@@ -6,10 +6,13 @@ use clap::Parser;
 
 #[derive(Parser, Debug)]
 struct Args {
-    /// path of the sample file in json format
+    /// Path to the output perf data file
+    #[arg(short, long, default_value = "perf.data")]
+    output: String,
+    /// Path of the sample file in JSON format
     #[arg(short, long)]
     samples_path: String,
-    /// path to build directory
+    /// Path to build directory containing ELFs referenced in the samples
     #[arg(short, long)]
     build_dir: String,
     /// Print a summary of the samples parsed to stdout
@@ -20,7 +23,7 @@ struct Args {
 fn main() -> std::io::Result<()> {
     let args = Args::parse();
 
-    let mut file = File::create("perf.data")?;
+    let mut file = File::create(args.output)?;
     let mut perf_file = PerfFile::new()?;
 
     // add samples from samples file
