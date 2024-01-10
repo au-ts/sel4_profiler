@@ -135,7 +135,7 @@ static err_t eth_dump_callback(void *arg, struct tcp_pcb *pcb, uint16_t len)
 
         // // Encode the message
         bool status = pb_encode(&stream, pmu_sample_fields, &pb_sample);
-        uint64_t message_len = (uint64_t) stream.bytes_written;
+        uint32_t message_len = (uint32_t) stream.bytes_written;
 
         if (!status) {
             microkit_dbg_puts("Nanopb encoding failed\n");
@@ -145,12 +145,17 @@ static err_t eth_dump_callback(void *arg, struct tcp_pcb *pcb, uint16_t len)
         
         // We first want to send the size of the following buffer, then the buffer itself
         char size_str[8];
+        u32_t htonl_size = lwip_htonl(message_len);
         my_itoa(message_len, size_str);
-        microkit_dbg_puts("This is the value of size_conv: ");
-        microkit_dbg_puts(size_str);
-        microkit_dbg_puts("\n");
-        send_tcp(&size_str);
-        send_tcp(&pb_buff);
+        // microkit_dbg_puts("This is the value of size_str: ");
+        // microkit_dbg_puts(size_str);
+        // microkit_dbg_puts("\n");
+        // microkit_dbg_puts("This is the size of size_str: ");
+        // puthex64(strlen(size_str));
+        // microkit_dbg_puts("\n");
+        send_tcp(&size_str, 2);
+        send_tcp(&pb_buff, message_len);
+    
     }
 
 
@@ -194,7 +199,7 @@ void eth_dump_start() {
 
         // // Encode the message
         bool status = pb_encode(&stream, pmu_sample_fields, &pb_sample);
-        uint64_t message_len = (uint64_t) stream.bytes_written;
+        uint32_t message_len = (uint32_t) stream.bytes_written;
 
         if (!status) {
             microkit_dbg_puts("Nanopb encoding failed\n");
@@ -203,13 +208,17 @@ void eth_dump_start() {
         enqueue_free(&profiler_ring, buffer, size, cookie);
 
         // We first want to send the size of the following buffer, then the buffer itself
-        char size_str[16];
+        char size_str[8];
+        u32_t htonl_size = lwip_htonl(message_len);
         my_itoa(message_len, size_str);
-        microkit_dbg_puts("This is the value of size_conv: ");
-        microkit_dbg_puts(size_str);
-        microkit_dbg_puts("\n");
-        send_tcp(&size_str);
-        send_tcp(&pb_buff);
+        // microkit_dbg_puts("This is the value of size_str: ");
+        // microkit_dbg_puts(size_str);
+        // microkit_dbg_puts("\n");
+        // microkit_dbg_puts("This is the size of size_str: ");
+        // puthex64(strlen(size_str));
+        // microkit_dbg_puts("\n");
+        send_tcp(&size_str, 2);
+        send_tcp(&pb_buff, message_len);
     }
     
 }
