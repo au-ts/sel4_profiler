@@ -186,7 +186,7 @@ int xmodemTransmit(unsigned char *src, int srcsz)
 					if ((c = _inbyte(DLY_1S)) == CAN) {
 						putchar_(ACK);
 						flushinput();
-                        sel4cp_dbg_puts("Cancelled by remote\n");
+                        microkit_dbg_puts("Cancelled by remote\n");
 						return -1; /* canceled by remote */
 					}
 					break;
@@ -199,7 +199,7 @@ int xmodemTransmit(unsigned char *src, int srcsz)
 		putchar_(CAN);
 		putchar_(CAN);
 		flushinput();
-        sel4cp_dbg_puts("No sync\n");
+        microkit_dbg_puts("No sync\n");
 		return -2; /* no sync */
 
 		for(;;) {
@@ -231,18 +231,18 @@ int xmodemTransmit(unsigned char *src, int srcsz)
 					xbuff[bufsz+3] = ccks;
 				}
 				for (retry = 0; retry < MAXRETRANS; ++retry) {
-                    sel4cp_dbg_puts("Sending via putchar_\n");
+                    microkit_dbg_puts("Sending via putchar_\n");
 					for (i = 0; i < bufsz+4+(crc?1:0); ++i) {
 						putchar_(xbuff[i]);
 					}
-                    sel4cp_dbg_puts("Sent via putchar_\n");
+                    microkit_dbg_puts("Sent via putchar_\n");
                     // Send the entire buffer
                     // _outbuff(xbuff, bufsz+4+(crc?1:0));
-                    // sel4cp_dbg_puts("sent via outbuff\n");
+                    // microkit_dbg_puts("sent via outbuff\n");
 					if ((c = _inbyte(DLY_1S)) >= 0 ) {
 						switch (c) {
 						case ACK:
-                            sel4cp_dbg_puts("recv ack in start trans\n");
+                            microkit_dbg_puts("recv ack in start trans\n");
 							++packetno;
 							len += bufsz;
 							goto start_trans;
@@ -250,7 +250,7 @@ int xmodemTransmit(unsigned char *src, int srcsz)
 							if ((c = _inbyte(DLY_1S)) == CAN) {
 								putchar_(ACK);
 								flushinput();
-                                sel4cp_dbg_puts("Cancelled by remote\n");
+                                microkit_dbg_puts("Cancelled by remote\n");
 								return -1; /* canceled by remote */
 							}
 							break;
@@ -264,23 +264,23 @@ int xmodemTransmit(unsigned char *src, int srcsz)
 				putchar_(CAN);
 				putchar_(CAN);
 				flushinput();
-                sel4cp_dbg_puts("Xmit error\n");
+                microkit_dbg_puts("Xmit error\n");
 				return -4; /* xmit error */
 			}
 			else {
-                sel4cp_dbg_puts("Sending end of transmit\n");
+                microkit_dbg_puts("Sending end of transmit\n");
 				for (retry = 0; retry < 10; ++retry) {
 					putchar_(EOT);
 					if ((c = _inbyte((DLY_1S)<<1)) == ACK) break;
 				}
-                sel4cp_dbg_puts("recv second ack");
+                microkit_dbg_puts("recv second ack");
 				// flushinput();
-                sel4cp_dbg_puts("We good\n");
+                microkit_dbg_puts("We good\n");
 				return (c == ACK)?len:-5;
 			}
 		}
 	}
-    sel4cp_dbg_puts("Finished xmode transmit\n");
+    microkit_dbg_puts("Finished xmode transmit\n");
 }
 
 #ifdef TEST_XMODEM_RECEIVE

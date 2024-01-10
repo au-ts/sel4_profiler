@@ -1,6 +1,6 @@
 #include <stdbool.h>
 #include <stdint.h>
-#include <sel4cp.h>
+#include <microkit.h>
 #include <sel4/sel4.h>
 #include <string.h>
 #include "profiler.h"
@@ -173,15 +173,15 @@ void configure_cnt5(uint32_t event, uint32_t val) {
 }
 
 /* Add a snapshot of the cycle and event registers to the array. This array needs to become a ring buffer. */
-void add_sample(sel4cp_id id, uint32_t time, uint64_t pc, uint32_t pmovsr, uint64_t *cc) {    
+void add_sample(microkit_id id, uint32_t time, uint64_t pc, uint32_t pmovsr, uint64_t *cc) {    
     uintptr_t buffer = 0;
     unsigned int buffer_len = 0;
     void * cookie = 0;
 
     int ret = dequeue_free(&profiler_ring, &buffer, &buffer_len, &cookie);
     if (ret != 0) {
-        sel4cp_dbg_puts(sel4cp_name);
-        sel4cp_dbg_puts("Failed to dequeue from profiler free ring\n");
+        microkit_dbg_puts(microkit_name);
+        microkit_dbg_puts("Failed to dequeue from profiler free ring\n");
         return;
     }
     pmu_sample_t *temp_sample = (pmu_sample_t *) buffer;
@@ -219,8 +219,8 @@ void add_sample(sel4cp_id id, uint32_t time, uint64_t pc, uint32_t pmovsr, uint6
     ret = enqueue_used(&profiler_ring, buffer, buffer_len, &cookie);
 
     if (ret != 0) {
-        sel4cp_dbg_puts(sel4cp_name);
-        sel4cp_dbg_puts("Failed to dequeue from profiler used ring\n");
+        microkit_dbg_puts(microkit_name);
+        microkit_dbg_puts("Failed to dequeue from profiler used ring\n");
         return;
     }
 
@@ -230,7 +230,7 @@ void add_sample(sel4cp_id id, uint32_t time, uint64_t pc, uint32_t pmovsr, uint6
     if (ring_empty(profiler_ring.free_ring)) {
         reset_cnt(pmovsr);
         halt_cnt();
-        sel4cp_notify(CLIENT_CH);
+        microkit_notify(CLIENT_CH);
     } else {
         reset_cnt(pmovsr);
         resume_cnt();
@@ -268,13 +268,13 @@ void user_pmu_configure(pmu_config_args_t config_args) {
 
 /* PPC will arrive from application to configure the PMU */
 seL4_MessageInfo_t
-protected(sel4cp_channel ch, sel4cp_msginfo msginfo)
+protected(microkit_channel ch, microkit_msginfo msginfo)
 {
     // This is deprecated for now. Using a shared memory region between process and profiler to control/configure
     // For now we should only be recieving on channel 5
     if (ch == 5) {
         // For now, we should have only 1 message 
-        uint32_t config = sel4cp_mr_get(0);
+        uint32_t config = microkit_mr_get(0);
 
         switch (config)
         {
@@ -286,26 +286,26 @@ protected(sel4cp_channel ch, sel4cp_msginfo msginfo)
             halt_cnt();
             // Also want to flush out anything that may be left in the ring buffer
             // Purge buffers if any
-            sel4cp_notify(CLIENT_HALT);
+            microkit_notify(CLIENT_HALT);
             break;
         case PROFILER_CONFIGURE:
             {
             /* Example layout of what a call to profile configure should look like (Based on the perfmon2 spec):
-                sel4cp_mr_set(0, PROFILER_CONFIGURE);
-                sel4cp_mr_set(1, REG_NUM);
-                sel4cp_mr_set(2, EVENT NUM);
-                sel4cp_mr_set(3, FLAGS(empty for now));
-                sel4cp_mr_set(4, VAL_UPPER);
-                sel4cp_mr_set(5, VAL_LOWER);
+                microkit_mr_set(0, PROFILER_CONFIGURE);
+                microkit_mr_set(1, REG_NUM);
+                microkit_mr_set(2, EVENT NUM);
+                microkit_mr_set(3, FLAGS(empty for now));
+                microkit_mr_set(4, VAL_UPPER);
+                microkit_mr_set(5, VAL_LOWER);
             These message registers are then unpacted here and applied to the PMU state.     
             */
 
             pmu_config_args_t args;
-            args.reg_num = sel4cp_mr_get(1);
-            args.reg_event = sel4cp_mr_get(2);
-            args.reg_flags = sel4cp_mr_get(3);
-            uint32_t top = sel4cp_mr_get(4);
-            uint32_t bottom = sel4cp_mr_get(5);
+            args.reg_num = microkit_mr_get(1);
+            args.reg_event = microkit_mr_get(2);
+            args.reg_flags = microkit_mr_get(3);
+            uint32_t top = microkit_mr_get(4);
+            uint32_t bottom = microkit_mr_get(5);
             args.reg_val = ((uint64_t) top << 32) | bottom;
             user_pmu_configure(args);
             break;
@@ -314,7 +314,7 @@ protected(sel4cp_channel ch, sel4cp_msginfo msginfo)
             break;
         }
     }
-    return sel4cp_msginfo_new(0, 0);
+    return microkit_msginfo_new(0, 0);
 }
 
 void init () {
@@ -329,8 +329,8 @@ void init () {
         int ret = enqueue_free(&profiler_ring, profiler_mem + (i * sizeof(perf_sample_t)), sizeof(perf_sample_t), NULL);
         
         if (ret != 0) {
-            sel4cp_dbg_puts(sel4cp_name);
-            sel4cp_dbg_puts("Failed to populate buffers for the perf record ring buffer\n");
+            microkit_dbg_puts(microkit_name);
+            microkit_dbg_puts("Failed to populate buffers for the perf record ring buffer\n");
             break;
         }
     }
@@ -352,41 +352,41 @@ void init () {
     profiler_state = PROF_INIT;
 }
 
-void notified(sel4cp_channel ch) {
+void notified(microkit_channel ch) {
     if (ch == 10) {
-        sel4cp_dbg_puts("Starting PMU\n");
+        microkit_dbg_puts("Starting PMU\n");
         // Set the profiler state to start
         profiler_state = PROF_START;
         configure_clkcnt(CYCLE_COUNTER_PERIOD);
         resume_cnt();
     } else if (ch == 20) {
-        sel4cp_dbg_puts("Halting PMU\n");
+        microkit_dbg_puts("Halting PMU\n");
         // Set the profiler state to halt
         profiler_state = PROF_HALT;
         halt_cnt();
         // Purge any buffers that may be leftover
-        sel4cp_notify(CLIENT_CH);
+        microkit_notify(CLIENT_CH);
     } else if (ch == 30) {
         // Only resume if profiler state is in 'START' state
         if (profiler_state == PROF_START) {
-            sel4cp_dbg_puts("Resuming PMU\n");
+            microkit_dbg_puts("Resuming PMU\n");
             resume_cnt();
         }
     }
 }
 
-void fault(sel4cp_id id, sel4cp_msginfo msginfo) {
-    size_t label = sel4cp_msginfo_get_label(msginfo);
+void fault(microkit_id id, microkit_msginfo msginfo) {
+    size_t label = microkit_msginfo_get_label(msginfo);
     if (label == seL4_Fault_PMUEvent) {
-        uint64_t pc = sel4cp_mr_get(0);
-        uint32_t ccnt_lower = sel4cp_mr_get(1);
-        uint32_t ccnt_upper = sel4cp_mr_get(2);
-        uint32_t pmovsr = sel4cp_mr_get(3);
+        uint64_t pc = microkit_mr_get(0);
+        uint32_t ccnt_lower = microkit_mr_get(1);
+        uint32_t ccnt_upper = microkit_mr_get(2);
+        uint32_t pmovsr = microkit_mr_get(3);
         uint64_t cc[4];
-        cc[0] = sel4cp_mr_get(4);
-        cc[1] = sel4cp_mr_get(5);
-        cc[2] = sel4cp_mr_get(6);
-        cc[3] = sel4cp_mr_get(7);
+        cc[0] = microkit_mr_get(4);
+        cc[1] = microkit_mr_get(5);
+        cc[2] = microkit_mr_get(6);
+        cc[3] = microkit_mr_get(7);
 
         uint64_t time = ((uint64_t) ccnt_upper << 32) | ccnt_lower;
         // profiler_handle_fault(pc, ccnt_lower, ...);
@@ -404,11 +404,11 @@ void fault(sel4cp_id id, sel4cp_msginfo msginfo) {
             // Print out the callchain
             // if (id == 14){
             //     for (int i = 0; i < MAX_INSN; i++) {
-            //         sel4cp_dbg_puts("cc: ");
+            //         microkit_dbg_puts("cc: ");
             //         puthex64(cc[i]);
-            //         sel4cp_dbg_puts("\n");
+            //         microkit_dbg_puts("\n");
             //     }
-            //     sel4cp_dbg_puts("\n");
+            //     microkit_dbg_puts("\n");
             // }
         } else {
             reset_cnt(pmovsr);
@@ -416,6 +416,6 @@ void fault(sel4cp_id id, sel4cp_msginfo msginfo) {
         }
     }
 
-    sel4cp_fault_reply(sel4cp_msginfo_new(0, 0));
+    microkit_fault_reply(microkit_msginfo_new(0, 0));
 
 }

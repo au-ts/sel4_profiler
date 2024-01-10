@@ -1,6 +1,6 @@
 #include <stdbool.h>
 #include <stdint.h>
-#include <sel4cp.h>
+#include <microkit.h>
 #include <sel4/sel4.h>
 #include <string.h>
 #include "profiler.h"
@@ -19,7 +19,7 @@ void endless_loop() {
     while(1) {
         if (i == 999999999) {
             i = 0;
-            sel4cp_notify(6);
+            microkit_notify(6);
             ticker++;
         } else if (ticker == 5) {
             break;
@@ -42,5 +42,5 @@ void init() {
     endless_loop();
 }
 
-void notified (sel4cp_channel ch) {
+void notified (microkit_channel ch) {
 }
