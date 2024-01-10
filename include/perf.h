@@ -5,7 +5,7 @@
 /* Perf file format as described by CERN */
 
 // Defines the max depth that we will record of the call stack 
-#define MAX_INSN 10
+#define MAX_CALL_DEPTH 4
 
 struct perf_file_section {
     uint64_t offset; /* File offset of the section. */
@@ -130,7 +130,7 @@ struct perf_sample {
     uint64_t values;            /* @kwinter not sure what values this is referring to */    
     union {
         uint64_t nr;                /* @kwinter no documentation on the following fields */
-        uint64_t ips[MAX_INSN];
+        uint64_t ips[MAX_CALL_DEPTH];
     };
     union {
         uint32_t size;              /* Perf sample raw */

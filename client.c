@@ -133,7 +133,23 @@ static err_t eth_dump_callback(void *arg, struct tcp_pcb *pcb, uint16_t len)
         strcat(sample_string, cpu);
         strcat(sample_string, ",\n\"period\": ");
         strcat(sample_string, period);
-        strcat(sample_string, "\n},");
+        strcat(sample_string, ",\n\"callstack\": [");
+        for (int i = 0; i < MAX_CALL_DEPTH; i++) {
+            if (i + 1 == MAX_CALL_DEPTH || sample->ips[i + 1] == 0) {
+                char cc[16];
+                my_itoa(sample->ips[i], cc);
+                strcat(sample_string, cc);
+                break;
+            } else {
+                char cc[16];
+                my_itoa(sample->ips[i], cc);
+                strcat(sample_string, cc);
+                strcat(sample_string, ", ");
+            }
+        }
+
+        strcat(sample_string, "]\n},");
+
 
         enqueue_free(&profiler_ring, buffer, size, cookie);
 
@@ -184,8 +200,22 @@ void eth_dump_start() {
         strcat(sample_string, cpu);
         strcat(sample_string, ",\n\"period\": ");
         strcat(sample_string, period);
-        strcat(sample_string, "\n},");
+        strcat(sample_string, ",\n\"callstack\": [");
+        for (int i = 0; i < MAX_CALL_DEPTH; i++) {
+            if (i + 1 == MAX_CALL_DEPTH || sample->ips[i + 1] == 0) {
+                char cc[16];
+                my_itoa(sample->ips[i], cc);
+                strcat(sample_string, cc);
+                break;
+            } else {
+                char cc[16];
+                my_itoa(sample->ips[i], cc);
+                strcat(sample_string, cc);
+                strcat(sample_string, ", ");
+            }
+        }
 
+        strcat(sample_string, "]\n},");
         enqueue_free(&profiler_ring, buffer, size, cookie);
 
         send_tcp(&sample_string);
