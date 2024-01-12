@@ -2,7 +2,7 @@
 
 #define BIT(nr) (1UL << (nr))
 
-#define MAX_INSN 10
+#define MAX_CALL_DEPTH 4
 
 #define SEL4_USER_CONTEXT_SIZE 0x24
 
@@ -80,7 +80,7 @@ struct pmu_sample {
     uint64_t time;          /* Timestamp */
     uint32_t cpu;           /* CPU affinity */
     uint64_t period;        /* Number of events per sample */
-    uint64_t ips[MAX_INSN]; /* Call stack - MAX_INSN = 10 */
+    uint64_t ips[MAX_CALL_DEPTH]; /* Call stack - MAX_CALL_DEPTH = 4 */
 };
 
 typedef struct pmu_sample pmu_sample_t;

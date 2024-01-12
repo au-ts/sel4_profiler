@@ -173,7 +173,7 @@ void configure_cnt5(uint32_t event, uint32_t val) {
 }
 
 /* Add a snapshot of the cycle and event registers to the array. This array needs to become a ring buffer. */
-void add_sample(microkit_id id, uint32_t time, uint64_t pc, uint32_t pmovsr) {    
+void add_sample(microkit_id id, uint32_t time, uint64_t pc, uint32_t pmovsr, uint64_t *cc) {    
     uintptr_t buffer = 0;
     unsigned int buffer_len = 0;
     void * cookie = 0;
@@ -211,7 +211,11 @@ void add_sample(microkit_id id, uint32_t time, uint64_t pc, uint32_t pmovsr) {
     temp_sample->time = time;
     temp_sample->cpu = 0;
     temp_sample->period = period;
-
+    for (int i = 0; i < MAX_CALL_DEPTH; i++) {
+        temp_sample->ips[i] = 0;
+        temp_sample->ips[i] = cc[i];
+    }
+    
     ret = enqueue_used(&profiler_ring, buffer, buffer_len, &cookie);
 
     if (ret != 0) {
@@ -378,6 +382,12 @@ void fault(microkit_id id, microkit_msginfo msginfo) {
         uint32_t ccnt_lower = microkit_mr_get(1);
         uint32_t ccnt_upper = microkit_mr_get(2);
         uint32_t pmovsr = microkit_mr_get(3);
+        uint64_t cc[4] = {0,0,0,0};
+        cc[0] = microkit_mr_get(4);
+        cc[1] = microkit_mr_get(5);
+        cc[2] = microkit_mr_get(6);
+        cc[3] = microkit_mr_get(7);
+
         uint64_t time = ((uint64_t) ccnt_upper << 32) | ccnt_lower;
         // profiler_handle_fault(pc, ccnt_lower, ...);
   
@@ -390,7 +400,7 @@ void fault(microkit_id id, microkit_msginfo msginfo) {
             pmovsr & (IRQ_COUNTER3 << 3) ||
             pmovsr & (IRQ_COUNTER4 << 4) ||
             pmovsr & (IRQ_COUNTER5 << 5)) {
-            add_sample(id, time, pc, pmovsr);
+            add_sample(id, time, pc, pmovsr, cc);
         } else {
             reset_cnt(pmovsr);
             resume_cnt();
