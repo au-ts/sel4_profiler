@@ -6,7 +6,7 @@ import struct
 import json
 import argparse
 
-sys.path.append("../protobuf")
+sys.path.append("../protobuf/python")
 import pmu_sample_pb2
 from google.protobuf.json_format import MessageToJson
 
