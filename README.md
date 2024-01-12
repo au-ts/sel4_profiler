@@ -17,26 +17,38 @@ Currently we have support for the imx8mm soc.
 make BUILD_DIR=<build_dir> MICROKIT_SDK=<path_to_sdk> MICROKIT_BOARD=<board> MICROKIT_CONFIG=benchmark
 ```
 # Protocol Buffers
-We use protocol buffers to encode our samples. Within the profiler tool, we use nanopb. If you wish to modify the proto structure, please find the `.proto` file in the `pb` directory.
 
-Use the following release of nanopb: `https://jpa.kapsi.fi/nanopb/download/nanopb-0.4.8-linux-x86.tar.gz`.
+We use protocol buffers to encode our samples. Within the profiler tool, we use nanopb.
+If you wish to modify the proto structure, please find the `pmu_sample.proto` file in the `protobuf/`
+directory at the root of the repository.
+
+There are two parts to protobuf in the repository.
+1. Within the profiler itself, in order to encode sample data.
+2. Within the netconn utility in order to parse and decode the sample data.
+
+## Generating nanopb files
+
+We use version 0.4.8 of nanopb, you can find the releases [here](https://jpa.kapsi.fi/nanopb/download/).
+
+For example, to reproduce the nanopb generated files on Linux:
+On Linux:
+```sh
+# In the root of the repository
+wget https://jpa.kapsi.fi/nanopb/download/nanopb-0.4.8-linux-x86.tar.gz
+tar xf nanopb-0.4.8-linux-x86.tar.gz
+nanopb-0.4.8-linux-x86/generator-bin/protoc --nanopb_out=. protobuf/pmu_sample.proto
+```
+
+## Generating Python protobuf files
 
 Please ensure that you have installed the Google Protocol Buffer compiler. More information can be found here: `https://github.com/protocolbuffers/protobuf`
 
 You can install this using `pip` with the following command: `pip install protobuf`.
 
-Then, to compile the specific nanopb files `pmu_sample.pb.c` and `pmu_sample.pb.h` please run the following command:
+```sh
+# In the root of the repository
+protoc --python_out=protobuf --proto_path=protobuf protobuf/pmu_sample.proto
 ```
-<path-to-nanopb>/generator-bin/protoc --nanopb_out=<output_dir> <proto_file>
-```
-
-To compile the appropriate Python versions of the proto files, please navigate to the network_host directory and to the pb directory. Ensure you have the correct version of the proto structure 
-and run the following command:
-```
-protoc --python_out=<output_dir> <proto_file>
-```
-
-Please ensure that the output of the above script is in the same directory as the network host tool.
 
 # Using
 
@@ -46,4 +58,4 @@ Please ensure that the output of the above script is in the same directory as th
 - Connect the client to the board by running the `connect` command on the Python client. You may need to restart the board here.
 - To start profiling, enter the `start` command.
 - To pause profiling, enter the `stop` command.
-- To finish profiling, enter the `exit` command. 
+- To finish profiling, enter the `exit` command.
