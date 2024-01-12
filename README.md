@@ -40,7 +40,7 @@ nanopb-0.4.8-linux-x86/generator-bin/protoc --nanopb_out=. protobuf/pmu_sample.p
 
 ## Generating Python protobuf files
 
-Please ensure that you have installed the Google Protocol Buffer compiler. More information can be found here: `https://github.com/protocolbuffers/protobuf`
+Please ensure that you have installed the Google Protocol Buffer compiler. More information can be found [here](https://github.com/protocolbuffers/protobuf).
 
 You can install this using `pip` with the following command: `pip install protobuf`.
 
