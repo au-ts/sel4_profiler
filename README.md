@@ -23,7 +23,7 @@ Use the following release of nanopb: `https://jpa.kapsi.fi/nanopb/download/nanop
 
 Please ensure that you have installed the Google Protocol Buffer compiler. More information can be found here: `https://github.com/protocolbuffers/protobuf`
 
-Also, the python host requires the following dependency: `pip install protobuf`.
+You can install this using `pip` with the following command: `pip install protobuf`.
 
 Then, to compile the specific nanopb files `pmu_sample.pb.c` and `pmu_sample.pb.h` please run the following command:
 ```
