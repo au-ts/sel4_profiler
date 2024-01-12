@@ -16,6 +16,25 @@ Currently we have support for the imx8mm soc.
 ```
 make BUILD_DIR=<build_dir> MICROKIT_SDK=<path_to_sdk> MICROKIT_BOARD=<board> MICROKIT_CONFIG=benchmark
 ```
+# Protocol Buffers
+We use protocol buffers to encode our samples. Within the profiler tool, we use nanopb. If you wish to modify the proto structure, please find the `.proto` file in the `pb` directory.
+
+Use the following release of nanopb: `https://github.com/protocolbuffers/protobuf/releases/download/v25.2/protoc-25.2-linux-aarch_64.zip`.
+
+Also, please ensure that you have installed the Google Protocol Buffer compiler. More information can be found here: `https://github.com/protocolbuffers/protobuf`
+
+Then, to compile the specific nanopb files `pmu_sample.pb.c` and `pmu_sample.pb.h` please run the following command:
+```
+<path-to-nanopb>/generator-bin/protoc --nanopb_out=<output_dir> <proto_file>
+```
+
+To compile the appropriate Python versions of the proto files, please navigate to the network_host directory and to the pb directory. Ensure you have the correct version of the proto structure 
+and run the following command:
+```
+protoc --python_out=<output_dir> <proto_file>
+```
+
+Please ensure that the output of the above script is in the same directory as the network host tool.
 
 # Using
 
