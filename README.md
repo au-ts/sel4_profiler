@@ -31,7 +31,6 @@ There are two parts to protobuf in the repository.
 We use version 0.4.8 of nanopb, you can find the releases [here](https://jpa.kapsi.fi/nanopb/download/).
 
 For example, to reproduce the nanopb generated files on Linux:
-On Linux:
 ```sh
 # In the root of the repository
 wget https://jpa.kapsi.fi/nanopb/download/nanopb-0.4.8-linux-x86.tar.gz
