@@ -24,4 +24,5 @@ void init() {
 void notified (microkit_channel ch) {
     microkit_dbg_puts("in dummy prog 2\n");
     big_loop();
+    microkit_dbg_puts("we have finished prog2\n");
 }

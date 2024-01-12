@@ -1,0 +1,12 @@
+syntax = "proto3";
+import "nanopb.proto";
+
+message pmu_sample {
+  uint64 ip = 1;
+  uint32 pid = 2;
+  uint64 time = 3;
+  uint32 cpu = 4;
+  uint64 period = 5;
+  repeated uint64 ips = 6 [(nanopb).max_count = 4];
+
+}

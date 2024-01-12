@@ -15,6 +15,9 @@
 #include "lwip/ip.h"
 #include "lwip/pbuf.h"
 #include "lwip/tcp.h"
+#include "nanopb/pb_encode.h"
+#include "nanopb/pmu_sample.pb.h"
+
 uintptr_t uart_base;
 uintptr_t profiler_control;
 
@@ -108,54 +111,46 @@ static err_t eth_dump_callback(void *arg, struct tcp_pcb *pcb, uint16_t len)
         client_state = CLIENT_IDLE;
         microkit_notify(30);
     } else if (!dequeue_used(&profiler_ring, &buffer, &size, &cookie)) {
-        // Dequeue from the profiler used ring
+        // microkit_dbg_puts("Sending initial buffer\n");
+
+        // // Create a buffer for the sample
+        uint8_t pb_buff[256];
+
+        // // Create a pb stream from the pb_buff
+        pb_ostream_t stream = pb_ostream_from_buffer(pb_buff, sizeof(pb_buff));
+
         pmu_sample_t *sample = (pmu_sample_t *) buffer;
-        char sample_string[100];
 
-        char ip[16];
-        my_itoa(sample->ip, ip);
-        char pid[16];
-        my_itoa(sample->pid, pid);
-        char time[16];
-        my_itoa(sample->time, time);
-        char cpu[16];
-        my_itoa(sample->cpu, cpu);
-        char period[16];
-        my_itoa(sample->period, period);
-
-        strcpy(sample_string, "{\"ip\": ");
-        strcat(sample_string, ip);
-        strcat(sample_string, ",\n\"pd\": ");
-        strcat(sample_string, pid);
-        strcat(sample_string, ",\n\"timestamp\": ");
-        strcat(sample_string, time);
-        strcat(sample_string, ",\n\"cpu\": ");
-        strcat(sample_string, cpu);
-        strcat(sample_string, ",\n\"period\": ");
-        strcat(sample_string, period);
-        strcat(sample_string, ",\n\"callstack\": [");
-        for (int i = 0; i < MAX_CALL_DEPTH; i++) {
-            if (i + 1 == MAX_CALL_DEPTH || sample->ips[i + 1] == 0) {
-                char cc[16];
-                my_itoa(sample->ips[i], cc);
-                strcat(sample_string, cc);
-                break;
-            } else {
-                char cc[16];
-                my_itoa(sample->ips[i], cc);
-                strcat(sample_string, cc);
-                strcat(sample_string, ", ");
-            }
+        // Copy the sample to a protobuf struct
+        pmu_sample pb_sample;
+        pb_sample.ip = sample->ip;
+        pb_sample.pid = sample->pid;
+        pb_sample.time = sample->time;
+        pb_sample.cpu = sample->cpu;
+        pb_sample.ips_count = MAX_INSN;
+        pb_sample.period = sample->period;
+        for (int i = 0; i < MAX_INSN; i++) {
+            pb_sample.ips[i] = sample->ips[i];
         }
 
-        strcat(sample_string, "]\n},");
+        // // Encode the message
+        bool status = pb_encode(&stream, pmu_sample_fields, &pb_sample);
+        uint64_t message_len = (uint64_t) stream.bytes_written;
 
+        if (!status) {
+            microkit_dbg_puts("Nanopb encoding failed\n");
+        }
 
         enqueue_free(&profiler_ring, buffer, size, cookie);
-
-        // microkit_dbg_puts("Sending buffers over network\n");
-
-        send_tcp(&sample_string);
+        
+        // We first want to send the size of the following buffer, then the buffer itself
+        char size_str[16];
+        my_itoa(message_len, size_str);
+        microkit_dbg_puts("This is the value of size_conv: ");
+        microkit_dbg_puts(size_str);
+        microkit_dbg_puts("\n");
+        send_tcp(&size_str);
+        send_tcp(&pb_buff);
     }
 
 
@@ -176,49 +171,46 @@ void eth_dump_start() {
         microkit_notify(RESUME_PMU);
     } else if (!dequeue_used(&profiler_ring, &buffer, &size, &cookie)) {
         // microkit_dbg_puts("Sending initial buffer\n");
+
+        // // Create a buffer for the sample
+        uint8_t pb_buff[256];
+
+        // // Create a pb stream from the pb_buff
+        pb_ostream_t stream = pb_ostream_from_buffer(pb_buff, sizeof(pb_buff));
+
         pmu_sample_t *sample = (pmu_sample_t *) buffer;
-        char sample_string[100];
 
-        char ip[16];
-        my_itoa(sample->ip, ip);
-        char pid[16];
-        my_itoa(sample->pid, pid);
-        char time[16];
-        my_itoa(sample->time, time);
-        char cpu[16];
-        my_itoa(sample->cpu, cpu);
-        char period[16];
-        my_itoa(sample->period, period);
+        // Copy the sample to a protobuf struct
+        pmu_sample pb_sample;
+        pb_sample.ip = sample->ip;
+        pb_sample.pid = sample->pid;
+        pb_sample.time = sample->time;
+        pb_sample.cpu = sample->cpu;
+        pb_sample.ips_count = MAX_INSN;
+        pb_sample.period = sample->period;
+        for (int i = 0; i < MAX_INSN; i++) {
+            pb_sample.ips[i] = sample->ips[i];
+        }
 
-        strcpy(sample_string, "{\"ip\": ");
-        strcat(sample_string, ip);
-        strcat(sample_string, ",\n\"pd\": ");
-        strcat(sample_string, pid);
-        strcat(sample_string, ",\n\"timestamp\": ");
-        strcat(sample_string, time);
-        strcat(sample_string, ",\n\"cpu\": ");
-        strcat(sample_string, cpu);
-        strcat(sample_string, ",\n\"period\": ");
-        strcat(sample_string, period);
-        strcat(sample_string, ",\n\"callstack\": [");
-        for (int i = 0; i < MAX_CALL_DEPTH; i++) {
-            if (i + 1 == MAX_CALL_DEPTH || sample->ips[i + 1] == 0) {
-                char cc[16];
-                my_itoa(sample->ips[i], cc);
-                strcat(sample_string, cc);
-                break;
-            } else {
-                char cc[16];
-                my_itoa(sample->ips[i], cc);
-                strcat(sample_string, cc);
-                strcat(sample_string, ", ");
-            }
+        // // Encode the message
+        bool status = pb_encode(&stream, pmu_sample_fields, &pb_sample);
+        uint64_t message_len = (uint64_t) stream.bytes_written;
+
+        if (!status) {
+            microkit_dbg_puts("Nanopb encoding failed\n");
         }
 
         strcat(sample_string, "]\n},");
         enqueue_free(&profiler_ring, buffer, size, cookie);
 
-        send_tcp(&sample_string);
+        // We first want to send the size of the following buffer, then the buffer itself
+        char size_str[16];
+        my_itoa(message_len, size_str);
+        microkit_dbg_puts("This is the value of size_conv: ");
+        microkit_dbg_puts(size_str);
+        microkit_dbg_puts("\n");
+        send_tcp(&size_str);
+        send_tcp(&pb_buff);
     }
     
 }
