@@ -1,0 +1,1 @@
+This is a basic python program to connect to the seL4 Profiling Framework, and collects samples over the network to store in json format.
