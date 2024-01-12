@@ -6,9 +6,7 @@ import struct
 import pmu_sample_pb2
 import json
 from google.protobuf.json_format import MessageToJson
-
-client_ip = "172.16.1.72"
-client_port = 1236
+import argparse
 
 # To track if we have sent a message, to ensure json format is correct
 first_msg = 0
@@ -92,7 +90,6 @@ class ProfilerClient:
                 sample = pmu_sample_pb2.pmu_sample()
 
                 sample.ParseFromString(data)
-                
                 self.f.write(MessageToJson(sample))
 
             except socket.error:
@@ -123,8 +120,14 @@ class ProfilerClient:
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Set IP address and port number')
+    parser.add_argument('-ip', dest='client_ip', required='true', help='IP address of the target system')
+    parser.add_argument('-port', dest='client_port', required='true', help='Port of the target system',
+                        type=int)
+    args = parser.parse_args()  
+
     # Intially, we want to create client object
-    profClient = ProfilerClient(client_ip, client_port)
+    profClient = ProfilerClient(args.client_ip, args.client_port)
     print("seL4 Profiler Network Client. Please enter command:")
 
     f = None
