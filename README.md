@@ -19,7 +19,7 @@ make BUILD_DIR=<build_dir> MICROKIT_SDK=<path_to_sdk> MICROKIT_BOARD=<board> MIC
 # Protocol Buffers
 We use protocol buffers to encode our samples. Within the profiler tool, we use nanopb. If you wish to modify the proto structure, please find the `.proto` file in the `pb` directory.
 
-Use the following release of nanopb: `https://github.com/protocolbuffers/protobuf/releases/download/v25.2/protoc-25.2-linux-aarch_64.zip`.
+Use the following release of nanopb: `https://jpa.kapsi.fi/nanopb/download/nanopb-0.4.8-linux-x86.tar.gz`.
 
 Please ensure that you have installed the Google Protocol Buffer compiler. More information can be found here: `https://github.com/protocolbuffers/protobuf`
 
