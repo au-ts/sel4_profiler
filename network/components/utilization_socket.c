@@ -138,9 +138,9 @@ static err_t utilization_accept_callback(void *arg, struct tcp_pcb *newpcb, err_
     return ERR_OK;
 }
 
-int send_tcp(void *buff) {
+int send_tcp(void *buff, uint32_t len) {
 
-    err_t error = tcp_write(utiliz_socket, buff, strlen(buff), TCP_WRITE_FLAG_COPY);
+    err_t error = tcp_write(utiliz_socket, buff, len, TCP_WRITE_FLAG_COPY);
     if (error) {
         print("Failed to send message through utilization peer: ");
         put8(error);
