@@ -17,6 +17,6 @@ int setup_utilization_socket(void);
 
 void init_lwip(void);
 void notified_lwip(microkit_channel ch);
-int send_tcp(void *buff);
+int send_tcp(void *buff, uint32_t len);
 void tcp_sent_callback(tcp_sent_fn callback);
 void tcp_reset_callback();
