@@ -8,7 +8,7 @@
  * a maximum of a single timeout per client for simplicity.
  *
  * Interfaces for clients:
- * seL4cp_ppcall() with label 0 is a request to get the current time.
+ * microkit_ppcall() with label 0 is a request to get the current time.
  * with a 1 is a request to set a timeout.
  */
 
