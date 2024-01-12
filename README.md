@@ -21,7 +21,9 @@ We use protocol buffers to encode our samples. Within the profiler tool, we use 
 
 Use the following release of nanopb: `https://github.com/protocolbuffers/protobuf/releases/download/v25.2/protoc-25.2-linux-aarch_64.zip`.
 
-Also, please ensure that you have installed the Google Protocol Buffer compiler. More information can be found here: `https://github.com/protocolbuffers/protobuf`
+Please ensure that you have installed the Google Protocol Buffer compiler. More information can be found here: `https://github.com/protocolbuffers/protobuf`
+
+Also, the python host requires the following dependency: `pip install protobuf`.
 
 Then, to compile the specific nanopb files `pmu_sample.pb.c` and `pmu_sample.pb.h` please run the following command:
 ```
