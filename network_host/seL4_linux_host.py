@@ -3,10 +3,12 @@ import sys
 import threading
 import os
 import struct
-import pmu_sample_pb2
 import json
-from google.protobuf.json_format import MessageToJson
 import argparse
+
+sys.path.append("../protobuf")
+import pmu_sample_pb2
+from google.protobuf.json_format import MessageToJson
 
 # To track if we have sent a message, to ensure json format is correct
 first_msg = 0
@@ -121,8 +123,8 @@ class ProfilerClient:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Set IP address and port number')
-    parser.add_argument('-ip', dest='client_ip', required='true', help='IP address of the target system')
-    parser.add_argument('-port', dest='client_port', required='true', help='Port of the target system',
+    parser.add_argument('--ip', dest='client_ip', required='true', help='IP address of the target system')
+    parser.add_argument('--port', dest='client_port', required='true', help='Port of the target system',
                         type=int)
     args = parser.parse_args()  
 

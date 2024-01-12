@@ -15,8 +15,8 @@
 #include "lwip/ip.h"
 #include "lwip/pbuf.h"
 #include "lwip/tcp.h"
-#include "nanopb/pb_encode.h"
-#include "nanopb/pmu_sample.pb.h"
+#include "protobuf/pb_encode.h"
+#include "protobuf/pmu_sample.pb.h"
 
 uintptr_t uart_base;
 uintptr_t profiler_control;

@@ -39,6 +39,7 @@ NETWORK_COMPONENTS=network/components
 RINGBUFFERDIR=libserialsharedringbuffer
 XMODEMDIR=xmodem
 UARTDIR=uart
+PROTOBUFDIR=protobuf
 
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 
@@ -104,7 +105,8 @@ UART_OBJS := uart/uart.o libserialsharedringbuffer/shared_ringbuffer.o
 UART_MUX_TX_OBJS := uart/mux_tx.o libserialsharedringbuffer/shared_ringbuffer.o
 UART_MUX_RX_OBJS := uart/mux_rx.o libserialsharedringbuffer/shared_ringbuffer.o
 PROFILER_OBJS := profiler.o libserialsharedringbuffer/shared_ringbuffer.o
-CLIENT_OBJS := client.o serial_server.o printf.o libserialsharedringbuffer/shared_ringbuffer.o xmodem/crc16.o xmodem/xmodem.o $(LWIPFILES:.c=.o) $(NETWORK_COMPONENTS)/lwip.o $(NETWORK_COMPONENTS)/utilization_socket.o
+CLIENT_OBJS := client.o serial_server.o printf.o libserialsharedringbuffer/shared_ringbuffer.o xmodem/crc16.o xmodem/xmodem.o $(LWIPFILES:.c=.o) \
+			   $(NETWORK_COMPONENTS)/lwip.o $(NETWORK_COMPONENTS)/utilization_socket.o $(NANOPBDIR)/pmu_sample.pb.o $(NANOPBDIR)/pb_common.o $(NANOPBDIR)/pb_encode.o
 DUMMY_PROG_OBJS := dummy_prog.o
 DUMMY_PROG2_OBJS := dummy_prog2.o
 
