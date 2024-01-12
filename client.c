@@ -127,9 +127,9 @@ static err_t eth_dump_callback(void *arg, struct tcp_pcb *pcb, uint16_t len)
         pb_sample.pid = sample->pid;
         pb_sample.time = sample->time;
         pb_sample.cpu = sample->cpu;
-        pb_sample.ips_count = MAX_INSN;
+        pb_sample.ips_count = MAX_CALL_DEPTH;
         pb_sample.period = sample->period;
-        for (int i = 0; i < MAX_INSN; i++) {
+        for (int i = 0; i < MAX_CALL_DEPTH; i++) {
             pb_sample.ips[i] = sample->ips[i];
         }
 
@@ -191,9 +191,9 @@ void eth_dump_start() {
         pb_sample.pid = sample->pid;
         pb_sample.time = sample->time;
         pb_sample.cpu = sample->cpu;
-        pb_sample.ips_count = MAX_INSN;
+        pb_sample.ips_count = MAX_CALL_DEPTH;
         pb_sample.period = sample->period;
-        for (int i = 0; i < MAX_INSN; i++) {
+        for (int i = 0; i < MAX_CALL_DEPTH; i++) {
             pb_sample.ips[i] = sample->ips[i];
         }
 
@@ -205,7 +205,6 @@ void eth_dump_start() {
             microkit_dbg_puts("Nanopb encoding failed\n");
         }
 
-        strcat(sample_string, "]\n},");
         enqueue_free(&profiler_ring, buffer, size, cookie);
 
         // We first want to send the size of the following buffer, then the buffer itself

@@ -92,7 +92,7 @@ class ProfilerClient:
                 sample = pmu_sample_pb2.pmu_sample()
 
                 sample.ParseFromString(data)
-                self.f.write(MessageToJson(sample))
+                self.f.write(MessageToJson(sample, including_default_value_fields=True))
 
             except socket.error:
                 global stop_recv
