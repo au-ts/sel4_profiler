@@ -40,10 +40,11 @@ RINGBUFFERDIR=libserialsharedringbuffer
 XMODEMDIR=xmodem
 UARTDIR=uart
 PROTOBUFDIR=protobuf
+ECHODIR=echo_server
 
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 
-IMAGES := profiler.elf client.elf uart.elf uart_mux_rx.elf uart_mux_tx.elf dummy_prog.elf dummy_prog2.elf eth.elf eth_mux_rx.elf eth_mux_tx.elf eth_copy.elf arp.elf timer.elf
+IMAGES := profiler.elf client.elf uart.elf uart_mux_rx.elf uart_mux_tx.elf eth.elf eth_mux_rx.elf eth_mux_tx.elf eth_copy.elf arp.elf timer.elf echo.elf
 CFLAGS := -mcpu=$(CPU) -mstrict-align -ffreestanding -g3 -O3 -Wall  -Wno-unused-function -fno-omit-frame-pointer
 LDFLAGS := -L$(BOARD_DIR)/lib -Llib
 LIBS := -lmicrokit -Tmicrokit.ld -lc
@@ -100,7 +101,7 @@ NETIFFILES=$(LWIP)/netif/ethernet.c
 
 # LWIPFILES: All the above.
 LWIPFILES=$(NETWORK_COMPONENTS)/lwip.c $(NETWORK_COMPONENTS)/lwip_timer.c cache.c $(COREFILES) $(CORE4FILES) $(NETIFFILES)
-LWIP_OBJS := $(LWIPFILES:.c=.o) $(NETWORK_COMPONENTS)/lwip.o $(ETH_RING_BUFFER)/shared_ringbuffer.o $(NETWORK_COMPONENTS)/utilization_socket.o
+ECHO_LWIPFILES=$(ECHODIR)/lwip.c $(NETWORK_COMPONENTS)/lwip_timer.c cache.c $(COREFILES) $(CORE4FILES) $(NETIFFILES)
 
 UART_OBJS := uart/uart.o libserialsharedringbuffer/shared_ringbuffer.o
 UART_MUX_TX_OBJS := uart/mux_tx.o libserialsharedringbuffer/shared_ringbuffer.o
@@ -108,20 +109,20 @@ UART_MUX_RX_OBJS := uart/mux_rx.o libserialsharedringbuffer/shared_ringbuffer.o
 PROFILER_OBJS := profiler.o libserialsharedringbuffer/shared_ringbuffer.o
 CLIENT_OBJS := client.o serial_server.o printf.o libserialsharedringbuffer/shared_ringbuffer.o xmodem/crc16.o xmodem/xmodem.o $(LWIPFILES:.c=.o) \
 			   $(NETWORK_COMPONENTS)/lwip.o $(NETWORK_COMPONENTS)/utilization_socket.o $(PROTOBUFDIR)/nanopb/pmu_sample.pb.o $(PROTOBUFDIR)/nanopb/pb_common.o $(PROTOBUFDIR)/nanopb/pb_encode.o
-DUMMY_PROG_OBJS := dummy_prog.o
-DUMMY_PROG2_OBJS := dummy_prog2.o
+
+ECHO_OBJS := $(ECHO_LWIPFILES:.c=.o) $(ECHODIR)/lwip.o $(ETH_RING_BUFFER)/shared_ringbuffer.o  $(ECHODIR)/udp_echo_socket.o $(ECHODIR)/tcp_echo_socket.o
 
 
 ETH_OBJS := $(ETHERNET_DRIVER)/ethernet.o $(ETH_RING_BUFFER)/shared_ringbuffer.o
 ETH_MUX_RX_OBJS := $(NETWORK_COMPONENTS)/mux_rx.o $(ETH_RING_BUFFER)/shared_ringbuffer.o
-ETH_MUX_TX_OBJS := $(NETWORK_COMPONENTS)/mux_tx_bandwidth_limited.o $(ETH_RING_BUFFER)/shared_ringbuffer.o
+ETH_MUX_TX_OBJS := $(NETWORK_COMPONENTS)/mux_tx.o $(ETH_RING_BUFFER)/shared_ringbuffer.o
 ETH_COPY_OBJS := $(NETWORK_COMPONENTS)/copy.o $(ETH_RING_BUFFER)/shared_ringbuffer.o
 ARP_OBJS := cache.o $(LWIP)/core/inet_chksum.o $(LWIP)/core/def.o $(NETWORK_COMPONENTS)/arp.o $(ETH_RING_BUFFER)/shared_ringbuffer.o
 TIMER_OBJS := $(TIMER_DRIVER)/timer.o
 
 OBJS := $(sort $(addprefix $(BUILD_DIR)/, $(ETH_OBJS) $(ETH_MUX_RX_OBJS) $(ETH_MUX_TX_OBJS)\
 	$(ETH_COPY_OBJS) \
-	$(LWIP_OBJS) $(ARP_OBJS) $(TIMER_OBJS)))
+	$(ARP_OBJS) $(TIMER_OBJS) $(ECHO_OBJS)))
 DEPS := $(OBJS:.o=.d)
 
 
@@ -150,20 +151,11 @@ $(BUILD_DIR)/uart_mux_rx.elf: $(addprefix $(BUILD_DIR)/, $(UART_MUX_RX_OBJS))
 $(BUILD_DIR)/uart_mux_tx.elf: $(addprefix $(BUILD_DIR)/, $(UART_MUX_TX_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-$(BUILD_DIR)/dummy_prog.elf: $(addprefix $(BUILD_DIR)/, $(DUMMY_PROG_OBJS))
-	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
-
-$(BUILD_DIR)/dummy_prog2.elf: $(addprefix $(BUILD_DIR)/, $(DUMMY_PROG2_OBJS))
-	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
-
 $(BUILD_DIR)/client.elf: $(addprefix $(BUILD_DIR)/, $(CLIENT_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 	
 $(BUILD_DIR)/eth.elf: $(addprefix $(BUILD_DIR)/, $(ETH_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
-
-# $(BUILD_DIR)/lwip.elf: $(addprefix $(BUILD_DIR)/, $(LWIP_OBJS))
-# 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 $(BUILD_DIR)/eth_mux_rx.elf: $(addprefix $(BUILD_DIR)/, $(ETH_MUX_RX_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
@@ -178,6 +170,9 @@ $(BUILD_DIR)/arp.elf: $(addprefix $(BUILD_DIR)/, $(ARP_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 $(BUILD_DIR)/timer.elf: $(addprefix $(BUILD_DIR)/, $(TIMER_OBJS))
+	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
+
+$(BUILD_DIR)/echo.elf: $(addprefix $(BUILD_DIR)/, $(ECHO_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 $(IMAGE_FILE) $(REPORT_FILE): $(addprefix $(BUILD_DIR)/, $(IMAGES)) profiler.system

@@ -224,11 +224,13 @@ void eth_dump_start() {
 }
 
 void init() {
+    microkit_dbg_puts("INITIALISING CLIENT\n");
     // Init serial here 
     // Currently handled by profiler, but eventually remove everything from there
     if (CLIENT_CONFIG == 0 || CLIENT_CONFIG == 1) {
         init_serial();
     } else if (CLIENT_CONFIG == 2) {
+        microkit_dbg_puts("initialising lwip\n");
         init_lwip();
     }
 
