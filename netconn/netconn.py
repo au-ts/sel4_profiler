@@ -38,20 +38,20 @@ class ProfilerClient:
         print("[send_command] : " + cmd)
         self.socket.send((cmd + "\n").encode('utf-8'))
 
-    def get_mappings(self, f):
+    def get_mappings(self):
         """
         Get the mappings from pid to ELF names
         """
         self.send_command("MAPPINGS")
-        f.write("{\n")
-        f.write("\"pd_mappings\": {\n")
+        self.output.write("{\n")
+        self.output.write("\"pd_mappings\": {\n")
         data = self.socket.recv(4096).decode()
         print(str(data))
         lines = str(data).split("\n")
         for line in lines:
             content = line.split(":")
-            f.write(f"\"{content[0]}\": {content[1]},\n")
-        f.write("}")
+            self.output.write(f"\"{content[0]}\": {content[1]},\n")
+        self.output.write("}")
     def connect(self):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -148,7 +148,7 @@ if __name__ == "__main__":
                 # TODO: Start this in a seperate thread
                 # recvThread = threading.Thread(target=client.recv_samples, args=(f))
 
-                client.recv_samples(f)
+                client.recv_samples()
                 # recvThread.start()
             else:
                 print("ERROR: attempted START command before CONNECT command called")
