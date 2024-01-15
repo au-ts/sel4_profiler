@@ -60,7 +60,7 @@ CFLAGS += -I$(BOARD_DIR)/include \
 	-I$(UARTDIR)/include \
 	-I$(LWIP)/include \
 	-I$(LWIP)/include/ipv4 \
-	-I$(RING_BUFFER)/include \
+	-I$(ETH_RING_BUFFER) \
 	-I$(PROTOBUFDIR)/nanopb \
 	-MD \
 	-MP
