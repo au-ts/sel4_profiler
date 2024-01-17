@@ -374,10 +374,86 @@ void notified(microkit_channel ch) {
         }
     }
 }
-
+static char *
+data_abort_dfsc_to_string(uintptr_t dfsc)
+{
+    switch(dfsc) {
+        case 0x00: return "address size fault, level 0";
+        case 0x01: return "address size fault, level 1";
+        case 0x02: return "address size fault, level 2";
+        case 0x03: return "address size fault, level 3";
+        case 0x04: return "translation fault, level 0";
+        case 0x05: return "translation fault, level 1";
+        case 0x06: return "translation fault, level 2";
+        case 0x07: return "translation fault, level 3";
+        case 0x09: return "access flag fault, level 1";
+        case 0x0a: return "access flag fault, level 2";
+        case 0x0b: return "access flag fault, level 3";
+        case 0x0d: return "permission fault, level 1";
+        case 0x0e: return "permission fault, level 2";
+        case 0x0f: return "permission fault, level 3";
+        case 0x10: return "synchronuos external abort";
+        case 0x11: return "synchronous tag check fault";
+        case 0x14: return "synchronous external abort, level 0";
+        case 0x15: return "synchronous external abort, level 1";
+        case 0x16: return "synchronous external abort, level 2";
+        case 0x17: return "synchronous external abort, level 3";
+        case 0x18: return "syncrhonous partity or ECC error";
+        case 0x1c: return "syncrhonous partity or ECC error, level 0";
+        case 0x1d: return "syncrhonous partity or ECC error, level 1";
+        case 0x1e: return "syncrhonous partity or ECC error, level 2";
+        case 0x1f: return "syncrhonous partity or ECC error, level 3";
+        case 0x21: return "alignment fault";
+        case 0x30: return "tlb conflict abort";
+        case 0x31: return "unsupported atomic hardware update fault";
+    }
+    return "<unexpected DFSC>";
+}
+static char *
+ec_to_string(uintptr_t ec)
+{
+    switch (ec) {
+        case 0: return "Unknown reason";
+        case 1: return "Trapped WFI or WFE instruction execution";
+        case 3: return "Trapped MCR or MRC access with (coproc==0b1111) this is not reported using EC 0b000000";
+        case 4: return "Trapped MCRR or MRRC access with (coproc==0b1111) this is not reported using EC 0b000000";
+        case 5: return "Trapped MCR or MRC access with (coproc==0b1110)";
+        case 6: return "Trapped LDC or STC access";
+        case 7: return "Access to SVC, Advanced SIMD or floating-point functionality trapped";
+        case 12: return "Trapped MRRC access with (coproc==0b1110)";
+        case 13: return "Branch Target Exception";
+        case 17: return "SVC instruction execution in AArch32 state";
+        case 21: return "SVC instruction execution in AArch64 state";
+        case 24: return "Trapped MSR, MRS or System instruction exuection in AArch64 state, this is not reported using EC 0xb000000, 0b000001 or 0b000111";
+        case 25: return "Access to SVE functionality trapped";
+        case 28: return "Exception from a Pointer Authentication instruction authentication failure";
+        case 32: return "Instruction Abort from a lower Exception level";
+        case 33: return "Instruction Abort taken without a change in Exception level";
+        case 34: return "PC alignment fault exception";
+        case 36: return "Data Abort from a lower Exception level";
+        case 37: return "Data Abort taken without a change in Exception level";
+        case 38: return "SP alignment faultr exception";
+        case 40: return "Trapped floating-point exception taken from AArch32 state";
+        case 44: return "Trapped floating-point exception taken from AArch64 state";
+        case 47: return "SError interrupt";
+        case 48: return "Breakpoint exception from a lower Exception level";
+        case 49: return "Breakpoint exception taken without a change in Exception level";
+        case 50: return "Software Step exception from a lower Exception level";
+        case 51: return "Software Step exception taken without a change in Exception level";
+        case 52: return "Watchpoint exception from a lower Exception level";
+        case 53: return "Watchpoint exception taken without a change in Exception level";
+        case 56: return "BKPT instruction execution in AArch32 state";
+        case 60: return "BRK instruction execution in AArch64 state";
+    }
+    return "<invalid EC>";
+}
 void fault(microkit_id id, microkit_msginfo msginfo) {
+    microkit_dbg_puts("recv fault in prof: ");
+    puthex64(id);
+    microkit_dbg_puts("\n");
     size_t label = microkit_msginfo_get_label(msginfo);
     if (label == seL4_Fault_PMUEvent) {
+        microkit_dbg_puts("recv pmu fault\n");
         uint64_t pc = microkit_mr_get(0);
         uint32_t ccnt_lower = microkit_mr_get(1);
         uint32_t ccnt_upper = microkit_mr_get(2);
@@ -405,6 +481,70 @@ void fault(microkit_id id, microkit_msginfo msginfo) {
             reset_cnt(pmovsr);
             resume_cnt();
         }
+    } else if (label == seL4_Fault_VMFault) {
+        seL4_Word ip = seL4_GetMR(seL4_VMFault_IP);
+        seL4_Word fault_addr = seL4_GetMR(seL4_VMFault_Addr);
+        seL4_Word is_instruction = seL4_GetMR(seL4_VMFault_PrefetchFault);
+        seL4_Word fsr = seL4_GetMR(seL4_VMFault_FSR);
+        seL4_Word ec = fsr >> 26;
+        seL4_Word il = fsr >> 25 & 1;
+        seL4_Word iss = fsr & 0x1ffffffUL;
+        microkit_dbg_puts("MON|ERROR: VMFault: ip=");
+        puthex64(ip);
+        microkit_dbg_puts("  fault_addr=");
+        puthex64(fault_addr);
+        microkit_dbg_puts("  fsr=");
+        puthex64(fsr);
+        microkit_dbg_puts("  ");
+        microkit_dbg_puts(is_instruction ? "(instruction fault)" : "(data fault)");
+        microkit_dbg_puts("\n");
+        microkit_dbg_puts("MON|ERROR:    ec: ");
+        puthex64(ec);
+        microkit_dbg_puts("  ");
+        microkit_dbg_puts(ec_to_string(ec));
+        microkit_dbg_puts("   il: ");
+        microkit_dbg_puts(il ? "1" : "0");
+        microkit_dbg_puts("   iss: ");
+        puthex64(iss);
+        microkit_dbg_puts("\n");
+
+        if (ec == 0x24) {
+            /* FIXME: Note, this is not a complete decoding of the fault! Just some of the more
+                common fields!
+            */
+            seL4_Word dfsc = iss & 0x3f;
+            bool ea = (iss >> 9) & 1;
+            bool cm = (iss >> 8) & 1;
+            bool s1ptw = (iss >> 7) & 1;
+            bool wnr = (iss >> 6) & 1;
+            microkit_dbg_puts("MON|ERROR:    dfsc = ");
+            microkit_dbg_puts(data_abort_dfsc_to_string(dfsc));
+            microkit_dbg_puts(" (");
+            puthex64(dfsc);
+            microkit_dbg_puts(")");
+            if (ea) {
+                microkit_dbg_puts(" -- external abort");
+            }
+            if (cm) {
+                microkit_dbg_puts(" -- cache maint");
+            }
+            if (s1ptw) {
+                microkit_dbg_puts(" -- stage 2 fault for stage 1 page table walk");
+            }
+            if (wnr) {
+                microkit_dbg_puts(" -- write not read");
+            }
+            microkit_dbg_puts("\n");
+        }
+        while (1);
+    } else if (label == seL4_Fault_CapFault) {
+        microkit_dbg_puts("Cap fault\n");
+    } else if (label == seL4_Fault_UnknownSyscall) {
+        microkit_dbg_puts("Unknown syscall\n");
+    } else if (label == seL4_Fault_UserException) {
+        microkit_dbg_puts("User Exception\n");
+    }  else if (label == seL4_Fault_NullFault) {
+        microkit_dbg_puts("Null fault\n");
     }
 
     microkit_fault_reply(microkit_msginfo_new(0, 0));

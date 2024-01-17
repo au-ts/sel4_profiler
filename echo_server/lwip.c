@@ -438,10 +438,10 @@ static void get_mac(void)
     state.mac[2] = 0x1;
     state.mac[3] = 0;
     state.mac[4] = 0;
-    if (!strcmp(microkit_name, "client1")) {
-        state.mac[5] = 11;
+    if (!strcmp(microkit_name, "client")) {
+        state.mac[5] = 0;
     } else {
-        state.mac[5] = 10;
+        state.mac[5] = 0x1;
     }
     /* microkit_ppcall(RX_CH, microkit_msginfo_new(0, 0));
     uint32_t palr = microkit_mr_get(0);

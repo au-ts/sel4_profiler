@@ -256,14 +256,14 @@ void init(void)
     state.mac_addrs[0][2] = 0x1;
     state.mac_addrs[0][3] = 0;
     state.mac_addrs[0][4] = 0;
-    state.mac_addrs[0][5] = 10;
+    state.mac_addrs[0][5] = 0;
 
     state.mac_addrs[1][0] = 0x52;
     state.mac_addrs[1][1] = 0x54;
     state.mac_addrs[1][2] = 0x1;
     state.mac_addrs[1][3] = 0;
     state.mac_addrs[1][4] = 0;
-    state.mac_addrs[1][5] = 11;
+    state.mac_addrs[1][5] = 1;
 
     // and for broadcast. 
     state.mac_addrs[2][0] = 0xff;
