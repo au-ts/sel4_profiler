@@ -65,7 +65,7 @@ void print_dump() {
 
     // Dequeue from the profiler used ring
     while(!dequeue_used(&profiler_ring, &buffer, &size, &cookie)) {
-        pmu_sample_t *sample = (pmu_sample_t *) buffer;
+        prof_sample_t *sample = (prof_sample_t *) buffer;
 
         printf_("{\n");
         // Print out sample
@@ -119,7 +119,7 @@ static err_t eth_dump_callback(void *arg, struct tcp_pcb *pcb, uint16_t len)
         // // Create a pb stream from the pb_buff
         pb_ostream_t stream = pb_ostream_from_buffer(pb_buff, sizeof(pb_buff));
 
-        pmu_sample_t *sample = (pmu_sample_t *) buffer;
+        prof_sample_t *sample = (prof_sample_t *) buffer;
 
         // Copy the sample to a protobuf struct
         pmu_sample pb_sample;
@@ -183,7 +183,7 @@ void eth_dump_start() {
         // // Create a pb stream from the pb_buff
         pb_ostream_t stream = pb_ostream_from_buffer(pb_buff, sizeof(pb_buff));
 
-        pmu_sample_t *sample = (pmu_sample_t *) buffer;
+        prof_sample_t *sample = (prof_sample_t *) buffer;
 
         // Copy the sample to a protobuf struct
         pmu_sample pb_sample;

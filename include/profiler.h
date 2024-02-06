@@ -1,8 +1,8 @@
 #pragma once
 
-#define BIT(nr) (1UL << (nr))
+#include <sel4/profiler_types.h>
 
-#define MAX_CALL_DEPTH 4
+#define BIT(nr) (1UL << (nr))
 
 #define SEL4_USER_CONTEXT_SIZE 0x24
 
@@ -74,13 +74,13 @@ struct pmu_config_args {
 
 typedef struct pmu_config_args pmu_config_args_t;
 
-struct pmu_sample {
+struct prof_sample {
     uint64_t ip;            /* Instruction pointer */
     uint32_t pid;           /* Process ID */
     uint64_t time;          /* Timestamp */
     uint32_t cpu;           /* CPU affinity */
     uint64_t period;        /* Number of events per sample */
-    uint64_t ips[MAX_CALL_DEPTH]; /* Call stack - MAX_CALL_DEPTH = 4 */
+    uint64_t ips[MAX_CALL_DEPTH]; /* Call stack - MAX_INSN = 10 */
 };
 
-typedef struct pmu_sample pmu_sample_t;
+typedef struct prof_sample prof_sample_t;

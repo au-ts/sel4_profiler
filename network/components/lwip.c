@@ -400,7 +400,7 @@ static void netif_status_callback(struct netif *netif)
         microkit_mr_set(2, (state.mac[4] << 24) | (state.mac[5] << 16));
         microkit_ppcall(ARP, microkit_msginfo_new(0, 1));
 
-        print("DHCP request finished, IP address for netif ");
+        print("DHCP request finished for profiler, IP address for netif ");
         print(netif->name);
         print(" is: ");
         print(ip4addr_ntoa(netif_ip4_addr(netif)));

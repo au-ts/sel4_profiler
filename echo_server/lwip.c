@@ -422,7 +422,7 @@ static void netif_status_callback(struct netif *netif)
         microkit_mr_set(2, (state.mac[4] << 24) | (state.mac[5] << 16));
         microkit_ppcall(ARP, microkit_msginfo_new(0, 3));
 
-        print("DHCP request finished, IP address for netif ");
+        print("DHCP request finished for echo server, IP address for netif ");
         print(netif->name);
         print(" is: ");
         print(ip4addr_ntoa(netif_ip4_addr(netif)));
@@ -539,6 +539,11 @@ void init(void)
         }
     }
 
+    #ifdef CONFIG_PROFILER_ENABLE
+    microkit_dbg_puts("Calling profiler register thread syscall\n");
+    seL4_ProfilerRegisterThread(1);
+    microkit_dbg_puts("Returned from syscall\n");
+    #endif
     print(microkit_name);
     print(": elf PD init complete\n");
 }

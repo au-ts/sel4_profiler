@@ -73,17 +73,21 @@
     <memory_region name="data_packet" size="0x1000"/>
     <memory_region name="data" size="0x1000"/>
     <memory_region name="tcp_echo_packet" size="0x100000" />
+    <memory_region name="log_buffer" size="0x200_000" page_size="0x200_000"/>
 
     <protection_domain name="profiler" priority="95">
         <program_image path="profiler.elf" />
         <map mr="uart" vaddr="0x5_000_000" perms="rw" cached="false" setvar_vaddr="uart_base" />
-
+        
+        <map mr="log_buffer" vaddr="0x4_000_000" perms="rw" cached="false" setvar_vaddr="log_buffer" />
+        <setvar symbol="log_buffer_phys" region_paddr="log_buffer" />
         <map mr="profiler_control" vaddr="0x3_800_000" perms="rw" cached="false" setvar_vaddr="profiler_control"/>
             <!-- shared memory for profiler ring buffer mechanism -->
         <map mr="profiler_ring_free" vaddr="0x8_000_000" perms="rw" cached="true" setvar_vaddr="profiler_ring_free" />
         <map mr="profiler_ring_used" vaddr="0x8_200_000" perms="rw" cached="true" setvar_vaddr="profiler_ring_used" />
         <map mr="profiler_mem" vaddr="0x8_600_000" perms="rw" cached="true" setvar_vaddr="profiler_mem" />
-
+        
+        <irq irq="23" id="21" /> <!-- PMU interrupt -->
 
         <!-- THIS IS THE SYSTEM WE ARE PROFILING AS CHILD PROTECTION DOMAINS -->
 
@@ -99,6 +103,7 @@
             <map mr="shared_dma_tx_cli1" vaddr="0x2_000_000" perms="rw" cached="true" setvar_vaddr="shared_dma_vaddr_tx" />
             <map mr="tcp_echo_packet" vaddr="0x5_012_000" perms="rw" cached="true" setvar_vaddr="tcp_recv_buffer" />
             <map mr="uart" vaddr="0x5_000_000" perms="rw" cached="false" setvar_vaddr="uart_base" />
+
         </protection_domain>
 
         <!-- THIS IS THE END OF THE SYSTEM WE ARE PROFILING -->

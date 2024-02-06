@@ -20,6 +20,9 @@ uintptr_t profiler_ring_used;
 uintptr_t profiler_ring_free;
 uintptr_t profiler_mem;
 
+uintptr_t log_buffer;
+uintptr_t log_buffer_phys;
+
 ring_handle_t profiler_ring;
 
 /* State of profiler */
@@ -184,7 +187,8 @@ void add_sample(microkit_id id, uint32_t time, uint64_t pc, uint32_t pmovsr, uin
         microkit_dbg_puts("Failed to dequeue from profiler free ring\n");
         return;
     }
-    pmu_sample_t *temp_sample = (pmu_sample_t *) buffer;
+
+    prof_sample_t *temp_sample = (prof_sample_t *) buffer;
     
     // Find which counter overflowed, and the corresponding period
 
@@ -266,57 +270,6 @@ void user_pmu_configure(pmu_config_args_t config_args) {
     }
 }
 
-/* PPC will arrive from application to configure the PMU */
-seL4_MessageInfo_t
-protected(microkit_channel ch, microkit_msginfo msginfo)
-{
-    // This is deprecated for now. Using a shared memory region between process and profiler to control/configure
-    // For now we should only be recieving on channel 5
-    if (ch == 5) {
-        // For now, we should have only 1 message 
-        uint32_t config = microkit_mr_get(0);
-
-        switch (config)
-        {
-        case PROFILER_START:
-            // Start PMU
-            resume_cnt();
-            break;
-        case PROFILER_STOP:
-            halt_cnt();
-            // Also want to flush out anything that may be left in the ring buffer
-            // Purge buffers if any
-            microkit_notify(CLIENT_HALT);
-            break;
-        case PROFILER_CONFIGURE:
-            {
-            /* Example layout of what a call to profile configure should look like (Based on the perfmon2 spec):
-                microkit_mr_set(0, PROFILER_CONFIGURE);
-                microkit_mr_set(1, REG_NUM);
-                microkit_mr_set(2, EVENT NUM);
-                microkit_mr_set(3, FLAGS(empty for now));
-                microkit_mr_set(4, VAL_UPPER);
-                microkit_mr_set(5, VAL_LOWER);
-            These message registers are then unpacted here and applied to the PMU state.     
-            */
-
-            pmu_config_args_t args;
-            args.reg_num = microkit_mr_get(1);
-            args.reg_event = microkit_mr_get(2);
-            args.reg_flags = microkit_mr_get(3);
-            uint32_t top = microkit_mr_get(4);
-            uint32_t bottom = microkit_mr_get(5);
-            args.reg_val = ((uint64_t) top << 32) | bottom;
-            user_pmu_configure(args);
-            break;
-            }
-        default:
-            break;
-        }
-    }
-    return microkit_msginfo_new(0, 0);
-}
-
 void init () {
     int *prof_cnt = (int *) profiler_control;
 
@@ -335,6 +288,23 @@ void init () {
         }
     }
 
+    // #ifdef CONFIG_PROFILER_ENABLE
+
+    // microkit_dbg_puts("This is the phys addr of the log buffer: ");
+    // puthex64(log_buffer_phys);
+    // microkit_dbg_puts("\n");
+
+    // microkit_dbg_puts("Calling benchmark set log buffer syscall\n");
+
+    // int res_buf = seL4_BenchmarkSetLogBuffer(log_buffer);
+
+    // if (res_buf) {
+    //     print("Could not set log buffer");
+    //     puthex64(res_buf);
+    // } else {
+    //     print("We set the log buffer\n");
+    // }
+    // #endif
 
     /* INITIALISE WHAT COUNTERS WE WANT TO TRACK IN HERE*/
     /* HERE USERS CAN ADD IN CONFIGURATION OPTIONS FOR THE PROFILER BY SETTING
@@ -350,6 +320,27 @@ void init () {
 
     // Set the profiler state to init
     profiler_state = PROF_INIT;
+}
+
+void handle_irq(void) {
+    pmu_sample_t *profLog = (pmu_sample_t *) log_buffer;
+    if (profLog->valid == 1) {
+        uint32_t pmovsr = profLog->irqFlag;
+        if (pmovsr & (IRQ_CYCLE_COUNTER << 31) ||
+            pmovsr & (IRQ_COUNTER0 << 0) ||
+            pmovsr & (IRQ_COUNTER1 << 1) ||
+            pmovsr & (IRQ_COUNTER2 << 2) ||
+            pmovsr & (IRQ_COUNTER3 << 3) ||
+            pmovsr & (IRQ_COUNTER4 << 4) ||
+            pmovsr & (IRQ_COUNTER5 << 5)) {
+            add_sample(profLog->pid, profLog->time, profLog->ip, pmovsr, profLog->ips);
+        } else {
+            reset_cnt(pmovsr);
+            resume_cnt();
+        }
+    } else {
+        reset_cnt(profLog->irqFlag);
+    }
 }
 
 void notified(microkit_channel ch) {
@@ -372,181 +363,8 @@ void notified(microkit_channel ch) {
             microkit_dbg_puts("Resuming PMU\n");
             resume_cnt();
         }
+    } else if (ch == 21) {
+        microkit_dbg_puts("Recv PMU irq!\n");
+        handle_irq();
     }
-}
-static char *
-data_abort_dfsc_to_string(uintptr_t dfsc)
-{
-    switch(dfsc) {
-        case 0x00: return "address size fault, level 0";
-        case 0x01: return "address size fault, level 1";
-        case 0x02: return "address size fault, level 2";
-        case 0x03: return "address size fault, level 3";
-        case 0x04: return "translation fault, level 0";
-        case 0x05: return "translation fault, level 1";
-        case 0x06: return "translation fault, level 2";
-        case 0x07: return "translation fault, level 3";
-        case 0x09: return "access flag fault, level 1";
-        case 0x0a: return "access flag fault, level 2";
-        case 0x0b: return "access flag fault, level 3";
-        case 0x0d: return "permission fault, level 1";
-        case 0x0e: return "permission fault, level 2";
-        case 0x0f: return "permission fault, level 3";
-        case 0x10: return "synchronuos external abort";
-        case 0x11: return "synchronous tag check fault";
-        case 0x14: return "synchronous external abort, level 0";
-        case 0x15: return "synchronous external abort, level 1";
-        case 0x16: return "synchronous external abort, level 2";
-        case 0x17: return "synchronous external abort, level 3";
-        case 0x18: return "syncrhonous partity or ECC error";
-        case 0x1c: return "syncrhonous partity or ECC error, level 0";
-        case 0x1d: return "syncrhonous partity or ECC error, level 1";
-        case 0x1e: return "syncrhonous partity or ECC error, level 2";
-        case 0x1f: return "syncrhonous partity or ECC error, level 3";
-        case 0x21: return "alignment fault";
-        case 0x30: return "tlb conflict abort";
-        case 0x31: return "unsupported atomic hardware update fault";
-    }
-    return "<unexpected DFSC>";
-}
-static char *
-ec_to_string(uintptr_t ec)
-{
-    switch (ec) {
-        case 0: return "Unknown reason";
-        case 1: return "Trapped WFI or WFE instruction execution";
-        case 3: return "Trapped MCR or MRC access with (coproc==0b1111) this is not reported using EC 0b000000";
-        case 4: return "Trapped MCRR or MRRC access with (coproc==0b1111) this is not reported using EC 0b000000";
-        case 5: return "Trapped MCR or MRC access with (coproc==0b1110)";
-        case 6: return "Trapped LDC or STC access";
-        case 7: return "Access to SVC, Advanced SIMD or floating-point functionality trapped";
-        case 12: return "Trapped MRRC access with (coproc==0b1110)";
-        case 13: return "Branch Target Exception";
-        case 17: return "SVC instruction execution in AArch32 state";
-        case 21: return "SVC instruction execution in AArch64 state";
-        case 24: return "Trapped MSR, MRS or System instruction exuection in AArch64 state, this is not reported using EC 0xb000000, 0b000001 or 0b000111";
-        case 25: return "Access to SVE functionality trapped";
-        case 28: return "Exception from a Pointer Authentication instruction authentication failure";
-        case 32: return "Instruction Abort from a lower Exception level";
-        case 33: return "Instruction Abort taken without a change in Exception level";
-        case 34: return "PC alignment fault exception";
-        case 36: return "Data Abort from a lower Exception level";
-        case 37: return "Data Abort taken without a change in Exception level";
-        case 38: return "SP alignment faultr exception";
-        case 40: return "Trapped floating-point exception taken from AArch32 state";
-        case 44: return "Trapped floating-point exception taken from AArch64 state";
-        case 47: return "SError interrupt";
-        case 48: return "Breakpoint exception from a lower Exception level";
-        case 49: return "Breakpoint exception taken without a change in Exception level";
-        case 50: return "Software Step exception from a lower Exception level";
-        case 51: return "Software Step exception taken without a change in Exception level";
-        case 52: return "Watchpoint exception from a lower Exception level";
-        case 53: return "Watchpoint exception taken without a change in Exception level";
-        case 56: return "BKPT instruction execution in AArch32 state";
-        case 60: return "BRK instruction execution in AArch64 state";
-    }
-    return "<invalid EC>";
-}
-void fault(microkit_id id, microkit_msginfo msginfo) {
-    microkit_dbg_puts("recv fault in prof: ");
-    puthex64(id);
-    microkit_dbg_puts("\n");
-    size_t label = microkit_msginfo_get_label(msginfo);
-    if (label == seL4_Fault_PMUEvent) {
-        microkit_dbg_puts("recv pmu fault\n");
-        uint64_t pc = microkit_mr_get(0);
-        uint32_t ccnt_lower = microkit_mr_get(1);
-        uint32_t ccnt_upper = microkit_mr_get(2);
-        uint32_t pmovsr = microkit_mr_get(3);
-        uint64_t cc[4] = {0,0,0,0};
-        cc[0] = microkit_mr_get(4);
-        cc[1] = microkit_mr_get(5);
-        cc[2] = microkit_mr_get(6);
-        cc[3] = microkit_mr_get(7);
-
-        uint64_t time = ((uint64_t) ccnt_upper << 32) | ccnt_lower;
-        // profiler_handle_fault(pc, ccnt_lower, ...);
-  
-        // Only add a snapshot if the counter we are sampling on is in the interrupt flag
-        // @kwinter Change this to deal with new counter definitions
-        if (pmovsr & (IRQ_CYCLE_COUNTER << 31) ||
-            pmovsr & (IRQ_COUNTER0 << 0) ||
-            pmovsr & (IRQ_COUNTER1 << 1) ||
-            pmovsr & (IRQ_COUNTER2 << 2) ||
-            pmovsr & (IRQ_COUNTER3 << 3) ||
-            pmovsr & (IRQ_COUNTER4 << 4) ||
-            pmovsr & (IRQ_COUNTER5 << 5)) {
-            add_sample(id, time, pc, pmovsr, cc);
-        } else {
-            reset_cnt(pmovsr);
-            resume_cnt();
-        }
-    } else if (label == seL4_Fault_VMFault) {
-        seL4_Word ip = seL4_GetMR(seL4_VMFault_IP);
-        seL4_Word fault_addr = seL4_GetMR(seL4_VMFault_Addr);
-        seL4_Word is_instruction = seL4_GetMR(seL4_VMFault_PrefetchFault);
-        seL4_Word fsr = seL4_GetMR(seL4_VMFault_FSR);
-        seL4_Word ec = fsr >> 26;
-        seL4_Word il = fsr >> 25 & 1;
-        seL4_Word iss = fsr & 0x1ffffffUL;
-        microkit_dbg_puts("MON|ERROR: VMFault: ip=");
-        puthex64(ip);
-        microkit_dbg_puts("  fault_addr=");
-        puthex64(fault_addr);
-        microkit_dbg_puts("  fsr=");
-        puthex64(fsr);
-        microkit_dbg_puts("  ");
-        microkit_dbg_puts(is_instruction ? "(instruction fault)" : "(data fault)");
-        microkit_dbg_puts("\n");
-        microkit_dbg_puts("MON|ERROR:    ec: ");
-        puthex64(ec);
-        microkit_dbg_puts("  ");
-        microkit_dbg_puts(ec_to_string(ec));
-        microkit_dbg_puts("   il: ");
-        microkit_dbg_puts(il ? "1" : "0");
-        microkit_dbg_puts("   iss: ");
-        puthex64(iss);
-        microkit_dbg_puts("\n");
-
-        if (ec == 0x24) {
-            /* FIXME: Note, this is not a complete decoding of the fault! Just some of the more
-                common fields!
-            */
-            seL4_Word dfsc = iss & 0x3f;
-            bool ea = (iss >> 9) & 1;
-            bool cm = (iss >> 8) & 1;
-            bool s1ptw = (iss >> 7) & 1;
-            bool wnr = (iss >> 6) & 1;
-            microkit_dbg_puts("MON|ERROR:    dfsc = ");
-            microkit_dbg_puts(data_abort_dfsc_to_string(dfsc));
-            microkit_dbg_puts(" (");
-            puthex64(dfsc);
-            microkit_dbg_puts(")");
-            if (ea) {
-                microkit_dbg_puts(" -- external abort");
-            }
-            if (cm) {
-                microkit_dbg_puts(" -- cache maint");
-            }
-            if (s1ptw) {
-                microkit_dbg_puts(" -- stage 2 fault for stage 1 page table walk");
-            }
-            if (wnr) {
-                microkit_dbg_puts(" -- write not read");
-            }
-            microkit_dbg_puts("\n");
-        }
-        while (1);
-    } else if (label == seL4_Fault_CapFault) {
-        microkit_dbg_puts("Cap fault\n");
-    } else if (label == seL4_Fault_UnknownSyscall) {
-        microkit_dbg_puts("Unknown syscall\n");
-    } else if (label == seL4_Fault_UserException) {
-        microkit_dbg_puts("User Exception\n");
-    }  else if (label == seL4_Fault_NullFault) {
-        microkit_dbg_puts("Null fault\n");
-    }
-
-    microkit_fault_reply(microkit_msginfo_new(0, 0));
-
 }
