@@ -38,8 +38,9 @@ fn main() -> std::io::Result<()> {
         let elf_path = Path::new(&elf_path_name);
 
         let filename = elf_path.file_name().unwrap().to_str().unwrap();
+
         perf_file.create_comm_event(pid, filename);
-        perf_file.create_mmap_event(pid, &application);
+        perf_file.create_mmap_event(pid, &elf_path_name);
     }
 
     for sample in samples_file.samples {
