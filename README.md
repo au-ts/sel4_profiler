@@ -46,7 +46,7 @@ You can install this using `pip` with the following command: `pip install protob
 
 ```sh
 # In the root of the repository
-protoc --python_out=protobuf --proto_path=protobuf protobuf/pmu_sample.proto
+protoc --python_out=protobuf/python --proto_path=protobuf/python protobuf/pmu_sample.proto
 ```
 
 # Using
