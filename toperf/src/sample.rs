@@ -12,11 +12,11 @@ pub struct Sel4Sample {
     pub ip: u64,
 
     // protection domain id
-    pub pd: u32,
+    pub pid: u32,
 
     // timestamp of when the sample occured
     #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub timestamp: u64,
+    pub time: u64,
 
     // cpu affinity - which cpu is being used
     pub cpu: u32,

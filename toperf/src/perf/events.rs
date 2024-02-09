@@ -113,9 +113,9 @@ impl SampleEvent {
         SampleEvent {
             header,
             ip: sample.ip,
-            pid: sample.pd,
-            tid: sample.pd,
-            time: sample.timestamp,
+            pid: sample.pid,
+            tid: sample.pid,
+            time: sample.time,
             cpu: sample.cpu,
             period: sample.period,
             callchain: callchain,

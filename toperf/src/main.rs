@@ -39,7 +39,7 @@ fn main() -> std::io::Result<()> {
         let elf_path_name = format!("{build_dir}/{application}");
         let elf_path = Path::new(&elf_path_name);
         // Check if elf path exists
-        if (!elf_path.exists()) {
+        if !elf_path.exists() {
             println!("Elf path: {elf_path_name} does not exist!");
             process::exit(1);        
         }
