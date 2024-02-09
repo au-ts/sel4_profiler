@@ -44,13 +44,17 @@ class ProfilerClient:
         """
         self.send_command("MAPPINGS")
         self.output.write("{\n")
-        self.output.write("\"pd_mappings\": {\n")
+        self.output.write("\"elf_tcb_mappings\": {\n")
         data = self.socket.recv(4096).decode()
         print(str(data))
         lines = str(data).split("\n")
-        for line in lines:
-            content = line.split(":")
-            self.output.write(f"\"{content[0]}\": {content[1]},\n")
+        for i in range(0, len(lines)):
+            content = lines[i].split(":")
+            self.output.write(f"\"{content[0]}\": {content[1]}")
+            if (i == len(lines) - 1):
+                self.output.write("\n")
+            else:
+                self.output.write(",\n") 
         self.output.write("}")
     def connect(self):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
