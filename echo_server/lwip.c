@@ -540,9 +540,7 @@ void init(void)
     }
 
     #ifdef CONFIG_PROFILER_ENABLE
-    microkit_dbg_puts("Calling profiler register thread syscall\n");
-    seL4_ProfilerRegisterThread(1);
-    microkit_dbg_puts("Returned from syscall\n");
+    seL4_ProfilerRegisterThread(52);
     #endif
     print(microkit_name);
     print(": elf PD init complete\n");
