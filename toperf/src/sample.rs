@@ -1,7 +1,7 @@
 use serde_with::{serde_as, DisplayFromStr};
 use serde_aux::prelude::*;
 
-pub const CALL_STACK_DEPTH: usize = 4;
+pub const CALL_STACK_DEPTH: usize = 16;
 
 #[repr(C)]
 #[serde_as]
@@ -24,6 +24,10 @@ pub struct Sel4Sample {
     // number of events per sample
     #[serde(deserialize_with = "deserialize_number_from_string")]
     pub period: u64,
+
+    // // number of ips in the call stack
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    pub nr: u64,
 
     // call stack - provides a trace of addresses for functions called
     #[serde_as(as = "[DisplayFromStr; CALL_STACK_DEPTH]")]

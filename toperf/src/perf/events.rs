@@ -106,7 +106,7 @@ impl SampleEvent {
 
         // TODO: check that sample.ips.len matches CALL_STACK_DEPTH
         let callchain = SampleIpCallchain {
-            nr: sample.ips.len() as u64,
+            nr: sample.nr,
             ips: sample.ips,
         };
 
