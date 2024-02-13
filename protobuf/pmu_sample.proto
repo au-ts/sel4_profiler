@@ -7,6 +7,7 @@ message pmu_sample {
   uint64 time = 3;
   uint32 cpu = 4;
   uint64 period = 5;
-  repeated uint64 ips = 6 [(nanopb).max_count = 4];
+  uint64 nr = 6;
+  repeated uint64 ips = 7 [(nanopb).max_count = 16];
 
 }
