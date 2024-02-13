@@ -2,10 +2,21 @@
 
 /* ----- THE FOLLOWING DEFINES ARE FOR CONFIGURING THE PROFILER ------*/
 
-/* CHANGE THIS VALUE TO CHANGE WHAT PD TO TRACK (WE NEED TO ACCESS THE TCB OF
-A PD TO TRACK PC) */
-#define PD_ID 0
+// TODO: NEED TO HAVE A BETTER WAY OF INJECTING THE MAPPINGS FROM THE SYSTEM DESCRIPTION
 
+/*
+    This is the string that maintains the mapping between profiler id's and elf names.
+    The profiler id is the value with which you make the the seL4_ProfilerRegisterThread(id) syscall.
+
+    Please change this string when adding processes to profile. Use the following structure:
+
+    "<elf_name>: <profiling_id>\n
+    <elf_name>: <profiling_id"
+
+    NOTE: Seperate pairs with new lines.
+*/  
+
+#define MAPPINGS_STR "echo.elf: 52"
 
 /* For each counter, set IRQ to 1 to sample on counter, or 0 to not.
 

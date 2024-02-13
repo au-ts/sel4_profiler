@@ -20,6 +20,7 @@
 #include "socket.h"
 #include "util.h"
 #include "client.h"
+#include "profiler_config.h"
 /* This file implements a TCP based utilization measurment process that starts
  * and stops utilization measurements based on a client's requests.
  * The protocol used to communicate is as follows:
@@ -53,9 +54,6 @@ uintptr_t data_packet;
 #define ERROR "400 ERROR\n"
 #define MAPPINGS "MAPPINGS\n"
 #define REFRESH "REFRESH\n"
-
-// TODO: NEED TO HAVE A BETTER WAY OF INJECTING THE MAPPINGS FROM THE SYSTEM DESCRIPTION
-#define MAPPINGS_STR "dummy_prog: 0\ndummy_prog1: 1"
 
 #define msg_match(msg, match) (strncmp(msg, match, strlen(match))==0)
 

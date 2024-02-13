@@ -80,7 +80,8 @@ struct prof_sample {
     uint64_t time;          /* Timestamp */
     uint32_t cpu;           /* CPU affinity */
     uint64_t period;        /* Number of events per sample */
-    uint64_t ips[MAX_CALL_DEPTH]; /* Call stack - MAX_INSN = 10 */
+    uint64_t nr;            /* Number of ips in the call stack*/
+    uint64_t ips[SEL4_PROF_MAX_CALL_DEPTH]; /* Call stack */
 };
 
 typedef struct prof_sample prof_sample_t;

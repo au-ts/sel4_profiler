@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <system>
-    <memory_region name="uart" size="0x10_000" phys_addr="0x30860000" />
+    <memory_region name="uart" size="0x10_000" phys_addr="0x30890000" />
     <memory_region name="eth0" size="0x10_000" phys_addr="0x30be0000" />
     <memory_region name="timer" size="0x10_000" phys_addr="0x302d0000" />
 
@@ -75,12 +75,11 @@
     <memory_region name="tcp_echo_packet" size="0x100000" />
     <memory_region name="log_buffer" size="0x200_000" page_size="0x200_000"/>
 
-    <protection_domain name="profiler" priority="95">
+    <protection_domain name="profiler" priority="96">
         <program_image path="profiler.elf" />
         <map mr="uart" vaddr="0x5_000_000" perms="rw" cached="false" setvar_vaddr="uart_base" />
         
         <map mr="log_buffer" vaddr="0x4_000_000" perms="rw" cached="false" setvar_vaddr="log_buffer" />
-        <setvar symbol="log_buffer_phys" region_paddr="log_buffer" />
         <map mr="profiler_control" vaddr="0x3_800_000" perms="rw" cached="false" setvar_vaddr="profiler_control"/>
             <!-- shared memory for profiler ring buffer mechanism -->
         <map mr="profiler_ring_free" vaddr="0x8_000_000" perms="rw" cached="true" setvar_vaddr="profiler_ring_free" />
@@ -105,6 +104,7 @@
             <map mr="uart" vaddr="0x5_000_000" perms="rw" cached="false" setvar_vaddr="uart_base" />
 
         </protection_domain>
+
 
         <!-- THIS IS THE END OF THE SYSTEM WE ARE PROFILING -->
 
@@ -420,7 +420,7 @@
         <end pd="client" id="30" />
         <end pd="profiler" id="30" />
     </channel>
-    
+
     <channel>
         <end pd="eth_copy1" id="1" />
         <end pd="client1" id="2" />
@@ -445,5 +445,4 @@
         <end pd="eth_mux_rx" id="1" />
         <end pd="eth_copy1" id="0" />
     </channel>
-
 </system>

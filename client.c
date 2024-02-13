@@ -4,7 +4,6 @@
 #include <microkit.h>
 #include <sel4/sel4.h>
 #include "client.h"
-#include "perf.h"
 #include "printf.h"
 #include "profiler.h"
 #include "xmodem.h"
@@ -127,9 +126,10 @@ static err_t eth_dump_callback(void *arg, struct tcp_pcb *pcb, uint16_t len)
         pb_sample.pid = sample->pid;
         pb_sample.time = sample->time;
         pb_sample.cpu = sample->cpu;
-        pb_sample.ips_count = MAX_CALL_DEPTH;
+        pb_sample.nr = sample->nr;
+        pb_sample.ips_count = SEL4_PROF_MAX_CALL_DEPTH;
         pb_sample.period = sample->period;
-        for (int i = 0; i < MAX_CALL_DEPTH; i++) {
+        for (int i = 0; i < SEL4_PROF_MAX_CALL_DEPTH; i++) {
             pb_sample.ips[i] = sample->ips[i];
         }
 
@@ -191,9 +191,10 @@ void eth_dump_start() {
         pb_sample.pid = sample->pid;
         pb_sample.time = sample->time;
         pb_sample.cpu = sample->cpu;
-        pb_sample.ips_count = MAX_CALL_DEPTH;
+        pb_sample.nr = sample->nr;
+        pb_sample.ips_count = SEL4_PROF_MAX_CALL_DEPTH;
         pb_sample.period = sample->period;
-        for (int i = 0; i < MAX_CALL_DEPTH; i++) {
+        for (int i = 0; i < SEL4_PROF_MAX_CALL_DEPTH; i++) {
             pb_sample.ips[i] = sample->ips[i];
         }
 
@@ -244,6 +245,7 @@ void init() {
 void notified(microkit_channel ch) {
     // Notified to empty profiler sample buffers
     if (ch == CLIENT_CH) {
+            // microkit_dbg_puts("notified to dump samples\n");
         // Determine how to dump buffers
         if (CLIENT_CONFIG == 0) {
             // Print over serial
@@ -261,6 +263,7 @@ void notified(microkit_channel ch) {
         }
     } else if(CLIENT_CONFIG == 2) {
         // Getting a network interrupt
+        // microkit_dbg_puts("Network interrupt for prof client\n");
         notified_lwip(ch);
     } 
 }

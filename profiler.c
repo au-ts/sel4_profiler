@@ -8,7 +8,6 @@
 #include "serial_server.h"
 #include "printf.h"
 #include "snapshot.h"
-#include "perf.h"
 #include "timer.h"
 #include "profiler_config.h"
 #include "client.h"
@@ -21,12 +20,18 @@ uintptr_t profiler_ring_free;
 uintptr_t profiler_mem;
 
 uintptr_t log_buffer;
-uintptr_t log_buffer_phys;
 
 ring_handle_t profiler_ring;
 
 /* State of profiler */
 int profiler_state;
+
+#define MRS(reg, v)  asm volatile("mrs %x0," reg : "=r"(v))
+#define MSR(reg, v)                                \
+    do {                                           \
+        uint64_t _v = v;                             \
+        asm volatile("msr " reg ",%x0" :: "r" (_v));\
+    }while(0)
 
 /* Halt the PMU */
 void halt_cnt() {
@@ -46,7 +51,6 @@ void halt_cnt() {
     mask = 0;
     mask |= (1 << 31);
     asm volatile("MSR PMCNTENSET_EL0, %0" : : "r" (value & ~mask));
-
 }
 
 /* Resume the PMU */
@@ -60,7 +64,6 @@ void resume_cnt() {
     asm volatile("isb; msr pmcr_el0, %0" : : "r" (val));
 
     asm volatile("MSR PMCNTENSET_EL0, %0" : : "r" (BIT(31)));
-
 }
 
 /* Reset the cycle counter to the sampling period. This needs to be changed
@@ -130,14 +133,14 @@ void reset_cnt(uint32_t interrupt_flags) {
 
         asm volatile("msr pmccntr_el0, %0" : : "r" (init_cnt));
     }
+
 }
 
 /* Configure cycle counter*/
-void configure_clkcnt(uint64_t val) {
-    uint64_t init_cnt = 0xffffffffffffffff - val;
+void configure_clkcnt() {
+    uint64_t init_cnt = 0xffffffffffffffff - CYCLE_COUNTER_PERIOD;
     asm volatile("msr pmccntr_el0, %0" : : "r" (init_cnt));
 }
-
 
 /* Configure event counter 0 */
 void configure_cnt0(uint32_t event, uint32_t val) {
@@ -176,7 +179,8 @@ void configure_cnt5(uint32_t event, uint32_t val) {
 }
 
 /* Add a snapshot of the cycle and event registers to the array. This array needs to become a ring buffer. */
-void add_sample(microkit_id id, uint32_t time, uint64_t pc, uint32_t pmovsr, uint64_t *cc) {    
+void add_sample(microkit_id id, uint32_t time, uint64_t pc, uint64_t nr, uint32_t pmovsr, uint64_t *cc) {    
+    // microkit_dbg_puts("adding sample\n");
     uintptr_t buffer = 0;
     unsigned int buffer_len = 0;
     void * cookie = 0;
@@ -215,7 +219,8 @@ void add_sample(microkit_id id, uint32_t time, uint64_t pc, uint32_t pmovsr, uin
     temp_sample->time = time;
     temp_sample->cpu = 0;
     temp_sample->period = period;
-    for (int i = 0; i < MAX_CALL_DEPTH; i++) {
+    temp_sample->nr = nr;
+    for (int i = 0; i < SEL4_PROF_MAX_CALL_DEPTH; i++) {
         temp_sample->ips[i] = 0;
         temp_sample->ips[i] = cc[i];
     }
@@ -241,33 +246,39 @@ void add_sample(microkit_id id, uint32_t time, uint64_t pc, uint32_t pmovsr, uin
     }
 }
 
-/* Initial user PMU configure interface. This is called during a PPC. With the root/child abstraction, PPC's do not currently work. */
-void user_pmu_configure(pmu_config_args_t config_args) {
-    uint32_t event = config_args.reg_event & ARMV8_PMEVTYPER_EVTCOUNT_MASK;
-    // In each of these cases set event for counter, set value of counter.
-    switch (config_args.reg_num)
-    {
-    case EVENT_CTR_0:
-        configure_cnt0(event, config_args.reg_val);
-        break;
-    case EVENT_CTR_1:
-        configure_cnt1(event, config_args.reg_val);
-        break;
-    case EVENT_CTR_2:
-        configure_cnt2(event, config_args.reg_val);
-        break;
-    case EVENT_CTR_3:
-        configure_cnt3(event, config_args.reg_val);
-        break;
-    case EVENT_CTR_4:
-        configure_cnt4(event, config_args.reg_val);
-        break;
-    case EVENT_CTR_5:
-        configure_cnt5(event, config_args.reg_val);
-        break;
-    default:
-        break;
-    }
+/* Dump the values of the cycle counter and event counters 0 to 5*/
+void print_pmu_debug() {
+    uint64_t clock = 0;
+    uint32_t c1 = 0;
+    uint32_t c2 = 0;
+    uint32_t c3 = 0;
+    uint32_t c4 = 0;
+    uint32_t c5 = 0;
+    uint32_t c6 = 0;
+
+    asm volatile("isb; mrs %0, pmccntr_el0" : "=r" (clock));
+    asm volatile("isb; mrs %0, pmevcntr0_el0" : "=r" (c1));
+    asm volatile("isb; mrs %0, pmevcntr1_el0" : "=r" (c2));
+    asm volatile("isb; mrs %0, pmevcntr2_el0" : "=r" (c3));
+    asm volatile("isb; mrs %0, pmevcntr3_el0" : "=r" (c4));
+    asm volatile("isb; mrs %0, pmevcntr4_el0" : "=r" (c5));
+    asm volatile("isb; mrs %0, pmevcntr4_el0" : "=r" (c6));
+
+    microkit_dbg_puts("This is the current cycle counter: ");
+    puthex64(clock);
+    microkit_dbg_puts("\nThis is the current event counter 0: ");
+    puthex64(c1);
+    microkit_dbg_puts("This is the current event counter 1: ");
+    puthex64(c2);
+    microkit_dbg_puts("\nThis is the current event counter 2: ");
+    puthex64(c3);
+    microkit_dbg_puts("\nThis is the current event counter 3: ");
+    puthex64(c4);
+    microkit_dbg_puts("\nThis is the current event counter 4: ");
+    puthex64(c5);
+    microkit_dbg_puts("\nThis is the current event counter 5: ");
+    puthex64(c6);
+    microkit_dbg_puts("\n");
 }
 
 void init () {
@@ -279,7 +290,7 @@ void init () {
     ring_init(&profiler_ring, (ring_buffer_t *) profiler_ring_free, (ring_buffer_t *) profiler_ring_used, 0, 512, 512);
     
     for (int i = 0; i < NUM_BUFFERS - 1; i++) {
-        int ret = enqueue_free(&profiler_ring, profiler_mem + (i * sizeof(perf_sample_t)), sizeof(perf_sample_t), NULL);
+        int ret = enqueue_free(&profiler_ring, profiler_mem + (i * sizeof(prof_sample_t)), sizeof(prof_sample_t), NULL);
         
         if (ret != 0) {
             microkit_dbg_puts(microkit_name);
@@ -288,32 +299,26 @@ void init () {
         }
     }
 
-    // #ifdef CONFIG_PROFILER_ENABLE
+    #ifdef CONFIG_PROFILER_ENABLE
 
-    // microkit_dbg_puts("This is the phys addr of the log buffer: ");
-    // puthex64(log_buffer_phys);
-    // microkit_dbg_puts("\n");
+    int res_buf = seL4_BenchmarkSetLogBuffer(log_buffer);
 
-    // microkit_dbg_puts("Calling benchmark set log buffer syscall\n");
-
-    // int res_buf = seL4_BenchmarkSetLogBuffer(log_buffer);
-
-    // if (res_buf) {
-    //     print("Could not set log buffer");
-    //     puthex64(res_buf);
-    // } else {
-    //     print("We set the log buffer\n");
-    // }
-    // #endif
+    if (res_buf) {
+        print("Could not set log buffer");
+        puthex64(res_buf);
+    } else {
+        print("We set the log buffer\n");
+    }
+    #endif
 
     /* INITIALISE WHAT COUNTERS WE WANT TO TRACK IN HERE*/
     /* HERE USERS CAN ADD IN CONFIGURATION OPTIONS FOR THE PROFILER BY SETTING
-    CALLING THE CONFIGURE FUNCTIONS. For example:
+    CALLING THE CONFIGURE F For example:
 
     configure_cnt0(L1I_CACHE_REFILL, 0xfffffff); 
     */
-    configure_cnt2(L1I_CACHE_REFILL, 0xffffff00); 
-    configure_cnt1(L1D_CACHE_REFILL, 0xfffffff0); 
+    // configure_cnt2(L1I_CACHE_REFILL, 0xffffff00); 
+    // configure_cnt1(L1D_CACHE_REFILL, 0xfffffff0); 
 
     // Make sure that the PMU is not running until we start
     halt_cnt();
@@ -322,25 +327,21 @@ void init () {
     profiler_state = PROF_INIT;
 }
 
-void handle_irq(void) {
-    pmu_sample_t *profLog = (pmu_sample_t *) log_buffer;
-    if (profLog->valid == 1) {
-        uint32_t pmovsr = profLog->irqFlag;
-        if (pmovsr & (IRQ_CYCLE_COUNTER << 31) ||
-            pmovsr & (IRQ_COUNTER0 << 0) ||
-            pmovsr & (IRQ_COUNTER1 << 1) ||
-            pmovsr & (IRQ_COUNTER2 << 2) ||
-            pmovsr & (IRQ_COUNTER3 << 3) ||
-            pmovsr & (IRQ_COUNTER4 << 4) ||
-            pmovsr & (IRQ_COUNTER5 << 5)) {
-            add_sample(profLog->pid, profLog->time, profLog->ip, pmovsr, profLog->ips);
-        } else {
-            reset_cnt(pmovsr);
-            resume_cnt();
+void handle_irq(uint32_t irqFlag) {
+    pmu_sample_t *profLogs = (pmu_sample_t *) log_buffer;
+    pmu_sample_t profLog = profLogs[0];
+
+    if (profLog.valid == 1) {
+        if (irqFlag & (IRQ_CYCLE_COUNTER << 31) ||
+            irqFlag & (IRQ_COUNTER0 << 0) ||
+            irqFlag & (IRQ_COUNTER1 << 1) ||
+            irqFlag & (IRQ_COUNTER2 << 2) ||
+            irqFlag & (IRQ_COUNTER3 << 3) ||
+            irqFlag & (IRQ_COUNTER4 << 4) ||
+            irqFlag & (IRQ_COUNTER5 << 5)) {
+            add_sample(profLog.pid, profLog.time, profLog.ip, profLog.nr, irqFlag, profLog.ips);
         }
-    } else {
-        reset_cnt(profLog->irqFlag);
-    }
+    } 
 }
 
 void notified(microkit_channel ch) {
@@ -348,7 +349,7 @@ void notified(microkit_channel ch) {
         microkit_dbg_puts("Starting PMU\n");
         // Set the profiler state to start
         profiler_state = PROF_START;
-        configure_clkcnt(CYCLE_COUNTER_PERIOD);
+        configure_clkcnt();
         resume_cnt();
     } else if (ch == 20) {
         microkit_dbg_puts("Halting PMU\n");
@@ -360,11 +361,23 @@ void notified(microkit_channel ch) {
     } else if (ch == 30) {
         // Only resume if profiler state is in 'START' state
         if (profiler_state == PROF_START) {
-            microkit_dbg_puts("Resuming PMU\n");
+            // microkit_dbg_puts("Resuming PMU\n");
             resume_cnt();
         }
     } else if (ch == 21) {
-        microkit_dbg_puts("Recv PMU irq!\n");
-        handle_irq();
+        // Get the interrupt flag from the PMU
+        // microkit_dbg_puts("Recv pmu irq\n");
+        uint32_t pmovsr = 0;
+        MRS("PMOVSCLR_EL0", pmovsr);
+
+        handle_irq(pmovsr);
+        reset_cnt(pmovsr);
+        resume_cnt();
+
+        // Clear the interrupt flag 
+        uint32_t val = BIT(31);
+        MSR("PMOVSCLR_EL0", val);
+
+        microkit_irq_ack(ch);
     }
 }
