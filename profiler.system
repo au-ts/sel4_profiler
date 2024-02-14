@@ -71,11 +71,10 @@
     <memory_region name="tx_cookies" size="0x200_000" page_size="0x200_000"/>
 
     <memory_region name="data_packet" size="0x1000"/>
-    <memory_region name="data" size="0x1000"/>
     <memory_region name="tcp_echo_packet" size="0x100000" />
     <memory_region name="log_buffer" size="0x200_000" page_size="0x200_000"/>
 
-    <protection_domain name="profiler" priority="96">
+    <protection_domain name="profiler" priority="105">
         <program_image path="profiler.elf" />
         <map mr="uart" vaddr="0x5_000_000" perms="rw" cached="false" setvar_vaddr="uart_base" />
         

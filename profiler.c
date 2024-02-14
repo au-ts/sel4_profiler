@@ -34,7 +34,7 @@ int profiler_state;
     }while(0)
 
 /* Halt the PMU */
-void halt_cnt() {
+void halt_pmu() {
     uint32_t value = 0;
     uint32_t mask = 0;
 
@@ -54,7 +54,7 @@ void halt_cnt() {
 }
 
 /* Resume the PMU */
-void resume_cnt() {
+void resume_pmu() {
     uint64_t val;
 
 	asm volatile("mrs %0, pmcr_el0" : "=r" (val));
@@ -68,7 +68,7 @@ void resume_cnt() {
 
 /* Reset the cycle counter to the sampling period. This needs to be changed
 to allow sampling on other event counters. */
-void reset_cnt(uint32_t interrupt_flags) {
+void reset_pmu(uint32_t interrupt_flags) {
     // Go through all of the interrupt flags, and reset the appropriate counters to
     // the appropriate values. 
     if (interrupt_flags & BIT(0)) {
@@ -237,12 +237,12 @@ void add_sample(microkit_id id, uint32_t time, uint64_t pc, uint64_t nr, uint32_
     // Notify the client that we need to dump. If we are dumping, do not 
     // restart the PMU until we have managed to purge all buffers over the network.
     if (ring_empty(profiler_ring.free_ring)) {
-        reset_cnt(pmovsr);
-        halt_cnt();
+        reset_pmu(pmovsr);
+        halt_pmu();
         microkit_notify(CLIENT_CH);
     } else {
-        reset_cnt(pmovsr);
-        resume_cnt();
+        reset_pmu(pmovsr);
+        resume_pmu();
     }
 }
 
@@ -321,7 +321,7 @@ void init () {
     // configure_cnt1(L1D_CACHE_REFILL, 0xfffffff0); 
 
     // Make sure that the PMU is not running until we start
-    halt_cnt();
+    halt_pmu();
 
     // Set the profiler state to init
     profiler_state = PROF_INIT;
@@ -341,7 +341,11 @@ void handle_irq(uint32_t irqFlag) {
             irqFlag & (IRQ_COUNTER5 << 5)) {
             add_sample(profLog.pid, profLog.time, profLog.ip, profLog.nr, irqFlag, profLog.ips);
         }
-    } 
+    } else {
+        // Not a valid sample. Restart PMU.
+        reset_pmu(irqFlag);
+        resume_pmu();
+    }
 }
 
 void notified(microkit_channel ch) {
@@ -350,19 +354,19 @@ void notified(microkit_channel ch) {
         // Set the profiler state to start
         profiler_state = PROF_START;
         configure_clkcnt();
-        resume_cnt();
+        resume_pmu();
     } else if (ch == 20) {
         microkit_dbg_puts("Halting PMU\n");
         // Set the profiler state to halt
         profiler_state = PROF_HALT;
-        halt_cnt();
+        halt_pmu();
         // Purge any buffers that may be leftover
         microkit_notify(CLIENT_CH);
     } else if (ch == 30) {
         // Only resume if profiler state is in 'START' state
         if (profiler_state == PROF_START) {
             // microkit_dbg_puts("Resuming PMU\n");
-            resume_cnt();
+            resume_pmu();
         }
     } else if (ch == 21) {
         // Get the interrupt flag from the PMU
@@ -371,8 +375,6 @@ void notified(microkit_channel ch) {
         MRS("PMOVSCLR_EL0", pmovsr);
 
         handle_irq(pmovsr);
-        reset_cnt(pmovsr);
-        resume_cnt();
 
         // Clear the interrupt flag 
         uint32_t val = BIT(31);
