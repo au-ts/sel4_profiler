@@ -44,7 +44,7 @@ ECHODIR=echo_server
 
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 
-IMAGES := profiler.elf client.elf uart.elf uart_mux_rx.elf uart_mux_tx.elf eth.elf eth_mux_rx.elf eth_mux_tx.elf eth_copy.elf arp.elf timer.elf echo.elf
+IMAGES := profiler.elf client.elf uart.elf uart_mux_rx.elf uart_mux_tx.elf eth.elf eth_mux_rx.elf eth_mux_tx.elf eth_copy.elf arp.elf timer.elf echo.elf dummy_prog.elf dummy_prog2.elf
 CFLAGS := -mcpu=$(CPU) -mstrict-align -ffreestanding -g3 -O3 -Wall  -Wno-unused-function -fno-omit-frame-pointer
 LDFLAGS := -L$(BOARD_DIR)/lib -Llib
 LIBS := -lmicrokit -Tmicrokit.ld -lc
@@ -111,7 +111,8 @@ CLIENT_OBJS := client.o serial_server.o printf.o libserialsharedringbuffer/share
 			   $(NETWORK_COMPONENTS)/lwip.o $(NETWORK_COMPONENTS)/utilization_socket.o $(PROTOBUFDIR)/nanopb/pmu_sample.pb.o $(PROTOBUFDIR)/nanopb/pb_common.o $(PROTOBUFDIR)/nanopb/pb_encode.o
 
 ECHO_OBJS := $(ECHO_LWIPFILES:.c=.o) $(ECHODIR)/lwip.o $(ETH_RING_BUFFER)/shared_ringbuffer.o  $(ECHODIR)/udp_echo_socket.o $(ECHODIR)/tcp_echo_socket.o
-
+DUMMY_PROG_OBJS := dummy_prog.o
+DUMMY_PROG2_OBJS := dummy_prog2.o
 
 ETH_OBJS := $(ETHERNET_DRIVER)/ethernet.o $(ETH_RING_BUFFER)/shared_ringbuffer.o
 ETH_MUX_RX_OBJS := $(NETWORK_COMPONENTS)/mux_rx.o $(ETH_RING_BUFFER)/shared_ringbuffer.o
@@ -173,6 +174,12 @@ $(BUILD_DIR)/timer.elf: $(addprefix $(BUILD_DIR)/, $(TIMER_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 $(BUILD_DIR)/echo.elf: $(addprefix $(BUILD_DIR)/, $(ECHO_OBJS))
+	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
+
+$(BUILD_DIR)/dummy_prog.elf: $(addprefix $(BUILD_DIR)/, $(DUMMY_PROG_OBJS))
+	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
+
+$(BUILD_DIR)/dummy_prog2.elf: $(addprefix $(BUILD_DIR)/, $(DUMMY_PROG2_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 $(IMAGE_FILE) $(REPORT_FILE): $(addprefix $(BUILD_DIR)/, $(IMAGES)) profiler.system

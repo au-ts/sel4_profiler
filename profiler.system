@@ -104,6 +104,14 @@
 
         </protection_domain>
 
+        <protection_domain name="dummy_prog" priority="50" id="0">
+            <program_image path="dummy_prog.elf"/>
+                <map mr="profiler_control" vaddr="0x3_800_000" perms="rw" cached="false" setvar_vaddr="profiler_control"/>
+        </protection_domain>
+
+        <protection_domain name="dummy_prog2" priority="50" id="29">
+            <program_image path="dummy_prog2.elf"/>
+        </protection_domain>
 
         <!-- THIS IS THE END OF THE SYSTEM WE ARE PROFILING -->
 
@@ -444,4 +452,10 @@
         <end pd="eth_mux_rx" id="1" />
         <end pd="eth_copy1" id="0" />
     </channel>
+
+    <channel>
+        <end pd="dummy_prog2" id="6"/>
+        <end pd="dummy_prog" id="6"/>
+    </channel>
+
 </system>

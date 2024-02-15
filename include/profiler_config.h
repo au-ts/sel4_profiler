@@ -16,7 +16,7 @@
     NOTE: Seperate pairs with new lines.
 */  
 
-#define MAPPINGS_STR "echo.elf: 52"
+#define MAPPINGS_STR "echo.elf: 52\n dummy_prog.elf: 1\n dummy_prog2.elf: 2"
 
 /* For each counter, set IRQ to 1 to sample on counter, or 0 to not.
 
