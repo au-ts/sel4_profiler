@@ -121,7 +121,7 @@ UART_MUX_TX_OBJS := $(UART_COMPONENTS)/mux_tx.o sddf_serial_sharedringbuffer.o
 UART_MUX_RX_OBJS := $(UART_COMPONENTS)/mux_rx.o sddf_serial_sharedringbuffer.o
 PROFILER_OBJS := $(PROFDIR)/profiler.o sddf_serial_sharedringbuffer.o
 CLIENT_OBJS := $(PROFDIR)/client.o $(PROFDIR)/serial_server.o  sddf_network_sharedringbuffer.o xmodem/crc16.o xmodem/xmodem.o \
- $(PROF_LWIPFILES:.c=.o) $(PROFDIR)/lwip.o $(PROFDIR)/utilization_socket.o sddf_timer_client.o \
+ $(PROF_LWIPFILES:.c=.o) $(PROFDIR)/lwip.o $(PROFDIR)/netconn_socket.o sddf_timer_client.o \
  $(PROTOBUFDIR)/nanopb/pmu_sample.pb.o $(PROTOBUFDIR)/nanopb/pb_common.o $(PROTOBUFDIR)/nanopb/pb_encode.o \
  $(UTIL)/util.o $(UTIL)/printf.o
 

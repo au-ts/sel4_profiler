@@ -491,7 +491,7 @@ void init_lwip(void)
         print("failed to start DHCP negotiation\n");
     }
 
-    setup_utilization_socket();
+    setup_netconn_socket();
     
     request_used_ntfn(&state.rx_ring);
     request_used_ntfn(&state.tx_ring);

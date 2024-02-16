@@ -21,8 +21,8 @@
 #include "util.h"
 #include "client.h"
 #include "profiler_config.h"
-/* This file implements a TCP based utilization measurment process that starts
- * and stops utilization measurements based on a client's requests.
+/* This file implements a TCP based profiler control process that starts
+ * and stops the profiler based on a client's requests.
  * The protocol used to communicate is as follows:
  * - Client connects
  * - Server sends: 100 SEL4 PROFILING CLIENT\n
@@ -35,7 +35,7 @@
  * - Server closes socket.
  *
  *
- * The server starts recording utilization stats when it receives START and
+ * The server starts recording profiling samples when it receives START and
  * finishes recording when it receives STOP or EXIT.
  *
  * Only one client can be connected.
@@ -57,27 +57,14 @@ uintptr_t data_packet;
 
 #define msg_match(msg, match) (strncmp(msg, match, strlen(match))==0)
 
-#define STR_HELPER(x) #x
-#define STR(x) STR_HELPER(x)
-#define RES(x, y, z) "220 VALID DATA (Data to follow)\n"    \
-    "Content-length: "STR(x)"\n"\
-    ","STR(y)","STR(z)
 
-
-struct bench *bench = (void *)(uintptr_t)0x5010000;
-
-uint64_t start;
-uint64_t idle_ccount_start;
-uint64_t idle_overflow_start;
-
-
-static err_t utilization_sent_callback(void *arg, struct tcp_pcb *pcb, u16_t len)
+static err_t netconn_sent_callback(void *arg, struct tcp_pcb *pcb, u16_t len)
 {
     microkit_dbg_puts("sent callback\n");
     return ERR_OK;
 }
 
-static err_t utilization_recv_callback(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err)
+static err_t netconn_recv_callback(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err)
 {
     if (p == NULL) {
         tcp_close(pcb);
@@ -92,20 +79,16 @@ static err_t utilization_recv_callback(void *arg, struct tcp_pcb *pcb, struct pb
     if (msg_match(data_packet_str, HELLO)) {
         error = tcp_write(pcb, OK_READY, strlen(OK_READY), TCP_WRITE_FLAG_COPY);
         if (error) {
-            microkit_dbg_puts("Failed to send OK_READY message through utilization peer");
+            microkit_dbg_puts("Failed to send OK_READY message through netconn peer");
         }
     } else if (msg_match(data_packet_str, START)) {
-        print(microkit_name);
-        print(" measurement starting... \n");
         microkit_notify(START_PMU);
     } else if (msg_match(data_packet_str, STOP)) {
-        print(microkit_name);
-        print(" measurement finished \n");;
         microkit_notify(STOP_PMU);
     } else if (msg_match(data_packet_str, MAPPINGS)) {
         error = tcp_write(pcb, MAPPINGS_STR, strlen(MAPPINGS_STR), TCP_WRITE_FLAG_COPY);
         if (error) {
-            microkit_dbg_puts("Failed to send OK message through utilization peer");
+            microkit_dbg_puts("Failed to send mappings through netconn peer");
         }
     } else if (msg_match(data_packet_str, REFRESH)) {
         // This is just to refresh the socket from the linux client side
@@ -116,22 +99,22 @@ static err_t utilization_recv_callback(void *arg, struct tcp_pcb *pcb, struct pb
         microkit_dbg_puts("\n");
         error = tcp_write(pcb, ERROR, strlen(ERROR), TCP_WRITE_FLAG_COPY);
         if (error) {
-            microkit_dbg_puts("Failed to send OK message through utilization peer");
+            microkit_dbg_puts("Failed to send OK message through netconn peer");
         }
     }
 
     return ERR_OK;
 }
 
-static err_t utilization_accept_callback(void *arg, struct tcp_pcb *newpcb, err_t err)
+static err_t netconn_accept_callback(void *arg, struct tcp_pcb *newpcb, err_t err)
 {
-    print("Utilization connection established!\n");
+    print("Netconn connection established!\n");
     err_t error = tcp_write(newpcb, WHOAMI, strlen(WHOAMI), TCP_WRITE_FLAG_COPY);
     if (error) {
-        print("Failed to send WHOAMI message through utilization peer\n");
+        print("Failed to send WHOAMI message through netconn peer\n");
     }
-    tcp_sent(newpcb, utilization_sent_callback);
-    tcp_recv(newpcb, utilization_recv_callback);
+    tcp_sent(newpcb, netconn_sent_callback);
+    tcp_recv(newpcb, netconn_recv_callback);
     utiliz_socket = newpcb;
     return ERR_OK;
 }
@@ -140,7 +123,7 @@ int send_tcp(void *buff, uint32_t len) {
 
     err_t error = tcp_write(utiliz_socket, buff, len, TCP_WRITE_FLAG_COPY);
     if (error) {
-        print("Failed to send message through utilization peer: ");
+        print("Failed to send message through netconn peer: ");
         put8(error);
         print("\n");
         if (error == -1) {
@@ -151,7 +134,7 @@ int send_tcp(void *buff, uint32_t len) {
 
     error = tcp_output(utiliz_socket);
     if (error) {
-        print("Failed to output via tcp through utilization peer: ");
+        print("Failed to output via tcp through netconn peer: ");
         put8(error);
         print("\n");
     }
@@ -164,10 +147,10 @@ void tcp_sent_callback(tcp_sent_fn callback) {
 }  
 
 void tcp_reset_callback() {
-    tcp_sent(utiliz_socket, utilization_sent_callback);
+    tcp_sent(utiliz_socket, netconn_sent_callback);
 }  
 
-int setup_utilization_socket(void)
+int setup_netconn_socket(void)
 {
     utiliz_socket = tcp_new_ip_type(IPADDR_TYPE_V4);
     if (utiliz_socket == NULL) {
@@ -175,7 +158,7 @@ int setup_utilization_socket(void)
         return -1;
     }
 
-    err_t error = tcp_bind(utiliz_socket, IP_ANY_TYPE, UTILIZATION_PORT);
+    err_t error = tcp_bind(utiliz_socket, IP_ANY_TYPE, NETCONN_PORT);
     if (error) {
         print("Failed to bind the TCP socket");
         return -1;
@@ -185,10 +168,10 @@ int setup_utilization_socket(void)
 
     utiliz_socket = tcp_listen_with_backlog_and_err(utiliz_socket, 1, &error);
     if (error != ERR_OK) {
-        print("Failed to listen on the utilization socket");
+        print("Failed to listen on the netconn socket");
         return -1;
     }
-    tcp_accept(utiliz_socket, utilization_accept_callback);
+    tcp_accept(utiliz_socket, netconn_accept_callback);
 
     return 0;
 }
