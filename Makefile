@@ -34,7 +34,7 @@ LWIP=$(SDDF)/network/ipstacks/lwip/src
 NETWORK_RING_BUFFER=$(SDDF)/network/libethsharedringbuffer
 ETHERNET_DRIVER=$(SDDF)/drivers/network/imx
 TIMER_DRIVER=$(SDDF)/drivers/clock/imx
-SDDF_NETWORK_COMPONENTS=network/components
+SDDF_NETWORK_COMPONENTS=$(SDDF)/network/components
 NETWORK_COMPONENTS=network/components
 UTIL=$(SDDF)/util
 
@@ -48,6 +48,7 @@ XMODEMDIR=xmodem
 UARTDIR=uart
 PROTOBUFDIR=protobuf
 ECHODIR=echo_server
+PROFDIR=profiler
 
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 
@@ -110,17 +111,17 @@ CORE4FILES=$(LWIP)/core/ipv4/autoip.c \
 NETIFFILES=$(LWIP)/netif/ethernet.c
 
 # LWIPFILES: All the above.
-LWIPFILES=$(NETWORK_COMPONENTS)/lwip.c $(NETWORK_COMPONENTS)/lwip_timer.c cache.c $(COREFILES) $(CORE4FILES) $(NETIFFILES) \
+PROF_LWIPFILES=$(PROFDIR)/lwip.c $(SDDF_NETWORK_COMPONENTS)/lwip_timer.c $(UTIL)/cache.c $(COREFILES) $(CORE4FILES) $(NETIFFILES) \
 $(UTIL)/util.c $(UTIL)/printf.c 
-ECHO_LWIPFILES=$(ECHODIR)/lwip.c $(SDDF_NETWORK_COMPONENTS)/lwip_timer.c cache.c $(COREFILES) $(CORE4FILES) $(NETIFFILES) \
+ECHO_LWIPFILES=$(ECHODIR)/lwip.c $(SDDF_NETWORK_COMPONENTS)/lwip_timer.c $(UTIL)/cache.c $(COREFILES) $(CORE4FILES) $(NETIFFILES) \
 $(UTIL)/util.c $(UTIL)/printf.c 
 
 UART_OBJS := $(UART_DRIVER)/uart.o sddf_serial_sharedringbuffer.o
 UART_MUX_TX_OBJS := $(UART_COMPONENTS)/mux_tx.o sddf_serial_sharedringbuffer.o
 UART_MUX_RX_OBJS := $(UART_COMPONENTS)/mux_rx.o sddf_serial_sharedringbuffer.o
-PROFILER_OBJS := profiler.o sddf_serial_sharedringbuffer.o
-CLIENT_OBJS := client.o serial_server.o  sddf_network_sharedringbuffer.o xmodem/crc16.o xmodem/xmodem.o \
- $(LWIPFILES:.c=.o) $(NETWORK_COMPONENTS)/lwip.o $(NETWORK_COMPONENTS)/utilization_socket.o sddf_timer_client.o \
+PROFILER_OBJS := $(PROFDIR)/profiler.o sddf_serial_sharedringbuffer.o
+CLIENT_OBJS := $(PROFDIR)/client.o $(PROFDIR)/serial_server.o  sddf_network_sharedringbuffer.o xmodem/crc16.o xmodem/xmodem.o \
+ $(PROF_LWIPFILES:.c=.o) $(PROFDIR)/lwip.o $(PROFDIR)/utilization_socket.o sddf_timer_client.o \
  $(PROTOBUFDIR)/nanopb/pmu_sample.pb.o $(PROTOBUFDIR)/nanopb/pb_common.o $(PROTOBUFDIR)/nanopb/pb_encode.o \
  $(UTIL)/util.o $(UTIL)/printf.o
 
@@ -133,7 +134,7 @@ ETH_OBJS := $(ETHERNET_DRIVER)/ethernet.o sddf_network_sharedringbuffer.o
 ETH_MUX_RX_OBJS := $(SDDF_NETWORK_COMPONENTS)/mux_rx.o sddf_network_sharedringbuffer.o
 ETH_MUX_TX_OBJS := $(SDDF_NETWORK_COMPONENTS)/mux_tx.o sddf_network_sharedringbuffer.o
 ETH_COPY_OBJS := $(SDDF_NETWORK_COMPONENTS)/copy.o sddf_network_sharedringbuffer.o
-ARP_OBJS := cache.o $(LWIP)/core/inet_chksum.o $(LWIP)/core/def.o $(SDDF_NETWORK_COMPONENTS)/arp.o sddf_network_sharedringbuffer.o
+ARP_OBJS := $(UTIL)/cache.o $(LWIP)/core/inet_chksum.o $(LWIP)/core/def.o $(SDDF_NETWORK_COMPONENTS)/arp.o sddf_network_sharedringbuffer.o
 TIMER_OBJS := $(TIMER_DRIVER)/timer.o
 
 OBJS := $(sort $(addprefix $(BUILD_DIR)/, $(ETH_OBJS) $(ETH_MUX_RX_OBJS) $(ETH_MUX_TX_OBJS)\
