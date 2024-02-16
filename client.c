@@ -7,7 +7,7 @@
 #include "printf.h"
 #include "profiler.h"
 #include "xmodem.h"
-#include "shared_ringbuffer.h"
+#include <sddf/network/shared_ringbuffer.h>
 #include "serial_server.h"
 #include "socket.h"
 #include <string.h>

@@ -2,11 +2,11 @@
 #include <stdint.h>
 #include <microkit.h>
 #include <string.h>
-
-#include "shared_ringbuffer.h"
+#include <sddf/network/shared_ringbuffer.h>
 #include "util.h"
 #include "lwip/ip_addr.h"
 #include "netif/etharp.h"
+#include "fence.h"
 
 uintptr_t rx_free_drv;
 uintptr_t rx_used_drv;

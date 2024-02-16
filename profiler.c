@@ -11,6 +11,7 @@
 #include "timer.h"
 #include "profiler_config.h"
 #include "client.h"
+#include <sddf/network/shared_ringbuffer.h>
 
 uintptr_t uart_base;
 uintptr_t profiler_control;
@@ -282,6 +283,7 @@ void print_pmu_debug() {
 }
 
 void init () {
+    microkit_dbg_puts("Profiler intialising...\n");
     int *prof_cnt = (int *) profiler_control;
 
     *prof_cnt = 0;
@@ -300,14 +302,15 @@ void init () {
     }
 
     #ifdef CONFIG_PROFILER_ENABLE
-
+    microkit_dbg_puts("Attempting to enable profiler!\n");
     int res_buf = seL4_BenchmarkSetLogBuffer(log_buffer);
+    microkit_dbg_puts("Finished syscall\n");
 
     if (res_buf) {
-        print("Could not set log buffer");
+        microkit_dbg_puts("Could not set log buffer");
         puthex64(res_buf);
     } else {
-        print("We set the log buffer\n");
+        microkit_dbg_puts("We set the log buffer\n");
     }
     #endif
 
@@ -325,6 +328,7 @@ void init () {
 
     // Set the profiler state to init
     profiler_state = PROF_INIT;
+    microkit_dbg_puts("Profiler initialised!\n");
 }
 
 void handle_irq(uint32_t irqFlag) {

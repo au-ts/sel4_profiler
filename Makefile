@@ -22,19 +22,26 @@ endif
 
 TOOLCHAIN := aarch64-none-elf
 
-CPU := cortex-a55
+CPU := cortex-a53
 
 CC := $(TOOLCHAIN)-gcc
 LD := $(TOOLCHAIN)-ld
 AS := $(TOOLCHAIN)-as
 MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 
-LWIP=network/ipstacks/lwip/src
-UTIL=include/
-ETH_RING_BUFFER=network/libethsharedringbuffer
-ETHERNET_DRIVER=network/imx
-TIMER_DRIVER=clock/imx
+SDDF=sDDF
+LWIP=$(SDDF)/network/ipstacks/lwip/src
+NETWORK_RING_BUFFER=$(SDDF)/network/libethsharedringbuffer
+ETHERNET_DRIVER=$(SDDF)/drivers/network/imx
+TIMER_DRIVER=$(SDDF)/drivers/clock/imx
+SDDF_NETWORK_COMPONENTS=network/components
 NETWORK_COMPONENTS=network/components
+UTIL=$(SDDF)/util
+
+SERIAL_RING_BUFFER=$(SDDF)/serial/libserialsharedringbuffer
+XMODEMDIR=xmodem
+UART_DRIVER=$(SDDF)/drivers/serial/imx
+UART_COMPONENTS=$(SDDF)/serial/components
 
 RINGBUFFERDIR=libserialsharedringbuffer
 XMODEMDIR=xmodem
@@ -54,14 +61,17 @@ REPORT_FILE = $(BUILD_DIR)/report.txt
 
 CFLAGS += -I$(BOARD_DIR)/include \
 	-Iinclude	\
-	-I$(RINGBUFFERDIR)/include \
+	-I$(SDDF)/include \
+	-I$(SDDF)/util/include \
+	-I$(SDDF)/util/include/arch \
+	-I$(SDDF)/benchmark/include \
 	-I$(BOARD_DIR)/include/sys \
 	-I$(XMODEMDIR)/include \
-	-I$(UARTDIR)/include \
+	-I$(UART_DRIVER)/include \
 	-I$(LWIP)/include \
 	-I$(LWIP)/include/ipv4 \
-	-I$(ETH_RING_BUFFER) \
 	-I$(PROTOBUFDIR)/nanopb \
+	-DSERIAL_NUM_CLIENTS=1 \
 	-MD \
 	-MP
 
@@ -100,25 +110,30 @@ CORE4FILES=$(LWIP)/core/ipv4/autoip.c \
 NETIFFILES=$(LWIP)/netif/ethernet.c
 
 # LWIPFILES: All the above.
-LWIPFILES=$(NETWORK_COMPONENTS)/lwip.c $(NETWORK_COMPONENTS)/lwip_timer.c cache.c $(COREFILES) $(CORE4FILES) $(NETIFFILES)
-ECHO_LWIPFILES=$(ECHODIR)/lwip.c $(NETWORK_COMPONENTS)/lwip_timer.c cache.c $(COREFILES) $(CORE4FILES) $(NETIFFILES)
+LWIPFILES=$(NETWORK_COMPONENTS)/lwip.c $(NETWORK_COMPONENTS)/lwip_timer.c cache.c $(COREFILES) $(CORE4FILES) $(NETIFFILES) \
+$(UTIL)/util.c $(UTIL)/printf.c 
+ECHO_LWIPFILES=$(ECHODIR)/lwip.c $(SDDF_NETWORK_COMPONENTS)/lwip_timer.c cache.c $(COREFILES) $(CORE4FILES) $(NETIFFILES) \
+$(UTIL)/util.c $(UTIL)/printf.c 
 
-UART_OBJS := uart/uart.o libserialsharedringbuffer/shared_ringbuffer.o
-UART_MUX_TX_OBJS := uart/mux_tx.o libserialsharedringbuffer/shared_ringbuffer.o
-UART_MUX_RX_OBJS := uart/mux_rx.o libserialsharedringbuffer/shared_ringbuffer.o
-PROFILER_OBJS := profiler.o libserialsharedringbuffer/shared_ringbuffer.o
-CLIENT_OBJS := client.o serial_server.o printf.o libserialsharedringbuffer/shared_ringbuffer.o xmodem/crc16.o xmodem/xmodem.o $(LWIPFILES:.c=.o) \
-			   $(NETWORK_COMPONENTS)/lwip.o $(NETWORK_COMPONENTS)/utilization_socket.o $(PROTOBUFDIR)/nanopb/pmu_sample.pb.o $(PROTOBUFDIR)/nanopb/pb_common.o $(PROTOBUFDIR)/nanopb/pb_encode.o
+UART_OBJS := $(UART_DRIVER)/uart.o sddf_serial_sharedringbuffer.o
+UART_MUX_TX_OBJS := $(UART_COMPONENTS)/mux_tx.o sddf_serial_sharedringbuffer.o
+UART_MUX_RX_OBJS := $(UART_COMPONENTS)/mux_rx.o sddf_serial_sharedringbuffer.o
+PROFILER_OBJS := profiler.o sddf_serial_sharedringbuffer.o
+CLIENT_OBJS := client.o serial_server.o  sddf_network_sharedringbuffer.o xmodem/crc16.o xmodem/xmodem.o \
+ $(LWIPFILES:.c=.o) $(NETWORK_COMPONENTS)/lwip.o $(NETWORK_COMPONENTS)/utilization_socket.o sddf_timer_client.o \
+ $(PROTOBUFDIR)/nanopb/pmu_sample.pb.o $(PROTOBUFDIR)/nanopb/pb_common.o $(PROTOBUFDIR)/nanopb/pb_encode.o \
+ $(UTIL)/util.o $(UTIL)/printf.o
 
-ECHO_OBJS := $(ECHO_LWIPFILES:.c=.o) $(ECHODIR)/lwip.o $(ETH_RING_BUFFER)/shared_ringbuffer.o  $(ECHODIR)/udp_echo_socket.o $(ECHODIR)/tcp_echo_socket.o
+ECHO_OBJS := $(ECHO_LWIPFILES:.c=.o) $(ECHODIR)/lwip.o sddf_network_sharedringbuffer.o  $(ECHODIR)/udp_echo_socket.o $(ECHODIR)/tcp_echo_socket.o \
+ $(UTIL)/util.o $(UTIL)/printf.o
 DUMMY_PROG_OBJS := dummy_prog.o
 DUMMY_PROG2_OBJS := dummy_prog2.o
 
-ETH_OBJS := $(ETHERNET_DRIVER)/ethernet.o $(ETH_RING_BUFFER)/shared_ringbuffer.o
-ETH_MUX_RX_OBJS := $(NETWORK_COMPONENTS)/mux_rx.o $(ETH_RING_BUFFER)/shared_ringbuffer.o
-ETH_MUX_TX_OBJS := $(NETWORK_COMPONENTS)/mux_tx.o $(ETH_RING_BUFFER)/shared_ringbuffer.o
-ETH_COPY_OBJS := $(NETWORK_COMPONENTS)/copy.o $(ETH_RING_BUFFER)/shared_ringbuffer.o
-ARP_OBJS := cache.o $(LWIP)/core/inet_chksum.o $(LWIP)/core/def.o $(NETWORK_COMPONENTS)/arp.o $(ETH_RING_BUFFER)/shared_ringbuffer.o
+ETH_OBJS := $(ETHERNET_DRIVER)/ethernet.o sddf_network_sharedringbuffer.o
+ETH_MUX_RX_OBJS := $(SDDF_NETWORK_COMPONENTS)/mux_rx.o sddf_network_sharedringbuffer.o
+ETH_MUX_TX_OBJS := $(SDDF_NETWORK_COMPONENTS)/mux_tx.o sddf_network_sharedringbuffer.o
+ETH_COPY_OBJS := $(SDDF_NETWORK_COMPONENTS)/copy.o sddf_network_sharedringbuffer.o
+ARP_OBJS := cache.o $(LWIP)/core/inet_chksum.o $(LWIP)/core/def.o $(SDDF_NETWORK_COMPONENTS)/arp.o sddf_network_sharedringbuffer.o
 TIMER_OBJS := $(TIMER_DRIVER)/timer.o
 
 OBJS := $(sort $(addprefix $(BUILD_DIR)/, $(ETH_OBJS) $(ETH_MUX_RX_OBJS) $(ETH_MUX_TX_OBJS)\
@@ -139,6 +154,15 @@ $(BUILD_DIR)/%.o: %.c Makefile
 
 $(BUILD_DIR)/%.o: %.s Makefile
 	$(AS) -g3 -mcpu=$(CPU) $< -o $@
+
+$(BUILD_DIR)/sddf_network_sharedringbuffer.o:
+	BUILD_DIR=$(abspath $(BUILD_DIR)) MICROKIT_INCLUDE=$(BOARD_DIR)/include make -C $(NETWORK_RING_BUFFER)
+
+$(BUILD_DIR)/sddf_serial_sharedringbuffer.o:
+	BUILD_DIR=$(abspath $(BUILD_DIR)) MICROKIT_INCLUDE=$(BOARD_DIR)/include make -C $(SERIAL_RING_BUFFER)
+
+$(BUILD_DIR)/sddf_timer_client.o:
+	BUILD_DIR=$(abspath $(BUILD_DIR)) MICROKIT_INCLUDE=$(BOARD_DIR)/include TIMER_CHANNEL=9 make -C $(SDDF)/timer/client
 
 $(BUILD_DIR)/profiler.elf: $(addprefix $(BUILD_DIR)/, $(PROFILER_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
@@ -194,7 +218,6 @@ $(IMAGE_FILE) $(REPORT_FILE): $(addprefix $(BUILD_DIR)/, $(IMAGES)) profiler.sys
 directories:
 	$(info $(shell mkdir -p $(BUILD_DIR)/libserialsharedringbuffer))	\
 	$(info $(shell mkdir -p $(BUILD_DIR)/xmodem))	\
-	$(info $(shell mkdir -p $(BUILD_DIR)/uart))	\
 	$(info $(shell mkdir -p $(BUILD_DIR)/uart))	\
 
 clean:

@@ -118,7 +118,7 @@
 
     <!-- UART System -->
 
-    <protection_domain name="uart" priority="97" pp="true">
+    <protection_domain name="uart" priority="97" pp="true" >
         <program_image path="uart.elf" />
 
         <map mr="uart" vaddr="0x5_000_000" perms="rw" cached="false" setvar_vaddr="uart_base" />
@@ -129,52 +129,49 @@
         <map mr="tx_free_serial_drv" vaddr="0x4_400_000" perms="rw" cached="true" setvar_vaddr="tx_free" />
         <map mr="tx_used_serial_drv" vaddr="0x4_600_000" perms="rw" cached="true" setvar_vaddr="tx_used" />
 
-        <map mr="shared_dma_tx_drv" vaddr="0x2_200_000" perms="rw" cached="true" setvar_vaddr="shared_dma_vaddr" />
-        <map mr="shared_dma_rx_drv" vaddr="0x2_600_000" perms="rw" cached="true" setvar_vaddr="shared_dma_rx_drv" />
-
-        <!-- we need physical addresses dma region -->
-        <setvar symbol="shared_dma_paddr" region_paddr="shared_dma_tx_drv" />
+        <map mr="shared_dma_tx_drv" vaddr="0x2_200_000" perms="rw" cached="true" />
+        <map mr="shared_dma_rx_drv" vaddr="0x2_600_000" perms="rw" cached="true" />
         
         <irq irq="59" id="1" /> <!-- Serial Interrupt (I think - serial@30890000)-->
 
     </protection_domain>
 
-    <protection_domain name="uart_mux_tx" priority="96" pp="true">
+    <protection_domain name="uart_mux_tx" priority="96" pp="true" >
         <program_image path="uart_mux_tx.elf" />
 
         <!-- shared memory for driver/mux ring buffer mechanism -->
-        <map mr="tx_free_serial_drv" vaddr="0x4_400_000" perms="rw" cached="true" setvar_vaddr="tx_free_drv" />
-        <map mr="tx_used_serial_drv" vaddr="0x4_600_000" perms="rw" cached="true" setvar_vaddr="tx_used_drv" />
+        <map mr="tx_free_serial_drv" vaddr="0x4_400_000" perms="rw" cached="true" setvar_vaddr="tx_free_driver" />
+        <map mr="tx_used_serial_drv" vaddr="0x4_600_000" perms="rw" cached="true" setvar_vaddr="tx_used_driver" />
 
         <!-- shared memory for mux/client ring buffer mechanism -->
         <map mr="tx_free_client" vaddr="0x3_400_000" perms="rw" cached="true" setvar_vaddr="tx_free_client" />
         <map mr="tx_used_client" vaddr="0x3_600_000" perms="rw" cached="true" setvar_vaddr="tx_used_client" />
 
-        <map mr="shared_dma_tx_drv" vaddr="0x2_200_000" perms="rw" cached="true" setvar_vaddr="shared_dma_tx_drv" />
+        <map mr="shared_dma_tx_drv" vaddr="0x2_200_000" perms="rw" cached="true" setvar_vaddr="tx_data_driver" />
 
-        <map mr="shared_dma_tx_client" vaddr="0x2_400_000" perms="rw" cached="true" setvar_vaddr="shared_dma_tx_client" />
+        <map mr="shared_dma_tx_client" vaddr="0x2_400_000" perms="rw" cached="true" setvar_vaddr="tx_data_client" />
 
     </protection_domain>            
 
-    <protection_domain name="uart_mux_rx" priority="95" pp="true">
+    <protection_domain name="uart_mux_rx" priority="95" pp="true" >
         <program_image path="uart_mux_rx.elf" />
 
         <!-- shared memory for driver/mux ring buffer mechanism -->
-        <map mr="rx_free_serial_drv" vaddr="0x4_000_000" perms="rw" cached="true" setvar_vaddr="rx_free_drv" />
-        <map mr="rx_used_serial_drv" vaddr="0x4_200_000" perms="rw" cached="true" setvar_vaddr="rx_used_drv" />
+        <map mr="rx_free_serial_drv" vaddr="0x4_000_000" perms="rw" cached="true" setvar_vaddr="rx_free_driver" />
+        <map mr="rx_used_serial_drv" vaddr="0x4_200_000" perms="rw" cached="true" setvar_vaddr="rx_used_driver" />
 
         <!-- shared memory for mux/client ring buffer mechanism -->
         <map mr="rx_free_client" vaddr="0x4_800_000" perms="rw" cached="true" setvar_vaddr="rx_free_client" />
         <map mr="rx_used_client" vaddr="0x5_000_000" perms="rw" cached="true" setvar_vaddr="rx_used_client" />
 
-        <map mr="shared_dma_rx_drv" vaddr="0x2_600_000" perms="rw" cached="true" setvar_vaddr="shared_dma_rx_drv" />
-        <map mr="shared_dma_rx_client" vaddr="0x2_800_000" perms="rw" cached="true" setvar_vaddr="shared_dma_rx_client" />
+        <map mr="shared_dma_rx_drv" vaddr="0x2_600_000" perms="rw" cached="true" setvar_vaddr="rx_data_driver" />
+        <map mr="shared_dma_rx_client" vaddr="0x2_800_000" perms="rw" cached="true" setvar_vaddr="rx_data_client" />
 
     </protection_domain>
 
     <!-- Ethernet System -->
 
-    <protection_domain name="eth" priority="101" pp="true" budget="200" period="400">
+   <protection_domain name="eth" priority="101" pp="true" budget="200" period="400">
         <program_image path="eth.elf" />
         <map mr="eth0" vaddr="0x2_000_000" perms="rw" cached="false"/>
 
@@ -190,7 +187,7 @@
         <map mr="tx_used_drv" vaddr="0x4_600_000" perms="rw" cached="true" setvar_vaddr="tx_used" />
 
         <irq irq="152" id="0" /> <!--> ethernet interrupt -->
-
+        
         <map mr="uart" vaddr="0x5_000_000" perms="rw" cached="false" setvar_vaddr="uart_base" />
 
         <!-- we need physical addresses of hw rings and dma region -->
@@ -296,7 +293,7 @@
 
     <!-- Client for dumping profiler samples -->
 
-    <protection_domain name="client" priority="97">
+    <protection_domain name="client" priority="94" >
         <program_image path="client.elf"/>
         <map mr="uart" vaddr="0x5_000_000" perms="rw" cached="false" setvar_vaddr="uart_base" />
         <!-- Memory regions shared with the profiler -->

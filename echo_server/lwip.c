@@ -16,7 +16,7 @@
 #include "lwip/sys.h"
 #include "lwip/dhcp.h"
 
-#include <include/shared_ringbuffer.h>
+#include <sddf/network/shared_ringbuffer.h>
 #include "echo.h"
 #include "timer.h"
 #include "cache.h"

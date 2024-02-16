@@ -1,7 +1,8 @@
-#include "shared_ringbuffer.h"
+#include <sddf/network/shared_ringbuffer.h>
 #include "util.h"
 #include <string.h>
 #include <stdbool.h>
+#include <microkit.h>
 
 uintptr_t rx_free_mux;
 uintptr_t rx_used_mux;

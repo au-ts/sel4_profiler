@@ -1,10 +1,16 @@
 #include "serial_server.h"
+#include <microkit.h>
 #include "uart.h"
-#include "shared_ringbuffer.h"
 #include "util.h"
 #include <string.h>
 #include <stdlib.h>
+#include <sddf/serial/shared_ringbuffer.h>
 
+struct serial_server {
+    /* Pointers to shared_ringbuffers */
+    ring_handle_t rx_ring;
+    ring_handle_t tx_ring;
+};
 /* Ring handle components -
 Need to have access to the same ring buffer mechanisms as the driver, so that we can enqueue
 buffers to be serviced by the driver.*/
