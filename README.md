@@ -7,7 +7,7 @@ Currently we have support for the imx8mm soc.
 
 # Installation
 
-- We require a special kernel configuration. The kernel version can be found at: https://github.com/Kswin01/seL4/tree/microkit-dev-profiler.
+- We require a special kernel configuration. The kernel version can be found at: https://github.com/Kswin01/seL4/tree/microkit-dev-profiler-irq.
 - We have tested with this version of microkit: https://github.com/Ivan-Velickovic/microkit.
 
 # Building
@@ -49,12 +49,15 @@ You can install this using `pip` with the following command: `pip install protob
 protoc --python_out=protobuf/python --proto_path=protobuf/python protobuf/python/pmu_sample.proto
 ```
 
-# Using
+# Notes
 
-- This demo system currently requires a Python client to be connected to the board over the network. The client can be found at: https://github.com/Kswin01/seL4-Profiler-Linux-Network-Host}.
-- Additionally, this demo is for the imx8mm.
-- When the board first starts running, an IP address will be printed to the terminal. Please modify the current IP address in the Python script.
-- Connect the client to the board by running the `connect` command on the Python client. You may need to restart the board here.
-- To start profiling, enter the `start` command.
-- To pause profiling, enter the `stop` command.
-- To finish profiling, enter the `exit` command.
+- This system currently requires a Python client to be connected to the board over the network. The client can be found within the netconn directory. Instructions can be found in `netconn/README.md`.
+
+- This demo system is integrated with the sDDF. Driver support will be inline with sDDF development.
+
+- Additionally, found within the `toperf` directory is a tool to convert from the samples file outputted by the netconn tool to a `perf.data` file. This will allow us make use of exisiting infrastructure surronding perf, such as `perf report` and flamegraph tools such as Mozilla Profiler.
+
+# Demo System
+The demo system here includes two dummy programs that run in infinite loops, as well as tcp benchmark found in the `echo_server` directory. 
+
+
