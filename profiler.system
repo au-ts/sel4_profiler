@@ -136,7 +136,7 @@
 
     </protection_domain>
 
-    <protection_domain name="uart_mux_tx" priority="96" pp="true" >
+    <protection_domain name="uart_mux_tx" priority="96" pp="true"  budget="200" period="400">
         <program_image path="uart_mux_tx.elf" />
 
         <!-- shared memory for driver/mux ring buffer mechanism -->
@@ -144,8 +144,8 @@
         <map mr="tx_used_serial_drv" vaddr="0x4_600_000" perms="rw" cached="true" setvar_vaddr="tx_used_driver" />
 
         <!-- shared memory for mux/client ring buffer mechanism -->
-        <map mr="tx_free_client" vaddr="0x3_400_000" perms="rw" cached="true" setvar_vaddr="tx_free_client" />
-        <map mr="tx_used_client" vaddr="0x3_600_000" perms="rw" cached="true" setvar_vaddr="tx_used_client" />
+        <map mr="tx_free_client" vaddr="0x5_400_000" perms="rw" cached="true" setvar_vaddr="tx_free_client" />
+        <map mr="tx_used_client" vaddr="0x5_600_000" perms="rw" cached="true" setvar_vaddr="tx_used_client" />
 
         <map mr="shared_dma_tx_drv" vaddr="0x2_200_000" perms="rw" cached="true" setvar_vaddr="tx_data_driver" />
 
@@ -153,7 +153,7 @@
 
     </protection_domain>            
 
-    <protection_domain name="uart_mux_rx" priority="95" pp="true" >
+    <protection_domain name="uart_mux_rx" priority="95" pp="true" budget="200" period="400">
         <program_image path="uart_mux_rx.elf" />
 
         <!-- shared memory for driver/mux ring buffer mechanism -->
@@ -161,11 +161,11 @@
         <map mr="rx_used_serial_drv" vaddr="0x4_200_000" perms="rw" cached="true" setvar_vaddr="rx_used_driver" />
 
         <!-- shared memory for mux/client ring buffer mechanism -->
-        <map mr="rx_free_client" vaddr="0x4_800_000" perms="rw" cached="true" setvar_vaddr="rx_free_client" />
-        <map mr="rx_used_client" vaddr="0x5_000_000" perms="rw" cached="true" setvar_vaddr="rx_used_client" />
+        <map mr="rx_free_client" vaddr="0x3_000_000" perms="rw" cached="true" setvar_vaddr="rx_free_client" />
+        <map mr="rx_used_client" vaddr="0x3_200_000" perms="rw" cached="true" setvar_vaddr="rx_used_client" />
 
         <map mr="shared_dma_rx_drv" vaddr="0x2_600_000" perms="rw" cached="true" setvar_vaddr="rx_data_driver" />
-        <map mr="shared_dma_rx_client" vaddr="0x2_800_000" perms="rw" cached="true" setvar_vaddr="rx_data_client" />
+        <map mr="shared_dma_rx_client" vaddr="0x4_800_000" perms="rw" cached="true" setvar_vaddr="rx_data_client" />
 
     </protection_domain>
 
@@ -301,13 +301,13 @@
         <map mr="profiler_ring_used" vaddr="0x8_200_000" perms="rw" cached="true" setvar_vaddr="profiler_ring_used" />
         <map mr="profiler_mem" vaddr="0x8_600_000" perms="rw" cached="true" setvar_vaddr="profiler_mem" />
         
-        <!-- Memory regions for client -->
-        <map mr="rx_free_client" vaddr="0x4_000_000" perms="rw" cached="true" setvar_vaddr="rx_free_client" />
-        <map mr="rx_used_client" vaddr="0x4_200_000" perms="rw" cached="true" setvar_vaddr="rx_used_client" />
-        <map mr="tx_free_client" vaddr="0x4_400_000" perms="rw" cached="true" setvar_vaddr="tx_free_client" />
-        <map mr="tx_used_client" vaddr="0x4_600_000" perms="rw" cached="true" setvar_vaddr="tx_used_client" />
+        <!-- Memory regions for serial client -->
+        <map mr="rx_free_client" vaddr="0x3_000_000" perms="rw" cached="true" setvar_vaddr="rx_free_client" />
+        <map mr="rx_used_client" vaddr="0x3_200_000" perms="rw" cached="true" setvar_vaddr="rx_used_client" />
+        <map mr="tx_free_client" vaddr="0x5_400_000" perms="rw" cached="true" setvar_vaddr="tx_free_client" />
+        <map mr="tx_used_client" vaddr="0x5_600_000" perms="rw" cached="true" setvar_vaddr="tx_used_client" />
         <map mr="shared_dma_tx_client" vaddr="0x2_400_000" perms="rw" cached="true" setvar_vaddr="shared_dma_tx_client" />
-        <map mr="shared_dma_rx_client" vaddr="0x2_800_000" perms="rw" cached="true" setvar_vaddr="shared_dma_rx_client" />
+        <map mr="shared_dma_rx_client" vaddr="0x4_800_000" perms="rw" cached="true" setvar_vaddr="shared_dma_rx_client" />
 
         <!-- LWIP Memory regions -->
 
@@ -320,8 +320,6 @@
         <map mr="shared_dma_rx_cli0" vaddr="0x2_800_000" perms="rw" cached="true" setvar_vaddr="shared_dma_vaddr_rx" />
         <map mr="shared_dma_tx_cli0" vaddr="0x2_600_000" perms="rw" cached="true" setvar_vaddr="shared_dma_vaddr_tx" />
         <map mr="data_packet" vaddr="0x5_011_000" perms="rw" cached="true" setvar_vaddr="data_packet" />
-
-        <!-- shared memory used for benchmarking -->
 
     </protection_domain>
 

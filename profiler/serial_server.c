@@ -204,6 +204,35 @@ int _inbyte(unsigned int timeout) {
     return (int) got_char;
 }
 
+char get_char() {
+    struct serial_server *local_server = &client_serial_server;
+
+    uintptr_t buffer = 0;
+    unsigned int buffer_len = 0; 
+    void *cookie = 0;
+
+    int err = dequeue_used(&local_server->rx_ring, &buffer, &buffer_len, &cookie);
+
+    if (err != 0) {
+        microkit_dbg_puts(microkit_name);
+        microkit_dbg_puts(": getchar - unable to dequeue from used ring\n");
+        return 0;
+    }
+
+    // We are only getting one character at a time, so we just need to cast the buffer to an char
+    char got_char = *((char *) buffer);
+
+    /* Now that we are finished with the used buffer, we can add it back to the free ring*/
+    int ret = enqueue_free(&local_server->rx_ring, buffer, buffer_len, cookie);
+
+    if (ret != 0) {
+        microkit_dbg_puts(microkit_name);
+        microkit_dbg_puts(": getchar - unable to enqueue used buffer back into free ring\n");
+    }
+
+    return got_char;
+}
+
 // Init function required by microkit, initialise serial datastructres for server here
 void init_serial(void) {
     // Here we need to init ring buffers and other data structures
@@ -211,7 +240,7 @@ void init_serial(void) {
     struct serial_server *local_server = &client_serial_server;
     
     // Init the shared ring buffers
-    ring_init(&local_server->rx_ring, (ring_buffer_t *)rx_free_client, (ring_buffer_t *)rx_used_client,  0, 512, 512);
+    ring_init(&local_server->rx_ring, (ring_buffer_t *)rx_free_client, (ring_buffer_t *)rx_used_client,  0, NUM_BUFFERS, NUM_BUFFERS);
     // We will also need to populate these rings with memory from the shared dma region
     
     // Add buffers to the rx ring
@@ -224,12 +253,12 @@ void init_serial(void) {
         }
     }
 
-    ring_init(&local_server->tx_ring, (ring_buffer_t *)tx_free_client, (ring_buffer_t *)tx_used_client, 0, 512, 512);
+    ring_init(&local_server->tx_ring, (ring_buffer_t *)tx_free_client, (ring_buffer_t *)tx_used_client, 0, NUM_BUFFERS, NUM_BUFFERS);
 
     // Add buffers to the tx ring
     for (int i = 0; i < NUM_BUFFERS - 1; i++) {
         // Have to start at the memory region left of by the rx ring
-        int ret = enqueue_free(&local_server->tx_ring, shared_dma_tx_client + ((i + NUM_BUFFERS) * BUFFER_SIZE), BUFFER_SIZE, NULL);
+        int ret = enqueue_free(&local_server->tx_ring, shared_dma_tx_client + (i * BUFFER_SIZE), BUFFER_SIZE, NULL);
 
         if (ret != 0) {
             microkit_dbg_puts(microkit_name);

@@ -68,14 +68,37 @@ void print_dump() {
 
         printf_("{\n");
         // Print out sample
-        printf_("\t\"ip\":\"%lx\"\n", sample->ip);
-        printf_("\t\"pd\":\"%d\"\n", sample->pid);
-        printf_("\t\"timestamp\":\"%lu\"\n", sample->time);
-        printf_("\t\"cpu\":\"%d\"\n", sample->cpu);
-        printf_("\t\"period\":\"%ld\"\n", sample->period);
+        printf_("\t\"ip\": \"%lx\"\n", sample->ip);
+        printf_("\t\"pid\": %d\n", sample->pid);
+        printf_("\t\"time\": \"%lu\"\n", sample->time);
+        printf_("\t\"cpu\": %d\n", sample->cpu);
+        printf_("\t\"period\": \"%ld\"\n", sample->period);
+        printf_("\t\"nr\": \"%ld\"\n", sample->nr);
+        printf_("\t\"ips\": [\n");
+        for (int i = 0; i < SEL4_PROF_MAX_CALL_DEPTH; i++) {
+            if (i != SEL4_PROF_MAX_CALL_DEPTH - 1) {
+                printf_("\t\t\"%ld\",\n", sample->ips[i]);
+            } else {
+                printf_("\t\t\"%ld\"\n]\n", sample->ips[i]);
+            }
+        } 
         printf_("}\n");
 
         enqueue_free(&profiler_ring, buffer, size, cookie);
+    }
+}
+
+void serial_control() {
+    char ctrl_char = get_char();
+
+    int ctrl_int = atoi(&ctrl_char);
+
+    if (ctrl_int == 1) {
+        // Start the PMU
+        microkit_notify(START_PMU);
+    } else if (ctrl_int == 2) {
+        // Stop the PMU
+        microkit_notify(STOP_PMU);
     }
 }
 
@@ -262,5 +285,8 @@ void notified(microkit_channel ch) {
         // Getting a network interrupt
         // microkit_dbg_puts("Network interrupt for prof client\n");
         notified_lwip(ch);
-    } 
+    } else if (ch == 11) {
+        // Getting a notification from serial mux rx. 
+        serial_control();
+    }
 }

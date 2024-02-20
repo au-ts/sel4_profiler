@@ -4,7 +4,7 @@
 #define SERVER_GETCHAR_CHANNEL 11
 
 int serial_server_printf(char *string);
-int getchar();
+char get_char();
 int serial_server_scanf(char* buffer);
 void init_serial(void);
 void putchar_(char character);
