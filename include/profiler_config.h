@@ -1,5 +1,7 @@
 #pragma once
 
+#include "profiler.h"
+
 /* ----- THE FOLLOWING DEFINES ARE FOR CONFIGURING THE PROFILER ------*/
 
 // TODO: NEED TO HAVE A BETTER WAY OF INJECTING THE MAPPINGS FROM THE SYSTEM DESCRIPTION
@@ -16,29 +18,6 @@
     NOTE: Seperate pairs with new lines.
 */  
 
-#define MAPPINGS_STR "echo.elf: 52\n dummy_prog.elf: 1\n dummy_prog2.elf: 2"
+#define MAPPINGS_STR "echo.elf: 52\ndummy_prog.elf: 1\ndummy_prog2.elf: 2"
 
-/* For each counter, set IRQ to 1 to sample on counter, or 0 to not.
-
-If 1 is set, ALSO set the appropriate sampling period. */
-
-#define IRQ_CYCLE_COUNTER 1
-#define CYCLE_COUNTER_PERIOD 1200000
-
-#define IRQ_COUNTER0 0
-#define COUNTER0_PERIOD 0
-
-#define IRQ_COUNTER1 0
-#define COUNTER1_PERIOD 120
-
-#define IRQ_COUNTER2 0
-#define COUNTER2_PERIOD 1200
-
-#define IRQ_COUNTER3 0
-#define COUNTER3_PERIOD 0
-
-#define IRQ_COUNTER4 0
-#define COUNTER4_PERIOD 0
-
-#define IRQ_COUNTER5 0
-#define COUNTER5_PERIOD 0
+#define CYCLE_COUNTER_PERIOD 1.3e9

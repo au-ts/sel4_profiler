@@ -4,6 +4,8 @@
 
 #define BIT(nr) (1UL << (nr))
 
+#define PMU_NUM_REGS 7
+
 #define SEL4_USER_CONTEXT_SIZE 0x24
 
 #define ARMV8_PMEVTYPER_EVTCOUNT_MASK 0x3ff
@@ -15,14 +17,15 @@
 #define PROFILER_STOP 1
 #define PROFILER_CONFIGURE 2
 #define PROFILER_READY 3
+
 // Definitions of counters available on PMU
-#define CYCLE_CTR 0
-#define EVENT_CTR_0 1
-#define EVENT_CTR_1 2
-#define EVENT_CTR_2 3
-#define EVENT_CTR_3 4
-#define EVENT_CTR_4 5
-#define EVENT_CTR_5 6
+#define EVENT_CTR_0 0
+#define EVENT_CTR_1 1
+#define EVENT_CTR_2 2
+#define EVENT_CTR_3 3
+#define EVENT_CTR_4 4
+#define EVENT_CTR_5 5
+#define CYCLE_CTR 6
 
 // Event definitions for ARMv8 PMU
 #define SW_INCR 0x00                /* Software Increment*/
@@ -55,6 +58,24 @@
 #define CHAIN 0x1e                  /* Odd performance counter chain mode */
 #define BUS_ACCESS_LD 0x60          /* Bus access - Read */
 
+/* PMU Register Names */
+#define PMU_EVENT_CTR0 "pmevcntr0_el0"
+#define PMU_EVENT_TYP0 "pmevtyper0_el0"
+#define PMU_EVENT_CTR1 "pmevcntr1_el0"
+#define PMU_EVENT_TYP1 "pmevtyper1_el0"
+#define PMU_EVENT_CTR2 "pmevcntr2_el0"
+#define PMU_EVENT_TYP2 "pmevtyper2_el0"
+#define PMU_EVENT_CTR3 "pmevcntr3_el0"
+#define PMU_EVENT_TYP3 "pmevtyper3_el0"
+#define PMU_EVENT_CTR4 "pmevcntr4_el0"
+#define PMU_EVENT_TYP4 "pmevtyper4_el0"
+#define PMU_EVENT_CTR5 "pmevcntr5_el0"
+#define PMU_EVENT_TYP5 "pmevtyper5_el0"
+#define PMU_CYCLE_CTR "pmccntr_el0"
+#define PMCR_EL0 "pmcr_el0"
+#define PMCNTENSET_EL0 "pmcntenset_el0"
+#define PMOVSCLR_EL0 "pmovsclr_el0"
+
 /* Different profiler states */
 enum profiler_states {
     PROF_INIT,
@@ -73,6 +94,18 @@ struct pmu_config_args {
 };
 
 typedef struct pmu_config_args pmu_config_args_t;
+
+struct pmu_reg {
+    int (* config_ctr)(uint32_t event, uint32_t val);
+    
+    uint32_t event;
+    uint64_t count;
+    // Save samples on register overflow if set
+    bool sampling;
+    bool overflowed;
+};
+
+typedef struct pmu_reg pmu_reg_t;
 
 struct prof_sample {
     uint64_t ip;            /* Instruction pointer */
