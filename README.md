@@ -8,7 +8,7 @@ Currently we have support for the imx8mm soc.
 # Installation
 
 - We require a special kernel configuration. The kernel version can be found at: https://github.com/Kswin01/seL4/tree/microkit-dev-profiler-irq.
-- We have tested with this version of microkit: https://github.com/Ivan-Velickovic/microkit.
+- We have tested with this version of microkit: https://github.com/Kswin01/sel4cp/tree/microkit_prof_dev.
 
 # Building
 - Ensure that you have either downloaded the appropriate microkit SDK, or built from source. Instructions for building microkit can be found in the microkit repo.
