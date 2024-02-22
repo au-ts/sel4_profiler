@@ -74,7 +74,6 @@ void resume_pmu() {
 
 // Configure event counter 0
 void configure_cnt0(uint32_t event, uint32_t val) {
-    microkit_dbg_puts("Configuring counter 0\n");
     ISB;
     MSR(PMU_EVENT_CTR0, 0xffffffff - val);
     MSR(PMU_EVENT_TYP0, event);
@@ -82,7 +81,6 @@ void configure_cnt0(uint32_t event, uint32_t val) {
 
 // Configure event counter 1
 void configure_cnt1(uint32_t event, uint32_t val) {
-    microkit_dbg_puts("configuring counter 1\n");
     ISB;
     MSR(PMU_EVENT_CTR1, 0xffffffff - val);
     MSR(PMU_EVENT_TYP1, event);
@@ -131,7 +129,7 @@ void reset_pmu(uint32_t interrupt_flags) {
     }
 
     // Handle the cycle counter.
-    if (pmu_registers[CYCLE_CTR].overflowed) {
+    if (pmu_registers[CYCLE_CTR].overflowed == 1) {
         uint64_t init_cnt = 0;
         if (pmu_registers[CYCLE_CTR].sampling == 1) {
             init_cnt = 0xffffffffffffffff - CYCLE_COUNTER_PERIOD;
@@ -169,88 +167,68 @@ void configure_eventcnt(int cntr, uint32_t event, uint64_t val, bool sampling) {
 /* Add a snapshot of the cycle and event registers to the array. This array needs to become a ring buffer. */
 void add_sample(microkit_id id, uint32_t time, uint64_t pc, uint64_t nr, uint32_t irqFlag, uint64_t *cc) {    
     // microkit_dbg_puts("adding sample\n");
-    uintptr_t buffer = 0;
-    unsigned int buffer_len = 0;
-    void * cookie = 0;
 
-    int ret = dequeue_free(&profiler_ring, &buffer, &buffer_len, &cookie);
-    if (ret != 0) {
-        microkit_dbg_puts(microkit_name);
-        microkit_dbg_puts("Failed to dequeue from profiler free ring\n");
-        return;
-    }
-
-    prof_sample_t *temp_sample = (prof_sample_t *) buffer;
-    
-    // Find which counter overflowed, and the corresponding period
-
-    uint64_t period = 0;
-
-    if (irqFlag & (pmu_registers[CYCLE_CTR].sampling << 31)) {
-        period = pmu_registers[CYCLE_CTR].count;
+    // Check what counters have overflown
+    if (irqFlag & ( (uint32_t) pmu_registers[CYCLE_CTR].sampling << 31)) {
         pmu_registers[CYCLE_CTR].overflowed = 1;
     } 
     
-    if (irqFlag & (pmu_registers[0].sampling << 0)) {
-        period = pmu_registers[0].count;
-        pmu_registers[0].overflowed = 1;
-    } 
-    
-    if (irqFlag & (pmu_registers[1].sampling << 1)) {
-        period = pmu_registers[1].count;
-        pmu_registers[1].overflowed = 1;
-    }
-    
-     if (irqFlag & (pmu_registers[2].sampling << 2)) {
-        period = pmu_registers[2].count;
-        pmu_registers[2].overflowed = 1;
-    }
-    
-    if (irqFlag & (pmu_registers[3].sampling << 3)) {
-        period = pmu_registers[3].count;
-        pmu_registers[3].overflowed = 1;
-    } 
-    
-    if (irqFlag & (pmu_registers[4].sampling << 4)) {
-        period = pmu_registers[4].count;
-        pmu_registers[4].overflowed = 1;
-    }
-    
-    if (irqFlag & (pmu_registers[5].sampling << 5)) {
-        period = pmu_registers[5].count;
-        pmu_registers[5].overflowed = 1;
+    for (int i = 0; i < PMU_NUM_REGS - 1; i++) {
+        if (irqFlag & ((uint32_t) pmu_registers[i].sampling << i)) {
+            pmu_registers[i].overflowed = 1;
+        }
     }
 
-    temp_sample->ip = pc;
-    temp_sample->pid = id;
-    temp_sample->time = time;
-    temp_sample->cpu = 0;
-    temp_sample->period = period;
-    temp_sample->nr = nr;
-    for (int i = 0; i < SEL4_PROF_MAX_CALL_DEPTH; i++) {
-        temp_sample->ips[i] = 0;
-        temp_sample->ips[i] = cc[i];
-    }
-    
-    ret = enqueue_used(&profiler_ring, buffer, buffer_len, &cookie);
+    // Loop over all overflown counters, and add a sample for each of them
+    for (int i = 0; i < PMU_NUM_REGS ; i++) {
+        if (pmu_registers[i].overflowed == 1) {
+            uintptr_t buffer = 0;
+            unsigned int buffer_len = 0;
+            void * cookie = 0;
 
-    if (ret != 0) {
-        microkit_dbg_puts(microkit_name);
-        microkit_dbg_puts("Failed to dequeue from profiler used ring\n");
-        return;
+            int ret = dequeue_free(&profiler_ring, &buffer, &buffer_len, &cookie);
+            if (ret != 0) {
+                microkit_dbg_puts(microkit_name);
+                microkit_dbg_puts("Failed to dequeue from profiler free ring\n");
+                return;
+            }
+
+            prof_sample_t *temp_sample = (prof_sample_t *) buffer;
+            
+            uint64_t period = pmu_registers[i].count;
+
+            temp_sample->ip = pc;
+            temp_sample->pid = id;
+            temp_sample->time = time;
+            temp_sample->cpu = 0;
+            temp_sample->period = period;
+            temp_sample->nr = nr;
+            for (int i = 0; i < SEL4_PROF_MAX_CALL_DEPTH; i++) {
+                temp_sample->ips[i] = 0;
+                temp_sample->ips[i] = cc[i];
+            }
+            
+            ret = enqueue_used(&profiler_ring, buffer, buffer_len, &cookie);
+
+            if (ret != 0) {
+                microkit_dbg_puts(microkit_name);
+                microkit_dbg_puts("Failed to dequeue from profiler used ring\n");
+                return;
+            }
+
+            // Check if the buffers are full (for testing dumping when we have 10 buffers)
+            // Notify the client that we need to dump. If we are dumping, do not 
+            // restart the PMU until we have managed to purge all buffers over the network.
+            if (ring_empty(profiler_ring.free_ring)) {
+                reset_pmu(irqFlag);
+                halt_pmu();
+                microkit_notify(CLIENT_CH);
+            }
+        }
     }
 
-    // Check if the buffers are full (for testing dumping when we have 10 buffers)
-    // Notify the client that we need to dump. If we are dumping, do not 
-    // restart the PMU until we have managed to purge all buffers over the network.
-    if (ring_empty(profiler_ring.free_ring)) {
-        reset_pmu(irqFlag);
-        halt_pmu();
-        microkit_notify(CLIENT_CH);
-    } else {
-        reset_pmu(irqFlag);
-        resume_pmu();
-    }
+    reset_pmu(irqFlag);
+    resume_pmu();
 }
 
 /* Dump the values of the cycle counter and event counters 0 to 5*/
@@ -370,7 +348,7 @@ void init () {
     /* INITIALISE WHAT COUNTERS WE WANT TO TRACK IN HERE */
     
     configure_clkcnt(CYCLE_COUNTER_PERIOD, 1);
-    // configure_eventcnt(EVENT_CTR_0, L1D_CACHE, 16, 1);
+    configure_eventcnt(EVENT_CTR_0, L1D_CACHE, 16, 1);
     
     // Make sure that the PMU is not running until we start
     halt_pmu();
