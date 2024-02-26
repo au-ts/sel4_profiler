@@ -3,7 +3,7 @@ This is a framework for profiling on-top of seL4. It is a statistical profiler t
 sample based on different events and frequencies. There is a sample client that can dump packets either 
 over serial or the network. 
 
-Currently we have support for the imx8mm soc.
+Currently we have support for the imx8mm, maaxboard and odroidc4. More about this is discussed in later sections.
 
 # Installation
 
@@ -77,7 +77,7 @@ In the `include/config.h` file, there is a define for called `CLIENT_CONFIG`. Se
     - 1 - Start profiling
     - 2 - Stop profiling, dump all packets
 
-This works on the odroidc4, imx8mm and maaxboard. Ensure that the makefile is changed appropriately, and the right register addresses and IRQ's are used in the system description.
+This works on the odroidc4, imx8mm and maaxboard. Ensure that the makefile is changed appropriately, and the right MMIO addresses and IRQ's are used in the system description.
 
 ### Network Control
 More details can be found in the `netconn` directory.
