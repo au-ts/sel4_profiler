@@ -80,11 +80,6 @@ class ProfilerClient:
                 # for the size len
                 raw_len = self.socket.recv(2).decode()
                 len = int(raw_len)
-                # int_len = int.from_bytes(raw_len, 'little')
-                # len = socket.ntohl(int_len)
-                # dataToRead = struct.unpack("L", self.socket.recv(8))[0]    
-                # print(f"This is int_len: {int_len}")
-                # print(f"This is len: {len}")
                 global first_msg
                 if (first_msg == 1):
                     self.output.write(",")

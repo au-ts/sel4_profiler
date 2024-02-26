@@ -116,7 +116,7 @@ void configure_cnt5(uint32_t event, uint32_t val) {
     MSR(PMU_EVENT_TYP5, event);
 }
 
-void reset_pmu(uint32_t interrupt_flags) {
+void reset_pmu() {
     // Loop through the pmu registers, if the overflown flag has been set, 
     // and we are sampling on this register, reset to max value - count.
     // Otherwise, reset to 0.
@@ -131,7 +131,7 @@ void reset_pmu(uint32_t interrupt_flags) {
     }
 
     // Handle the cycle counter.
-    if (pmu_registers[CYCLE_CTR].overflowed) {
+    if (pmu_registers[CYCLE_CTR].overflowed == 1) {
         uint64_t init_cnt = 0;
         if (pmu_registers[CYCLE_CTR].sampling == 1) {
             init_cnt = 0xffffffffffffffff - CYCLE_COUNTER_PERIOD;
@@ -167,7 +167,7 @@ void configure_eventcnt(int cntr, uint32_t event, uint64_t val, bool sampling) {
 }
 
 /* Add a snapshot of the cycle and event registers to the array. This array needs to become a ring buffer. */
-void add_sample(microkit_id id, uint32_t time, uint64_t pc, uint64_t nr, uint32_t irqFlag, uint64_t *cc) {    
+void add_sample(microkit_id id, uint32_t time, uint64_t pc, uint64_t nr, uint32_t irqFlag, uint64_t *cc, uint64_t period) {    
     // microkit_dbg_puts("adding sample\n");
     uintptr_t buffer = 0;
     unsigned int buffer_len = 0;
@@ -183,43 +183,6 @@ void add_sample(microkit_id id, uint32_t time, uint64_t pc, uint64_t nr, uint32_
     prof_sample_t *temp_sample = (prof_sample_t *) buffer;
     
     // Find which counter overflowed, and the corresponding period
-
-    uint64_t period = 0;
-
-    if (irqFlag & (pmu_registers[CYCLE_CTR].sampling << 31)) {
-        period = pmu_registers[CYCLE_CTR].count;
-        pmu_registers[CYCLE_CTR].overflowed = 1;
-    } 
-    
-    if (irqFlag & (pmu_registers[0].sampling << 0)) {
-        period = pmu_registers[0].count;
-        pmu_registers[0].overflowed = 1;
-    } 
-    
-    if (irqFlag & (pmu_registers[1].sampling << 1)) {
-        period = pmu_registers[1].count;
-        pmu_registers[1].overflowed = 1;
-    }
-    
-     if (irqFlag & (pmu_registers[2].sampling << 2)) {
-        period = pmu_registers[2].count;
-        pmu_registers[2].overflowed = 1;
-    }
-    
-    if (irqFlag & (pmu_registers[3].sampling << 3)) {
-        period = pmu_registers[3].count;
-        pmu_registers[3].overflowed = 1;
-    } 
-    
-    if (irqFlag & (pmu_registers[4].sampling << 4)) {
-        period = pmu_registers[4].count;
-        pmu_registers[4].overflowed = 1;
-    }
-    
-    if (irqFlag & (pmu_registers[5].sampling << 5)) {
-        period = pmu_registers[5].count;
-        pmu_registers[5].overflowed = 1;
-    }
 
     temp_sample->ip = pc;
     temp_sample->pid = id;
@@ -244,11 +207,11 @@ void add_sample(microkit_id id, uint32_t time, uint64_t pc, uint64_t nr, uint32_
     // Notify the client that we need to dump. If we are dumping, do not 
     // restart the PMU until we have managed to purge all buffers over the network.
     if (ring_empty(profiler_ring.free_ring)) {
-        reset_pmu(irqFlag);
+        reset_pmu();
         halt_pmu();
         microkit_notify(CLIENT_CH);
     } else {
-        reset_pmu(irqFlag);
+        reset_pmu();
         resume_pmu();
     }
 }
@@ -335,9 +298,9 @@ void init_pmu_regs() {
 
 void init () {
     microkit_dbg_puts("Profiler intialising...\n");
-    int *prof_cnt = (int *) profiler_control;
 
-    *prof_cnt = 0;
+    // Ensure that the PMU is not running
+    halt_pmu();
 
     // Init the record buffers
     ring_init(&profiler_ring, (ring_buffer_t *) profiler_ring_free, (ring_buffer_t *) profiler_ring_used, 0, 512, 512);
@@ -360,9 +323,7 @@ void init () {
     if (res_buf) {
         microkit_dbg_puts("Could not set log buffer");
         puthex64(res_buf);
-    } else {
-        microkit_dbg_puts("We set the log buffer\n");
-    }
+    } 
     #endif
 
     init_pmu_regs();
@@ -377,17 +338,49 @@ void init () {
 
     // Set the profiler state to init
     profiler_state = PROF_INIT;
-    #if defined(BOARD_odroidc4)
-        microkit_dbg_puts("we are running on oc4!\n");
-    #elif defined(BOARD_imx8mm_evk) 
-        microkit_dbg_puts("we are running on imx8\n");
-    #endif
-
 }
 
 void handle_irq(uint32_t irqFlag) {
     pmu_sample_t *profLogs = (pmu_sample_t *) log_buffer;
     pmu_sample_t profLog = profLogs[0];
+
+    uint64_t period = 0;
+
+    // Update structs to check what counters overflowed
+    if (irqFlag & (pmu_registers[CYCLE_CTR].sampling << 31)) {
+        period = pmu_registers[CYCLE_CTR].count;
+        pmu_registers[CYCLE_CTR].overflowed = 1;
+    } 
+    
+    if (irqFlag & (pmu_registers[0].sampling << 0)) {
+        period = pmu_registers[0].count;
+        pmu_registers[0].overflowed = 1;
+    } 
+    
+    if (irqFlag & (pmu_registers[1].sampling << 1)) {
+        period = pmu_registers[1].count;
+        pmu_registers[1].overflowed = 1;
+    }
+    
+     if (irqFlag & (pmu_registers[2].sampling << 2)) {
+        period = pmu_registers[2].count;
+        pmu_registers[2].overflowed = 1;
+    }
+    
+    if (irqFlag & (pmu_registers[3].sampling << 3)) {
+        period = pmu_registers[3].count;
+        pmu_registers[3].overflowed = 1;
+    } 
+    
+    if (irqFlag & (pmu_registers[4].sampling << 4)) {
+        period = pmu_registers[4].count;
+        pmu_registers[4].overflowed = 1;
+    }
+    
+    if (irqFlag & (pmu_registers[5].sampling << 5)) {
+        period = pmu_registers[5].count;
+        pmu_registers[5].overflowed = 1;
+    }
 
     if (profLog.valid == 1) {
         if (irqFlag & (pmu_registers[CYCLE_CTR].sampling << 31) ||
@@ -397,7 +390,7 @@ void handle_irq(uint32_t irqFlag) {
             irqFlag & (pmu_registers[3].sampling << 3) ||
             irqFlag & (pmu_registers[4].sampling << 4) ||
             irqFlag & (pmu_registers[5].sampling << 5)) {
-            add_sample(profLog.pid, profLog.time, profLog.ip, profLog.nr, irqFlag, profLog.ips);
+            add_sample(profLog.pid, profLog.time, profLog.ip, profLog.nr, irqFlag, profLog.ips, period);
         }
     } else {
         // Not a valid sample. Restart PMU.
@@ -411,7 +404,6 @@ void notified(microkit_channel ch) {
         microkit_dbg_puts("Starting PMU\n");
         // Set the profiler state to start
         profiler_state = PROF_START;
-        configure_clkcnt(CYCLE_COUNTER_PERIOD, 1);
         resume_pmu();
     } else if (ch == 20) {
         microkit_dbg_puts("Halting PMU\n");
@@ -428,7 +420,6 @@ void notified(microkit_channel ch) {
         }
     } else if (ch == 21) {
         // Get the interrupt flag from the PMU
-        // microkit_dbg_puts("Recv pmu irq\n");
         uint32_t irqFlag = 0;
         MRS(PMOVSCLR_EL0, irqFlag);
 
