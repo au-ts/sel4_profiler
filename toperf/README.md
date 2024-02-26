@@ -1,7 +1,9 @@
 # toperf tool
-- This repository serves as a tool to convert from seL4 sample packets to a format that perf can interpret. This is specifically for the PERFILE2.
+- This repository serves as a tool to convert from seL4 sample packets to a format that perf can interpret. This is specifically for the perf file format v2.
 
 - By utilising the pre-existing perf infrastructure we're able to take advantage of the many perf tools, as well as open source tools like flamegraph
+
+- Please see the `example/` directory for an example using the toperf tool.
 
 ## Installation
 - This tool is written in the Rust Programming Language, and can be installed by following the link https://www.rust-lang.org/tools/install
