@@ -1,5 +1,5 @@
 # toperf tool
-- This repository serves as a tool to convert from seL4 sample packets to a format that perf can interpret
+- This repository serves as a tool to convert from seL4 sample packets to a format that perf can interpret. This is specifically for the PERFILE2.
 
 - By utilising the pre-existing perf infrastructure we're able to take advantage of the many perf tools, as well as open source tools like flamegraph
 
@@ -91,6 +91,13 @@
     - period: refers to how often sample data is sampled
     - ips: the callstack of the program at the time the sample was recorded. This is recorded to a maximum depth of 16.
     - nr: the number of instruction pointers within the callstack. 
+
+## Mmap Events
+Mmap events are required for symbol resolution on perf. We falsely create an mmap event, in which the elf path gets mapped
+to a particular memory region corresponding to a pd. The actual mmap base we use
+is important, and it must line up with whatever base is used in the elf. 
+
+Currently, we set the base to 0x1f0000, which is the start address of our protection domains. 
 
 ## Credit
 
