@@ -68,7 +68,10 @@ The first thing the user must do is add a line of code to register a thread for 
 `seL4_ProfilerRegisterThread(int threadId)` syscall. This sets a value within the threads TCB to ensure that 
 samples are recorded during that threads execution. The `threadId` is a user managed identification for the thread. You will have to maintain the appropriate mappings in `include/profiler_config.h` in order for the perf tools to function correctly.
 
-## Serial Control
+## Controlling the profiler
+In the `include/config.h` file, there is a define for called `CLIENT_CONFIG`. Set this value to whatever control method that you wish to use. 0 is using serial, 2 is using the network controller. Serial works on both odroidc4 and imx8mm, whereas the netconn tool is only available on the imx8mm currently.
+
+### Serial Control
 - Using this profiler over serial will result in the raw json samples being dumped to terminal.
 - You can entire the following values into the terminal with the multiplexer set to hand characters to the profiler:
     - 1 - Start profiling
@@ -76,7 +79,7 @@ samples are recorded during that threads execution. The `threadId` is a user man
 
 This works on the odroidc4, imx8mm and maaxboard. Ensure that the makefile is changed appropriately, and the right register addresses and IRQ's are used in the system description.
 
-## Network Control
+### Network Control
 More details can be found in the `netconn` directory.
 
 This only works on the imx8mm and maaxboard currently. There ethernet issues when 
