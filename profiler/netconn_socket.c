@@ -84,7 +84,6 @@ static err_t netconn_recv_callback(void *arg, struct tcp_pcb *pcb, struct pbuf *
     } else if (msg_match(data_packet_str, START)) {
         microkit_notify(START_PMU);
     } else if (msg_match(data_packet_str, STOP)) {
-        microkit_dbg_puts("STOPPING PMU!\n");
         microkit_notify(STOP_PMU);
     } else if (msg_match(data_packet_str, MAPPINGS)) {
         error = tcp_write(pcb, MAPPINGS_STR, strlen(MAPPINGS_STR), TCP_WRITE_FLAG_COPY);

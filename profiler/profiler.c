@@ -412,7 +412,6 @@ void notified(microkit_channel ch) {
     } else if (ch == 30) {
         // Only resume if profiler state is in 'START' state
         if (profiler_state == PROF_START) {
-            // microkit_dbg_puts("Resuming PMU\n");
             resume_pmu();
         }
     } else if (ch == 21) {

@@ -112,16 +112,13 @@ void xmodem_dump() {
     while(!dequeue_used(&profiler_ring, &buffer, &size, &cookie)) {
         dequeue_used(&profiler_ring, &buffer, &size, &cookie);
         int ret = xmodemTransmit((unsigned char *) buffer, 128);
-        microkit_dbg_puts("This is the ret of xmodem: ");
         puthex64(ret);
-        microkit_dbg_puts("\n");
         enqueue_free(&profiler_ring, buffer, size, cookie);
     }   
 }
 
 static err_t eth_dump_callback(void *arg, struct tcp_pcb *pcb, uint16_t len)
 {
-    // microkit_dbg_puts("Eth dump callback\n");
     uintptr_t buffer = 0;
     unsigned int size = 0;
     void *cookie = 0;
@@ -133,7 +130,6 @@ static err_t eth_dump_callback(void *arg, struct tcp_pcb *pcb, uint16_t len)
         client_state = CLIENT_IDLE;
         microkit_notify(30);
     } else if (!dequeue_used(&profiler_ring, &buffer, &size, &cookie)) {
-        // microkit_dbg_puts("Sending initial buffer\n");
 
         // // Create a buffer for the sample
         uint8_t pb_buff[256];
@@ -170,12 +166,6 @@ static err_t eth_dump_callback(void *arg, struct tcp_pcb *pcb, uint16_t len)
         char size_str[8];
         u32_t htonl_size = lwip_htonl(message_len);
         my_itoa(message_len, size_str);
-        // microkit_dbg_puts("This is the value of size_str: ");
-        // microkit_dbg_puts(size_str);
-        // microkit_dbg_puts("\n");
-        // microkit_dbg_puts("This is the size of size_str: ");
-        // puthex64(strlen(size_str));
-        // microkit_dbg_puts("\n");
         send_tcp(&size_str, 2);
         send_tcp(&pb_buff, message_len);
     
@@ -198,8 +188,6 @@ void eth_dump_start() {
         client_state = CLIENT_IDLE;
         microkit_notify(RESUME_PMU);
     } else if (!dequeue_used(&profiler_ring, &buffer, &size, &cookie)) {
-        // microkit_dbg_puts("Sending initial buffer\n");
-
         // // Create a buffer for the sample
         uint8_t pb_buff[256];
 
@@ -235,12 +223,6 @@ void eth_dump_start() {
         char size_str[8];
         u32_t htonl_size = lwip_htonl(message_len);
         my_itoa(message_len, size_str);
-        // microkit_dbg_puts("This is the value of size_str: ");
-        // microkit_dbg_puts(size_str);
-        // microkit_dbg_puts("\n");
-        // microkit_dbg_puts("This is the size of size_str: ");
-        // puthex64(strlen(size_str));
-        // microkit_dbg_puts("\n");
         send_tcp(&size_str, 2);
         send_tcp(&pb_buff, message_len);
     }
@@ -265,7 +247,6 @@ void init() {
 void notified(microkit_channel ch) {
     // Notified to empty profiler sample buffers
     if (ch == CLIENT_CH) {
-            // microkit_dbg_puts("notified to dump samples\n");
         // Determine how to dump buffers
         if (CLIENT_CONFIG == 0) {
             // Print over serial
@@ -283,7 +264,6 @@ void notified(microkit_channel ch) {
         }
     } else if(CLIENT_CONFIG == 2) {
         // Getting a network interrupt
-        // microkit_dbg_puts("Network interrupt for prof client\n");
         notified_lwip(ch);
     } else if (ch == 11) {
         // Getting a notification from serial mux rx. 
