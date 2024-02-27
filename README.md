@@ -3,7 +3,7 @@ This is a framework for profiling on-top of seL4. It is a statistical profiler t
 sample based on different events and frequencies. There is a sample client that can dump packets either 
 over serial or the network. 
 
-Currently we have support for the imx8mm, maaxboard and odroidc4. More about this is discussed in later sections.
+Currently, we support armv8 platforms. Specifically, we have tested on the imx8mm, maaxboard and odroidc4. The profiler component should be SoC agnostic, however, the client is reliant on the current seL4 sDDF development. 
 
 # Project Status
 Currently completed items:

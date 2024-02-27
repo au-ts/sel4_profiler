@@ -60,7 +60,6 @@ uintptr_t data_packet;
 
 static err_t netconn_sent_callback(void *arg, struct tcp_pcb *pcb, u16_t len)
 {
-    microkit_dbg_puts("sent callback\n");
     return ERR_OK;
 }
 

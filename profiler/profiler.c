@@ -328,7 +328,7 @@ void init () {
     /* INITIALISE WHAT COUNTERS WE WANT TO TRACK IN HERE */
     
     configure_clkcnt(CYCLE_COUNTER_PERIOD, 1);
-    configure_eventcnt(EVENT_CTR_0, L1D_CACHE, 16, 1);
+    // configure_eventcnt(EVENT_CTR_0, L1D_CACHE, 16, 1);
     
     // Make sure that the PMU is not running until we start
     halt_pmu();
