@@ -5,6 +5,18 @@ over serial or the network.
 
 Currently we have support for the imx8mm, maaxboard and odroidc4. More about this is discussed in later sections.
 
+# Project Status
+Currently completed items:
+- PMU interface for arm8.
+- Kernel changes to record sample data (instruction pointer, callstack).
+- Statiscal profiler.
+- Client to send samples over serial/ethernet.
+- Using protocal buffers to send data over ethernet.
+- Conversion tool to generate `perf.data` files. 
+
+TO-DO:
+- Multicore support.
+
 # Installation
 
 - We require a special kernel configuration. The kernel version can be found at: https://github.com/Kswin01/seL4/tree/microkit-dev-profiler-irq.
