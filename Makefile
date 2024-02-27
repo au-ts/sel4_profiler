@@ -20,6 +20,14 @@ ifeq ($(strip $(MICROKIT_CONFIG)),)
 $(error MICROKIT_CONFIG must be specified)
 endif
 
+ifeq ($(MICROKIT_BOARD),maaxboard)
+SDDF_PLATFORM_DIR := imx
+SYSTEM_DESC := profiler_maaxboard.system
+else ifeq($(MICROKIT_BOARD),odroidc4)
+SDDF_PLATFORM_DIR := meson
+SYSTEM_DESC := profiler_oc4.system
+endif
+
 TOOLCHAIN := aarch64-none-elf
 
 CPU := cortex-a53
@@ -32,16 +40,18 @@ MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 SDDF=sDDF
 LWIP=$(SDDF)/network/ipstacks/lwip/src
 NETWORK_RING_BUFFER=$(SDDF)/network/libethsharedringbuffer
-ETHERNET_DRIVER=$(SDDF)/drivers/network/imx
-TIMER_DRIVER=$(SDDF)/drivers/clock/imx
+
 SDDF_NETWORK_COMPONENTS=$(SDDF)/network/components
 NETWORK_COMPONENTS=network/components
 UTIL=$(SDDF)/util
 
 SERIAL_RING_BUFFER=$(SDDF)/serial/libserialsharedringbuffer
 XMODEMDIR=xmodem
-UART_DRIVER=$(SDDF)/drivers/serial/imx
 UART_COMPONENTS=$(SDDF)/serial/components
+
+UART_DRIVER=$(SDDF)/drivers/serial/$(SDDF_PLATFORM_DIR)
+ETHERNET_DRIVER=$(SDDF)/drivers/network/$(SDDF_PLATFORM_DIR)
+TIMER_DRIVER=$(SDDF)/drivers/clock/$(SDDF_PLATFORM_DIR)
 
 RINGBUFFERDIR=libserialsharedringbuffer
 XMODEMDIR=xmodem
@@ -207,8 +217,8 @@ $(BUILD_DIR)/dummy_prog.elf: $(addprefix $(BUILD_DIR)/, $(DUMMY_PROG_OBJS))
 $(BUILD_DIR)/dummy_prog2.elf: $(addprefix $(BUILD_DIR)/, $(DUMMY_PROG2_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-$(IMAGE_FILE) $(REPORT_FILE): $(addprefix $(BUILD_DIR)/, $(IMAGES)) profiler.system
-	$(MICROKIT_TOOL) profiler.system --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
+$(IMAGE_FILE) $(REPORT_FILE): $(addprefix $(BUILD_DIR)/, $(IMAGES)) $(SYSTEM_DESC)
+	$(MICROKIT_TOOL) $(SYSTEM_DESC) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
 
 .PHONY: all depend compile clean
 

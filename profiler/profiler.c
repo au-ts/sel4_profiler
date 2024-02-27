@@ -74,7 +74,6 @@ void resume_pmu() {
 
 // Configure event counter 0
 void configure_cnt0(uint32_t event, uint32_t val) {
-    microkit_dbg_puts("Configuring counter 0\n");
     ISB;
     MSR(PMU_EVENT_CTR0, 0xffffffff - val);
     MSR(PMU_EVENT_TYP0, event);
@@ -82,7 +81,6 @@ void configure_cnt0(uint32_t event, uint32_t val) {
 
 // Configure event counter 1
 void configure_cnt1(uint32_t event, uint32_t val) {
-    microkit_dbg_puts("configuring counter 1\n");
     ISB;
     MSR(PMU_EVENT_CTR1, 0xffffffff - val);
     MSR(PMU_EVENT_TYP1, event);
@@ -168,7 +166,6 @@ void configure_eventcnt(int cntr, uint32_t event, uint64_t val, bool sampling) {
 
 /* Add a snapshot of the cycle and event registers to the array. This array needs to become a ring buffer. */
 void add_sample(microkit_id id, uint32_t time, uint64_t pc, uint64_t nr, uint32_t irqFlag, uint64_t *cc, uint64_t period) {    
-    // microkit_dbg_puts("adding sample\n");
     uintptr_t buffer = 0;
     unsigned int buffer_len = 0;
     void * cookie = 0;
@@ -331,7 +328,7 @@ void init () {
     /* INITIALISE WHAT COUNTERS WE WANT TO TRACK IN HERE */
     
     configure_clkcnt(CYCLE_COUNTER_PERIOD, 1);
-    // configure_eventcnt(EVENT_CTR_0, L1D_CACHE, 16, 1);
+    configure_eventcnt(EVENT_CTR_0, L1D_CACHE, 16, 1);
     
     // Make sure that the PMU is not running until we start
     halt_pmu();
