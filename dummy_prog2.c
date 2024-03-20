@@ -6,7 +6,6 @@
 #include "profiler.h"
 #include "util.h"
 #include "serial_server.h"
-#include "printf.h"
 
 
 uintptr_t profiler_control;

@@ -23,9 +23,6 @@ endif
 ifeq ($(MICROKIT_BOARD),maaxboard)
 SDDF_PLATFORM_DIR := imx
 SYSTEM_DESC := profiler_maaxboard.system
-else ifeq($(MICROKIT_BOARD),odroidc4)
-SDDF_PLATFORM_DIR := meson
-SYSTEM_DESC := profiler_oc4.system
 endif
 
 TOOLCHAIN := aarch64-none-elf
@@ -38,23 +35,18 @@ AS := $(TOOLCHAIN)-as
 MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 
 SDDF=sDDF
+SDDF_INCLUDE=$(SDDF)/include/sddf
 LWIP=$(SDDF)/network/ipstacks/lwip/src
 NETWORK_RING_BUFFER=$(SDDF)/network/libethsharedringbuffer
-
 SDDF_NETWORK_COMPONENTS=$(SDDF)/network/components
 NETWORK_COMPONENTS=network/components
 UTIL=$(SDDF)/util
 
-SERIAL_RING_BUFFER=$(SDDF)/serial/libserialsharedringbuffer
-XMODEMDIR=xmodem
 UART_COMPONENTS=$(SDDF)/serial/components
-
 UART_DRIVER=$(SDDF)/drivers/serial/$(SDDF_PLATFORM_DIR)
 ETHERNET_DRIVER=$(SDDF)/drivers/network/$(SDDF_PLATFORM_DIR)
 TIMER_DRIVER=$(SDDF)/drivers/clock/$(SDDF_PLATFORM_DIR)
 
-RINGBUFFERDIR=libserialsharedringbuffer
-XMODEMDIR=xmodem
 UARTDIR=uart
 PROTOBUFDIR=protobuf
 ECHODIR=echo_server
@@ -62,9 +54,9 @@ PROFDIR=profiler
 
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 
-IMAGES := profiler.elf client.elf uart.elf uart_mux_rx.elf uart_mux_tx.elf eth.elf eth_mux_rx.elf eth_mux_tx.elf eth_copy.elf arp.elf timer.elf echo.elf dummy_prog.elf dummy_prog2.elf
+IMAGES := profiler.elf client.elf uart.elf uart_virt_rx.elf uart_virt_tx.elf eth.elf eth_virt_rx.elf eth_virt_tx.elf eth_copy.elf arp.elf timer.elf echo.elf dummy_prog.elf dummy_prog2.elf
 CFLAGS := -mcpu=$(CPU) -mstrict-align -ffreestanding -g3 -O3 -Wall  -Wno-unused-function -fno-omit-frame-pointer
-LDFLAGS := -L$(BOARD_DIR)/lib -Llib
+LDFLAGS := -L$(BOARD_DIR)/lib -L$(SDDF)/lib
 LIBS := -lmicrokit -Tmicrokit.ld -lc
 
 IMAGE_FILE = $(BUILD_DIR)/loader.img
@@ -77,11 +69,11 @@ CFLAGS += -I$(BOARD_DIR)/include \
 	-I$(SDDF)/util/include/arch \
 	-I$(SDDF)/benchmark/include \
 	-I$(BOARD_DIR)/include/sys \
-	-I$(XMODEMDIR)/include \
 	-I$(UART_DRIVER)/include \
 	-I$(LWIP)/include \
 	-I$(LWIP)/include/ipv4 \
 	-I$(PROTOBUFDIR)/nanopb \
+	-Iinclude/ethernet_config \
 	-DSERIAL_NUM_CLIENTS=1 \
 	-MD \
 	-MP
@@ -121,34 +113,33 @@ CORE4FILES=$(LWIP)/core/ipv4/autoip.c \
 NETIFFILES=$(LWIP)/netif/ethernet.c
 
 # LWIPFILES: All the above.
-PROF_LWIPFILES=$(PROFDIR)/lwip.c $(SDDF_NETWORK_COMPONENTS)/lwip_timer.c $(UTIL)/cache.c $(COREFILES) $(CORE4FILES) $(NETIFFILES) \
-$(UTIL)/util.c $(UTIL)/printf.c 
-ECHO_LWIPFILES=$(ECHODIR)/lwip.c $(SDDF_NETWORK_COMPONENTS)/lwip_timer.c $(UTIL)/cache.c $(COREFILES) $(CORE4FILES) $(NETIFFILES) \
-$(UTIL)/util.c $(UTIL)/printf.c 
+PROF_LWIPFILES=$(PROFDIR)/lwip.c $(COREFILES) $(CORE4FILES) $(NETIFFILES)
+ECHO_LWIPFILES=$(ECHODIR)/lwip.c $(COREFILES) $(CORE4FILES) $(NETIFFILES)
 
-UART_OBJS := $(UART_DRIVER)/uart.o sddf_serial_sharedringbuffer.o
-UART_MUX_TX_OBJS := $(UART_COMPONENTS)/mux_tx.o sddf_serial_sharedringbuffer.o
-UART_MUX_RX_OBJS := $(UART_COMPONENTS)/mux_rx.o sddf_serial_sharedringbuffer.o
-PROFILER_OBJS := $(PROFDIR)/profiler.o sddf_serial_sharedringbuffer.o
-CLIENT_OBJS := $(PROFDIR)/client.o $(PROFDIR)/serial_server.o  sddf_network_sharedringbuffer.o xmodem/crc16.o xmodem/xmodem.o \
+UART_OBJS := $(UART_DRIVER)/uart.o printf.o putchar_debug.o
+UART_VIRT_TX_OBJS := $(UART_COMPONENTS)/virt_tx.o 
+UART_VIRT_RX_OBJS := $(UART_COMPONENTS)/virt_rx.o 
+PROFILER_OBJS := $(PROFDIR)/profiler.o sddf_network_sharedringbuffer.o
+CLIENT_OBJS := $(PROFDIR)/client.o $(PROFDIR)/serial_server.o  sddf_network_sharedringbuffer.o  \
  $(PROF_LWIPFILES:.c=.o) $(PROFDIR)/lwip.o $(PROFDIR)/netconn_socket.o sddf_timer_client.o \
  $(PROTOBUFDIR)/nanopb/pmu_sample.pb.o $(PROTOBUFDIR)/nanopb/pb_common.o $(PROTOBUFDIR)/nanopb/pb_encode.o \
- $(UTIL)/util.o $(UTIL)/printf.o
+ serial/profiler_printf.o printf.o putchar_debug.o
 
-ECHO_OBJS := $(ECHO_LWIPFILES:.c=.o) $(ECHODIR)/lwip.o sddf_network_sharedringbuffer.o  $(ECHODIR)/udp_echo_socket.o $(ECHODIR)/tcp_echo_socket.o \
- $(UTIL)/util.o $(UTIL)/printf.o
+ECHO_OBJS := $(ECHO_LWIPFILES:.c=.o) $(ECHODIR)/lwip.o sddf_network_sharedringbuffer.o  \
+$(ECHODIR)/udp_echo_socket.o $(ECHODIR)/tcp_echo_socket.o printf.o putchar_serial.o \
+sddf_timer_client.o 
 DUMMY_PROG_OBJS := dummy_prog.o
 DUMMY_PROG2_OBJS := dummy_prog2.o
 
-ETH_OBJS := $(ETHERNET_DRIVER)/ethernet.o sddf_network_sharedringbuffer.o
-ETH_MUX_RX_OBJS := $(SDDF_NETWORK_COMPONENTS)/mux_rx.o sddf_network_sharedringbuffer.o
-ETH_MUX_TX_OBJS := $(SDDF_NETWORK_COMPONENTS)/mux_tx.o sddf_network_sharedringbuffer.o
-ETH_COPY_OBJS := $(SDDF_NETWORK_COMPONENTS)/copy.o sddf_network_sharedringbuffer.o
-ARP_OBJS := $(UTIL)/cache.o $(LWIP)/core/inet_chksum.o $(LWIP)/core/def.o $(SDDF_NETWORK_COMPONENTS)/arp.o sddf_network_sharedringbuffer.o
-TIMER_OBJS := $(TIMER_DRIVER)/timer.o
+ETH_OBJS := $(ETHERNET_DRIVER)/ethernet.o sddf_network_sharedringbuffer.o printf.o putchar_debug.o
+ETH_VIRT_RX_OBJS := $(SDDF_NETWORK_COMPONENTS)/mux_rx.o sddf_network_sharedringbuffer.o printf.o putchar_debug.o
+ETH_VIRT_TX_OBJS := $(SDDF_NETWORK_COMPONENTS)/mux_tx.o sddf_network_sharedringbuffer.o $(UTIL)/cache.o printf.o putchar_debug.o
+ETH_COPY_OBJS := $(SDDF_NETWORK_COMPONENTS)/copy.o sddf_network_sharedringbuffer.o printf.o putchar_debug.o
+ARP_OBJS := $(UTIL)/cache.o $(LWIP)/core/inet_chksum.o $(LWIP)/core/def.o $(SDDF_NETWORK_COMPONENTS)/arp.o sddf_network_sharedringbuffer.o printf.o putchar_debug.o
+TIMER_OBJS := $(TIMER_DRIVER)/timer.o printf.o putchar_debug.o
 
-OBJS := $(sort $(addprefix $(BUILD_DIR)/, $(ETH_OBJS) $(ETH_MUX_RX_OBJS) $(ETH_MUX_TX_OBJS)\
-	$(ETH_COPY_OBJS) \
+OBJS := $(sort $(addprefix $(BUILD_DIR)/, $(ETH_OBJS) $(ETH_VIRT_RX_OBJS) $(ETH_VIRT_TX_OBJS)\
+	$(ETH_COPY_OBJS) $(CLIENT_OBJS)\
 	$(ARP_OBJS) $(TIMER_OBJS) $(ECHO_OBJS)))
 DEPS := $(OBJS:.o=.d)
 
@@ -169,11 +160,17 @@ $(BUILD_DIR)/%.o: %.s Makefile
 $(BUILD_DIR)/sddf_network_sharedringbuffer.o:
 	BUILD_DIR=$(abspath $(BUILD_DIR)) MICROKIT_INCLUDE=$(BOARD_DIR)/include make -C $(NETWORK_RING_BUFFER)
 
-$(BUILD_DIR)/sddf_serial_sharedringbuffer.o:
-	BUILD_DIR=$(abspath $(BUILD_DIR)) MICROKIT_INCLUDE=$(BOARD_DIR)/include make -C $(SERIAL_RING_BUFFER)
-
 $(BUILD_DIR)/sddf_timer_client.o:
 	BUILD_DIR=$(abspath $(BUILD_DIR)) MICROKIT_INCLUDE=$(BOARD_DIR)/include TIMER_CHANNEL=9 make -C $(SDDF)/timer/client
+
+$(BUILD_DIR)/printf.o: $(UTIL)/printf.c $(SDDF_INCLUDE)/util/printf.h
+	$(CC) -c $(CFLAGS) $(UTIL)/printf.c -o $(BUILD_DIR)/printf.o
+
+$(BUILD_DIR)/putchar_debug.o: $(UTIL)/putchar_debug.c
+	$(CC) -c $(CFLAGS) $(UTIL)/putchar_debug.c -o $(BUILD_DIR)/putchar_debug.o
+
+$(BUILD_DIR)/putchar_serial.o: $(UTIL)/putchar_serial.c
+	$(CC) -c $(CFLAGS) $(UTIL)/putchar_serial.c -o $(BUILD_DIR)/putchar_serial.o
 
 $(BUILD_DIR)/profiler.elf: $(addprefix $(BUILD_DIR)/, $(PROFILER_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
@@ -181,10 +178,10 @@ $(BUILD_DIR)/profiler.elf: $(addprefix $(BUILD_DIR)/, $(PROFILER_OBJS))
 $(BUILD_DIR)/uart.elf: $(addprefix $(BUILD_DIR)/, $(UART_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-$(BUILD_DIR)/uart_mux_rx.elf: $(addprefix $(BUILD_DIR)/, $(UART_MUX_RX_OBJS))
+$(BUILD_DIR)/uart_virt_rx.elf: $(addprefix $(BUILD_DIR)/, $(UART_VIRT_RX_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-$(BUILD_DIR)/uart_mux_tx.elf: $(addprefix $(BUILD_DIR)/, $(UART_MUX_TX_OBJS))
+$(BUILD_DIR)/uart_virt_tx.elf: $(addprefix $(BUILD_DIR)/, $(UART_VIRT_TX_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 $(BUILD_DIR)/client.elf: $(addprefix $(BUILD_DIR)/, $(CLIENT_OBJS))
@@ -193,10 +190,10 @@ $(BUILD_DIR)/client.elf: $(addprefix $(BUILD_DIR)/, $(CLIENT_OBJS))
 $(BUILD_DIR)/eth.elf: $(addprefix $(BUILD_DIR)/, $(ETH_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-$(BUILD_DIR)/eth_mux_rx.elf: $(addprefix $(BUILD_DIR)/, $(ETH_MUX_RX_OBJS))
+$(BUILD_DIR)/eth_virt_rx.elf: $(addprefix $(BUILD_DIR)/, $(ETH_VIRT_RX_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-$(BUILD_DIR)/eth_mux_tx.elf: $(addprefix $(BUILD_DIR)/, $(ETH_MUX_TX_OBJS))
+$(BUILD_DIR)/eth_virt_tx.elf: $(addprefix $(BUILD_DIR)/, $(ETH_VIRT_TX_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 $(BUILD_DIR)/eth_copy.elf: $(addprefix $(BUILD_DIR)/, $(ETH_COPY_OBJS))
@@ -227,8 +224,6 @@ $(IMAGE_FILE) $(REPORT_FILE): $(addprefix $(BUILD_DIR)/, $(IMAGES)) $(SYSTEM_DES
 
 #Make the Directories
 directories:
-	$(info $(shell mkdir -p $(BUILD_DIR)/libserialsharedringbuffer))	\
-	$(info $(shell mkdir -p $(BUILD_DIR)/xmodem))	\
 	$(info $(shell mkdir -p $(BUILD_DIR)/uart))	\
 
 clean:

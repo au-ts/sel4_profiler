@@ -6,7 +6,6 @@
 #include "profiler.h"
 #include "util.h"
 #include "serial_server.h"
-#include "printf.h"
 #include "snapshot.h"
 #include "timer.h"
 #include "profiler_config.h"
@@ -166,18 +165,16 @@ void configure_eventcnt(int cntr, uint32_t event, uint64_t val, bool sampling) {
 
 /* Add a snapshot of the cycle and event registers to the array. This array needs to become a ring buffer. */
 void add_sample(microkit_id id, uint32_t time, uint64_t pc, uint64_t nr, uint32_t irqFlag, uint64_t *cc, uint64_t period) {    
-    uintptr_t buffer = 0;
-    unsigned int buffer_len = 0;
-    void * cookie = 0;
 
-    int ret = dequeue_free(&profiler_ring, &buffer, &buffer_len, &cookie);
+    buff_desc_t buffer;
+    int ret = dequeue_free(&profiler_ring, &buffer);
     if (ret != 0) {
         microkit_dbg_puts(microkit_name);
         microkit_dbg_puts("Failed to dequeue from profiler free ring\n");
         return;
     }
 
-    prof_sample_t *temp_sample = (prof_sample_t *) buffer;
+    prof_sample_t *temp_sample = (prof_sample_t *) buffer.phys_or_offset;
     
     // Find which counter overflowed, and the corresponding period
 
@@ -192,7 +189,7 @@ void add_sample(microkit_id id, uint32_t time, uint64_t pc, uint64_t nr, uint32_
         temp_sample->ips[i] = cc[i];
     }
     
-    ret = enqueue_used(&profiler_ring, buffer, buffer_len, &cookie);
+    ret = enqueue_used(&profiler_ring, buffer);
 
     if (ret != 0) {
         microkit_dbg_puts(microkit_name);
@@ -300,10 +297,13 @@ void init () {
     halt_pmu();
 
     // Init the record buffers
-    ring_init(&profiler_ring, (ring_buffer_t *) profiler_ring_free, (ring_buffer_t *) profiler_ring_used, 0, 512, 512);
+    ring_init(&profiler_ring, (ring_buffer_t *) profiler_ring_free, (ring_buffer_t *) profiler_ring_used, 512);
     
     for (int i = 0; i < NUM_BUFFERS - 1; i++) {
-        int ret = enqueue_free(&profiler_ring, profiler_mem + (i * sizeof(prof_sample_t)), sizeof(prof_sample_t), NULL);
+        buff_desc_t buffer;
+        buffer.phys_or_offset = profiler_mem + (i * sizeof(prof_sample_t));
+        buffer.len = sizeof(prof_sample_t);
+        int ret = enqueue_free(&profiler_ring, buffer);
         
         if (ret != 0) {
             microkit_dbg_puts(microkit_name);

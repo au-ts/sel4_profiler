@@ -38,13 +38,13 @@
     <memory_region name="shared_dma_tx_cli1" size="0x200_000" page_size="0x200_000" />
     <memory_region name="shared_dma_rx_cli1" size="0x200_000" page_size="0x200_000" />
 
-    <!-- shared memory for driver/mux ring buffer mechanism -->
+    <!-- shared memory for driver/virt ring buffer mechanism -->
     <memory_region name="rx_free_drv" size="0x200_000" page_size="0x200_000"/>
     <memory_region name="rx_used_drv" size="0x200_000" page_size="0x200_000"/>
     <memory_region name="tx_free_drv" size="0x200_000" page_size="0x200_000"/>
     <memory_region name="tx_used_drv" size="0x200_000" page_size="0x200_000"/>
 
-    <!-- shared memory for mux_rx/copy ring buffer mechanism -->
+    <!-- shared memory for virt_rx/copy ring buffer mechanism -->
     <memory_region name="rx_free_copy0" size="0x200_000" page_size="0x200_000"/>
     <memory_region name="rx_used_copy0" size="0x200_000" page_size="0x200_000"/>
     <memory_region name="rx_free_copy1" size="0x200_000" page_size="0x200_000"/>
@@ -54,16 +54,16 @@
     <memory_region name="rx_used_cli0" size="0x200_000" page_size="0x200_000"/>
     <memory_region name="rx_free_cli1" size="0x200_000" page_size="0x200_000"/>
     <memory_region name="rx_used_cli1" size="0x200_000" page_size="0x200_000"/>
-    <!-- shared memory for lwip/mux_tx ring buffer mechanism -->
+    <!-- shared memory for lwip/virt_tx ring buffer mechanism -->
     <memory_region name="tx_free_cli0" size="0x200_000" page_size="0x200_000"/>
     <memory_region name="tx_used_cli0" size="0x200_000" page_size="0x200_000"/>
     <memory_region name="tx_free_cli1" size="0x200_000" page_size="0x200_000"/>
     <memory_region name="tx_used_cli1" size="0x200_000" page_size="0x200_000"/>
 
-    <!-- shared memory for rx mux/arp ring buffer mechanism -->
+    <!-- shared memory for rx virt/arp ring buffer mechanism -->
     <memory_region name="rx_free_arp" size="0x200_000" page_size="0x200_000"/>
     <memory_region name="rx_used_arp" size="0x200_000" page_size="0x200_000"/>
-    <!-- shared memory for arp/mux_tx ring buffer mechanism -->
+    <!-- shared memory for arp/virt_tx ring buffer mechanism -->
     <memory_region name="tx_free_arp" size="0x200_000" page_size="0x200_000"/>
     <memory_region name="tx_used_arp" size="0x200_000" page_size="0x200_000"/>
 
@@ -136,14 +136,14 @@
 
     </protection_domain>
 
-    <protection_domain name="uart_mux_tx" priority="96" pp="true" >
-        <program_image path="uart_mux_tx.elf" />
+    <protection_domain name="uart_virt_tx" priority="96" pp="true" >
+        <program_image path="uart_virt_tx.elf" />
 
-        <!-- shared memory for driver/mux ring buffer mechanism -->
+        <!-- shared memory for driver/virt ring buffer mechanism -->
         <map mr="tx_free_serial_drv" vaddr="0x4_400_000" perms="rw" cached="true" setvar_vaddr="tx_free_driver" />
         <map mr="tx_used_serial_drv" vaddr="0x4_600_000" perms="rw" cached="true" setvar_vaddr="tx_used_driver" />
 
-        <!-- shared memory for mux/client ring buffer mechanism -->
+        <!-- shared memory for virt/client ring buffer mechanism -->
         <map mr="tx_free_client" vaddr="0x3_400_000" perms="rw" cached="true" setvar_vaddr="tx_free_client" />
         <map mr="tx_used_client" vaddr="0x3_600_000" perms="rw" cached="true" setvar_vaddr="tx_used_client" />
 
@@ -153,14 +153,14 @@
 
     </protection_domain>            
 
-    <protection_domain name="uart_mux_rx" priority="95" pp="true" >
-        <program_image path="uart_mux_rx.elf" />
+    <protection_domain name="uart_virt_rx" priority="95" pp="true" >
+        <program_image path="uart_virt_rx.elf" />
 
-        <!-- shared memory for driver/mux ring buffer mechanism -->
+        <!-- shared memory for driver/virt ring buffer mechanism -->
         <map mr="rx_free_serial_drv" vaddr="0x4_000_000" perms="rw" cached="true" setvar_vaddr="rx_free_driver" />
         <map mr="rx_used_serial_drv" vaddr="0x4_200_000" perms="rw" cached="true" setvar_vaddr="rx_used_driver" />
 
-        <!-- shared memory for mux/client ring buffer mechanism -->
+        <!-- shared memory for virt/client ring buffer mechanism -->
         <map mr="rx_free_client" vaddr="0x4_800_000" perms="rw" cached="true" setvar_vaddr="rx_free_client" />
         <map mr="rx_used_client" vaddr="0x5_000_000" perms="rw" cached="true" setvar_vaddr="rx_used_client" />
 
@@ -195,18 +195,18 @@
         <setvar symbol="hw_ring_buffer_paddr" region_paddr="hw_ring_buffer" />
     </protection_domain>
 
-    <protection_domain name="eth_mux_rx" priority="99" pp="true">
-        <program_image path="eth_mux_rx.elf" />
-        <!-- shared memory for driver/mux ring buffer mechanism -->
+    <protection_domain name="eth_virt_rx" priority="99" pp="true">
+        <program_image path="eth_virt_rx.elf" />
+        <!-- shared memory for driver/virt ring buffer mechanism -->
         <map mr="rx_free_drv" vaddr="0x4_000_000" perms="rw" cached="true" setvar_vaddr="rx_free_drv" />
         <map mr="rx_used_drv" vaddr="0x4_200_000" perms="rw" cached="true" setvar_vaddr="rx_used_drv" />
 
-        <!-- shared memory for mux/client ring buffer mechanism -->
+        <!-- shared memory for virt/client ring buffer mechanism -->
         <map mr="rx_free_copy0" vaddr="0x3_000_000" perms="rw" cached="true" setvar_vaddr="rx_free_cli0" />
         <map mr="rx_used_copy0" vaddr="0x3_200_000" perms="rw" cached="true" setvar_vaddr="rx_used_cli0" />
         <map mr="rx_free_copy1" vaddr="0x3_400_000" perms="rw" cached="true" setvar_vaddr="rx_free_cli1" />
         <map mr="rx_used_copy1" vaddr="0x3_600_000" perms="rw" cached="true" setvar_vaddr="rx_used_cli1" />
-        <!-- shared memory for arp/rx_mux ring buffer mechanism -->
+        <!-- shared memory for arp/rx_virt ring buffer mechanism -->
         <map mr="rx_free_arp" vaddr="0x4_400_000" perms="rw" cached="true" setvar_vaddr="rx_free_arp" />
         <map mr="rx_used_arp" vaddr="0x4_600_000" perms="rw" cached="true" setvar_vaddr="rx_used_arp" />
 
@@ -219,10 +219,10 @@
     <protection_domain name="eth_copy0" priority="98" budget="20000">
         <program_image path="eth_copy.elf" />
         <map mr="shared_dma_rx_cli0" vaddr="0x2_800_000" perms="rw" cached="true" setvar_vaddr="shared_dma_vaddr_cli" />
-        <map mr="shared_dma_rx" vaddr="0x2_400_000" perms="r" cached="true" setvar_vaddr="shared_dma_vaddr_mux" />
+        <map mr="shared_dma_rx" vaddr="0x2_400_000" perms="r" cached="true" setvar_vaddr="shared_dma_vaddr_virt" />
 
-        <map mr="rx_free_copy0" vaddr="0x3_000_000" perms="rw" cached="true" setvar_vaddr="rx_free_mux" />
-        <map mr="rx_used_copy0" vaddr="0x3_200_000" perms="rw" cached="true" setvar_vaddr="rx_used_mux" />
+        <map mr="rx_free_copy0" vaddr="0x3_000_000" perms="rw" cached="true" setvar_vaddr="rx_free_virt" />
+        <map mr="rx_used_copy0" vaddr="0x3_200_000" perms="rw" cached="true" setvar_vaddr="rx_used_virt" />
 
         <map mr="rx_free_cli0" vaddr="0x4_000_000" perms="rw" cached="true" setvar_vaddr="rx_free_cli" />
         <map mr="rx_used_cli0" vaddr="0x4_200_000" perms="rw" cached="true" setvar_vaddr="rx_used_cli" />
@@ -233,10 +233,10 @@
     <protection_domain name="eth_copy1" priority="98" budget="20000">
         <program_image path="eth_copy.elf" />
         <map mr="shared_dma_rx_cli1" vaddr="0x2_200_000" perms="rw" cached="true" setvar_vaddr="shared_dma_vaddr_cli" />
-        <map mr="shared_dma_rx" vaddr="0x2_400_000" perms="r" cached="true" setvar_vaddr="shared_dma_vaddr_mux" />
+        <map mr="shared_dma_rx" vaddr="0x2_400_000" perms="r" cached="true" setvar_vaddr="shared_dma_vaddr_virt" />
 
-        <map mr="rx_free_copy1" vaddr="0x3_400_000" perms="rw" cached="true" setvar_vaddr="rx_free_mux" />
-        <map mr="rx_used_copy1" vaddr="0x3_600_000" perms="rw" cached="true" setvar_vaddr="rx_used_mux" />
+        <map mr="rx_free_copy1" vaddr="0x3_400_000" perms="rw" cached="true" setvar_vaddr="rx_free_virt" />
+        <map mr="rx_used_copy1" vaddr="0x3_600_000" perms="rw" cached="true" setvar_vaddr="rx_used_virt" />
 
         <map mr="rx_free_cli1" vaddr="0x4_000_000" perms="rw" cached="true" setvar_vaddr="rx_free_cli" />
         <map mr="rx_used_cli1" vaddr="0x4_200_000" perms="rw" cached="true" setvar_vaddr="rx_used_cli" />
@@ -244,19 +244,19 @@
         <map mr="uart" vaddr="0x5_000_000" perms="rw" cached="false" setvar_vaddr="uart_base" />
     </protection_domain>        
 
-    <protection_domain name="eth_mux_tx" priority="100" budget="20000">
-        <program_image path="eth_mux_tx.elf" />
-                    <!-- shared memory for driver/mux ring buffer mechanism -->
-        <!-- shared memory for driver/mux ring buffer mechanism -->
+    <protection_domain name="eth_virt_tx" priority="100" budget="20000">
+        <program_image path="eth_virt_tx.elf" />
+                    <!-- shared memory for driver/virt ring buffer mechanism -->
+        <!-- shared memory for driver/virt ring buffer mechanism -->
         <map mr="tx_free_drv" vaddr="0x4_400_000" perms="rw" cached="true" setvar_vaddr="tx_free_drv" />
         <map mr="tx_used_drv" vaddr="0x4_600_000" perms="rw" cached="true" setvar_vaddr="tx_used_drv" />
 
-        <!-- shared memory for mux/client ring buffer mechanism -->
+        <!-- shared memory for virt/client ring buffer mechanism -->
         <map mr="tx_free_cli0" vaddr="0x3_400_000" perms="rw" cached="true" setvar_vaddr="tx_free_cli0" />
         <map mr="tx_used_cli0" vaddr="0x3_600_000" perms="rw" cached="true" setvar_vaddr="tx_used_cli0" />
         <map mr="tx_free_cli1" vaddr="0x3_000_000" perms="rw" cached="true" setvar_vaddr="tx_free_cli1" />
         <map mr="tx_used_cli1" vaddr="0x3_200_000" perms="rw" cached="true" setvar_vaddr="tx_used_cli1" />
-        <!-- shared memory for arp/tx_mux ring buffer mechanism -->
+        <!-- shared memory for arp/tx_virt ring buffer mechanism -->
         <map mr="tx_free_arp" vaddr="0x5_200_000" perms="rw" cached="true" setvar_vaddr="tx_free_arp" />
         <map mr="tx_used_arp" vaddr="0x5_400_000" perms="rw" cached="true" setvar_vaddr="tx_used_arp" />
 
@@ -272,11 +272,11 @@
 
     <protection_domain name="arp" priority="98" budget="20000" pp="true">
         <program_image path="arp.elf" />
-        <!-- shared memory for arp/rx_mux ring buffer mechanism -->
+        <!-- shared memory for arp/rx_virt ring buffer mechanism -->
         <map mr="rx_free_arp" vaddr="0x4_400_000" perms="rw" cached="true" setvar_vaddr="rx_free" />
         <map mr="rx_used_arp" vaddr="0x4_600_000" perms="rw" cached="true" setvar_vaddr="rx_used" />
 
-        <!-- shared memory for arp/tx_mux ring buffer mechanism -->
+        <!-- shared memory for arp/tx_virt ring buffer mechanism -->
         <map mr="tx_free_arp" vaddr="0x5_200_000" perms="rw" cached="true" setvar_vaddr="tx_free" />
         <map mr="tx_used_arp" vaddr="0x5_400_000" perms="rw" cached="true" setvar_vaddr="tx_used" />
 
@@ -332,22 +332,22 @@
 
  <channel>
         <end pd="client" id="9"/>
-        <end pd="uart_mux_tx" id="1"/>
+        <end pd="uart_virt_tx" id="1"/>
     </channel>
 
     <channel>
         <end pd="uart" id="8"/>
-        <end pd="uart_mux_tx" id="9"/>
+        <end pd="uart_virt_tx" id="9"/>
     </channel>
 
    <channel>
         <end pd="client" id="11"/>
-        <end pd="uart_mux_rx" id="1"/>
+        <end pd="uart_virt_rx" id="1"/>
     </channel>
 
     <channel>
         <end pd="uart" id="10"/>
-        <end pd="uart_mux_rx" id="11"/>
+        <end pd="uart_virt_rx" id="11"/>
     </channel>
 
     <channel>
@@ -367,16 +367,16 @@
 
     <channel>
         <end pd="eth" id="3" />
-        <end pd="eth_mux_rx" id="3" />
+        <end pd="eth_virt_rx" id="3" />
     </channel>
 
     <channel>
-        <end pd="eth_mux_rx" id="0" />
+        <end pd="eth_virt_rx" id="0" />
         <end pd="eth_copy0" id="0" />
     </channel>
 
     <channel>
-        <end pd="eth_mux_rx" id="2" />
+        <end pd="eth_virt_rx" id="2" />
         <end pd="arp" id="0" />
     </channel>
 
@@ -386,22 +386,22 @@
     </channel>
 
     <channel>
-        <end pd="eth_mux_tx" id="3" />
+        <end pd="eth_virt_tx" id="3" />
         <end pd="eth" id="2" />
     </channel>
 
     <channel>
-        <end pd="eth_mux_tx" id="0" />
+        <end pd="eth_virt_tx" id="0" />
         <end pd="client" id="3" />
     </channel>
 
     <channel>
-        <end pd="eth_mux_tx" id="2" />
+        <end pd="eth_virt_tx" id="2" />
         <end pd="arp" id="1" />
     </channel>
 
     <channel>
-        <end pd="eth_mux_tx" id="4" />
+        <end pd="eth_virt_tx" id="4" />
         <end pd="timer" id="4" />
     </channel>
 
@@ -431,7 +431,7 @@
     </channel>
 
     <channel>
-        <end pd="eth_mux_tx" id="1" />
+        <end pd="eth_virt_tx" id="1" />
         <end pd="client1" id="3" />
     </channel>
 
@@ -446,7 +446,7 @@
     </channel>
 
     <channel>
-        <end pd="eth_mux_rx" id="1" />
+        <end pd="eth_virt_rx" id="1" />
         <end pd="eth_copy1" id="0" />
     </channel>
 

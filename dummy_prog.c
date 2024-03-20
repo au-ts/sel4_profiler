@@ -6,7 +6,6 @@
 #include "profiler.h"
 #include "util.h"
 #include "serial_server.h"
-#include "printf.h"
 
 #define PROFILER_CH_START 10
 #define PROFILER_CH_END 20

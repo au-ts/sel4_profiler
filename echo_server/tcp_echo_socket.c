@@ -22,10 +22,10 @@ static err_t lwip_tcp_sent_callback(void *arg, struct tcp_pcb *pcb, u16_t len)
 static err_t lwip_tcp_recv_callback(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err)
 {
     if (p == NULL) {
-        print("Closing conn\n");
+        sddf_printf("Closing conn\n");
         err = tcp_close(pcb);
         if (err) {
-            print("Error closing\n");
+            sddf_printf("Error closing\n");
         }
         return ERR_OK;
     }
@@ -36,7 +36,7 @@ static err_t lwip_tcp_recv_callback(void *arg, struct tcp_pcb *pcb, struct pbuf 
     if (err) {
         err = tcp_output(pcb);
         if (err) {
-            print("Message can't send\n");
+            sddf_printf("Message can't send\n");
         }
     }
 
@@ -52,24 +52,24 @@ void lwip_tcp_err_callback(void *arg, err_t err) {
 
     switch (err) {
         case ERR_RST:
-            print("Connection reset by peer\n");
+            sddf_printf("Connection reset by peer\n");
             struct pcb *tcp_pcb = (struct pcb*)arg;
             tcp_close(tcp_pcb);
             break;
         case ERR_ABRT:
-            print("Connection aborted\n");
+            sddf_printf("Connection aborted\n");
             break;
 
         default:
-            print("ERROR HAS OCCURED\n");
-            putC('\n');
+            sddf_printf("ERROR HAS OCCURED\n");
+            sddf_printf('\n');
 
     }
     
 }
 
 static err_t tcp_accept_callback(void *arg, struct tcp_pcb *pcb, err_t err) {
-    print("TCP CONNECTED\n");
+    sddf_printf("TCP CONNECTED\n");
 
     tcp_nagle_disable(pcb);
 

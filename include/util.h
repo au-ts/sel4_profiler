@@ -75,36 +75,3 @@ put8(uint8_t x)
     } while (x);
     microkit_dbg_puts(&tmp[i]);
 }
-
-static void _assert_fail(
-    const char  *assertion,
-    const char  *file,
-    unsigned int line,
-    const char  *function)
-{
-    microkit_dbg_puts("Failed assertion '");
-    microkit_dbg_puts(assertion);
-    microkit_dbg_puts("' at ");
-    microkit_dbg_puts(file);
-    microkit_dbg_puts(":");
-    put8(line);
-    microkit_dbg_puts(" in function ");
-    microkit_dbg_puts(function);
-    microkit_dbg_puts("\n");
-    while (1) {}
-}
-
-#ifdef NO_ASSERT
-
-#define assert(expr)
-
-#else
-
-#define assert(expr) \
-    do { \
-        if (!(expr)) { \
-            _assert_fail(#expr, __FILE__, __LINE__, __FUNCTION__); \
-        } \
-    } while(0)
-
-#endif

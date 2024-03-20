@@ -1,5 +1,6 @@
 {
     "files.associations": {
-        "pb_encode.h": "c"
+        "pb_encode.h": "c",
+        "printf.h": "c"
     }
 }
