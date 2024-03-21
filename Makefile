@@ -44,12 +44,11 @@ SDDF_INCLUDE=$(SDDF)/include/sddf
 LWIP=$(SDDF)/network/ipstacks/lwip/src
 NETWORK_RING_BUFFER=$(SDDF)/network/libethsharedringbuffer
 SDDF_NETWORK_COMPONENTS=$(SDDF)/network/components
-UTIL=$(SDDF)/util
-
-UART_COMPONENTS=$(SDDF)/serial/components
-UART_DRIVER=$(SDDF)/drivers/serial/$(SDDF_PLATFORM_DIR)
 ETHERNET_DRIVER=$(SDDF)/drivers/network/$(SDDF_PLATFORM_DIR)
 TIMER_DRIVER=$(SDDF)/drivers/clock/$(SDDF_PLATFORM_DIR)
+UTIL=$(SDDF)/util
+UART_COMPONENTS=$(SDDF)/serial/components
+UART_DRIVER=$(SDDF)/drivers/serial/$(SDDF_PLATFORM_DIR)
 
 UARTDIR=uart
 PROTOBUFDIR=protobuf
@@ -69,9 +68,6 @@ REPORT_FILE = $(BUILD_DIR)/report.txt
 CFLAGS += -I$(BOARD_DIR)/include \
 	-Iinclude	\
 	-I$(SDDF)/include \
-	-I$(SDDF)/util/include \
-	-I$(SDDF)/util/include/arch \
-	-I$(SDDF)/benchmark/include \
 	-I$(BOARD_DIR)/include/sys \
 	-I$(UART_DRIVER)/include \
 	-I$(LWIP)/include \

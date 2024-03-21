@@ -21,6 +21,7 @@
 #include "util.h"
 #include "client.h"
 #include "profiler_config.h"
+
 /* This file implements a TCP based profiler control process that starts
  * and stops the profiler based on a client's requests.
  * The protocol used to communicate is as follows:
@@ -107,7 +108,7 @@ static err_t netconn_recv_callback(void *arg, struct tcp_pcb *pcb, struct pbuf *
 
 static err_t netconn_accept_callback(void *arg, struct tcp_pcb *newpcb, err_t err)
 {
-    print("Netconn connection established!\n");
+    microkit_dbg_puts("Netconn connection established!\n");
     err_t error = tcp_write(newpcb, WHOAMI, strlen(WHOAMI), TCP_WRITE_FLAG_COPY);
     if (error) {
         print("Failed to send WHOAMI message through netconn peer\n");
@@ -171,6 +172,6 @@ int setup_netconn_socket(void)
         return -1;
     }
     tcp_accept(utiliz_socket, netconn_accept_callback);
-
+    microkit_dbg_puts("Setup netconn socket\n");
     return 0;
 }
