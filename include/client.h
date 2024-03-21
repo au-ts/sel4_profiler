@@ -9,10 +9,9 @@
 /* CLIENT CONFIG OPTIONS
     Specify how to dump sample buffers
     0 - Print over serial
-    1 - Use the xmodem protocol to send over serial
-    2 - Use netconn to control and send samples over the network
+    1 - Use netconn to control and send samples over the network
 */
-#define CLIENT_CONFIG 2
+#define CLIENT_CONFIG 1
 
 #define START_PMU 10
 #define STOP_PMU 20

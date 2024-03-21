@@ -112,10 +112,10 @@ static err_t eth_dump_callback(void *arg, struct tcp_pcb *pcb, uint16_t len)
         microkit_notify(30);
     } else if (!dequeue_used(&profiler_ring, &buffer)) {
 
-        // // Create a buffer for the sample
+        // Create a buffer for the sample
         uint8_t pb_buff[256];
 
-        // // Create a pb stream from the pb_buff
+        // Create a pb stream from the pb_buff
         pb_ostream_t stream = pb_ostream_from_buffer(pb_buff, sizeof(pb_buff));
 
         prof_sample_t *sample = (prof_sample_t *) buffer.phys_or_offset;
@@ -210,9 +210,9 @@ void eth_dump_start() {
 }
 
 void init() {
-    if (CLIENT_CONFIG == 0 || CLIENT_CONFIG == 1) {
+    if (CLIENT_CONFIG == 0) {
         init_serial();
-    } else if (CLIENT_CONFIG == 2) {
+    } else if (CLIENT_CONFIG == 1) {
         microkit_dbg_puts("initialising lwip\n");
         init_lwip();
     }
@@ -231,7 +231,7 @@ void notified(microkit_channel ch) {
         if (CLIENT_CONFIG == 0) {
             // Print over serial
             print_dump();
-        } else if (CLIENT_CONFIG == 2) {
+        } else if (CLIENT_CONFIG == 1) {
             // Send over TCP. Only start this if a dump is not already
             // in progress. If a dump isn't in progress, update state.
             if (client_state == CLIENT_IDLE) {
@@ -239,7 +239,7 @@ void notified(microkit_channel ch) {
                 eth_dump_start();
             }
         }
-    } else if(CLIENT_CONFIG == 2) {
+    } else if(CLIENT_CONFIG == 1) {
         // Getting a network interrupt
         notified_lwip(ch);
     } else if (ch == 11) {

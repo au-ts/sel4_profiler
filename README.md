@@ -78,7 +78,7 @@ The first thing the user must do is add a line of code to register a thread for 
 samples are recorded during that threads execution. The `threadId` is a user managed identification for the thread. You will have to maintain the appropriate mappings in `include/profiler_config.h` in order for the perf tools to function correctly.
 
 ## Controlling the profiler
-In the `include/config.h` file, there is a #define called `CLIENT_CONFIG`. Set this value to whatever control method that you wish to use. 0 is using serial, 2 is using the network controller. 
+In the `include/config.h` file, there is a #define called `CLIENT_CONFIG`. Set this value to whatever control method that you wish to use. 0 is using serial, 1 is using the network controller. 
 
 ### Serial Control
 - Using this profiler over serial will result in the raw json samples being dumped to terminal.
