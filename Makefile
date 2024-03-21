@@ -23,6 +23,11 @@ endif
 ifeq ($(MICROKIT_BOARD),maaxboard)
 SDDF_PLATFORM_DIR := imx
 SYSTEM_DESC := profiler_maaxboard.system
+CPU := cortex-a55
+else ifeq ($(MICROKIT_BOARD),odroidc4)
+SDDF_PLATFORM_DIR := meson
+SYSTEM_DESC := profiler_oc4.system
+CPU := cortex-a53
 endif
 
 TOOLCHAIN := aarch64-none-elf
@@ -39,7 +44,6 @@ SDDF_INCLUDE=$(SDDF)/include/sddf
 LWIP=$(SDDF)/network/ipstacks/lwip/src
 NETWORK_RING_BUFFER=$(SDDF)/network/libethsharedringbuffer
 SDDF_NETWORK_COMPONENTS=$(SDDF)/network/components
-NETWORK_COMPONENTS=network/components
 UTIL=$(SDDF)/util
 
 UART_COMPONENTS=$(SDDF)/serial/components

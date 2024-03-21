@@ -6,12 +6,12 @@
 #define NUM_CLIENTS 3
 
 #define ARP_NAME "arp"
-#define CLI0_NAME "client0"
+#define CLI0_NAME "prof_client"
 #define CLI1_NAME "client1"
-#define COPY0_NAME "copy0"
-#define COPY1_NAME "copy1"
-#define MUX_RX_NAME "mux_rx"
-#define MUX_TX_NAME "mux_tx"
+#define COPY0_NAME "eth_copy0"
+#define COPY1_NAME "eth_copy1"
+#define MUX_RX_NAME "eth_virt_rx"
+#define MUX_TX_NAME "eth_virt_tx"
 #define DRIVER_NAME "eth"
 
 #define DATA_REGION_SIZE                    0x200000
