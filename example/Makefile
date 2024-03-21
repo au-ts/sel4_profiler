@@ -4,9 +4,9 @@
 # SPDX-License-Identifier: BSD-2-Clause
 #
 
-ifeq ($(strip $(BUILD_DIR)),)
-$(error BUILD_DIR must be specified)
-endif
+
+BUILD_DIR ?= build
+MICROKIT_CONFIG ?= profile
 
 ifeq ($(strip $(MICROKIT_SDK)),)
 $(error MICROKIT_SDK must be specified)
@@ -16,19 +16,15 @@ ifeq ($(strip $(MICROKIT_BOARD)),)
 $(error MICROKIT_BOARD must be specified)
 endif
 
-ifeq ($(strip $(MICROKIT_CONFIG)),)
-$(error MICROKIT_CONFIG must be specified)
-endif
-
 ifeq ($(MICROKIT_BOARD),maaxboard)
 SDDF_PLATFORM_DIR := imx
-SYSTEM_DESC := profiler_maaxboard.system
 CPU := cortex-a55
 else ifeq ($(MICROKIT_BOARD),odroidc4)
 SDDF_PLATFORM_DIR := meson
-SYSTEM_DESC := profiler_oc4.system
 CPU := cortex-a53
 endif
+
+SYSTEM_DESC := board/$(MICROKIT_BOARD)/profiler.system
 
 TOOLCHAIN := aarch64-none-elf
 
@@ -39,7 +35,8 @@ LD := $(TOOLCHAIN)-ld
 AS := $(TOOLCHAIN)-as
 MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 
-SDDF=sDDF
+ROOTDIR=$(abspath ..)
+SDDF=$(ROOTDIR)/sDDF
 SDDF_INCLUDE=$(SDDF)/include/sddf
 LWIP=$(SDDF)/network/ipstacks/lwip/src
 NETWORK_RING_BUFFER=$(SDDF)/network/libethsharedringbuffer
@@ -50,11 +47,10 @@ UTIL=$(SDDF)/util
 UART_COMPONENTS=$(SDDF)/serial/components
 UART_DRIVER=$(SDDF)/drivers/serial/$(SDDF_PLATFORM_DIR)
 
-UARTDIR=uart
-PROTOBUFDIR=protobuf
+PROTOBUFDIR=$(ROOTDIR)/protobuf
 ECHODIR=echo_server
-PROFDIR=profiler
-
+PROFDIR=$(ROOTDIR)/profiler
+SERIALDIR=$(ROOTDIR)/serial
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 
 IMAGES := profiler.elf client.elf uart.elf uart_virt_rx.elf uart_virt_tx.elf eth.elf eth_virt_rx.elf eth_virt_tx.elf eth_copy.elf arp.elf timer.elf echo.elf dummy_prog.elf dummy_prog2.elf
@@ -66,14 +62,14 @@ IMAGE_FILE = $(BUILD_DIR)/loader.img
 REPORT_FILE = $(BUILD_DIR)/report.txt
 
 CFLAGS += -I$(BOARD_DIR)/include \
-	-Iinclude	\
+	-I$(ROOTDIR)/include	\
 	-I$(SDDF)/include \
 	-I$(BOARD_DIR)/include/sys \
 	-I$(UART_DRIVER)/include \
 	-I$(LWIP)/include \
 	-I$(LWIP)/include/ipv4 \
 	-I$(PROTOBUFDIR)/nanopb \
-	-Iinclude/ethernet_config \
+	-I$(ROOTDIR)/include/ethernet_config \
 	-DSERIAL_NUM_CLIENTS=1 \
 	-MD \
 	-MP
@@ -123,7 +119,7 @@ PROFILER_OBJS := $(PROFDIR)/profiler.o sddf_network_sharedringbuffer.o
 CLIENT_OBJS := $(PROFDIR)/client.o $(PROFDIR)/serial_server.o  sddf_network_sharedringbuffer.o  \
  $(PROF_LWIPFILES:.c=.o) $(PROFDIR)/lwip.o $(PROFDIR)/netconn_socket.o sddf_timer_client.o \
  $(PROTOBUFDIR)/nanopb/pmu_sample.pb.o $(PROTOBUFDIR)/nanopb/pb_common.o $(PROTOBUFDIR)/nanopb/pb_encode.o \
- serial/profiler_printf.o printf.o putchar_debug.o
+ $(SERIALDIR)/profiler_printf.o printf.o putchar_debug.o
 
 ECHO_OBJS := $(ECHO_LWIPFILES:.c=.o) $(ECHODIR)/lwip.o sddf_network_sharedringbuffer.o  \
 $(ECHODIR)/udp_echo_socket.o $(ECHODIR)/tcp_echo_socket.o printf.o putchar_serial.o \
