@@ -128,7 +128,7 @@ if __name__ == "__main__":
     parser.add_argument('--ip', dest='client_ip', required='true', help='IP address of the target system')
     parser.add_argument('--port', dest='client_port', required='true', help='Port of the target system',
                         type=int)
-    parser.add_argument('--output', dest='output', help='Port of the target system',
+    parser.add_argument('--output', dest='output', help='File to output sample data to',
                         default="samples.json")
     args = parser.parse_args()
 
