@@ -129,7 +129,8 @@
         <map mr="shared_dma_tx_drv" vaddr="0x2_200_000" perms="rw" cached="true" />
         <map mr="shared_dma_rx_drv" vaddr="0x2_600_000" perms="rw" cached="true" />
         
-        <irq irq="59" id="1" /> <!-- Serial Interrupt (I think - serial@30890000)-->
+         <!-- UART interrupt -->
+        <irq irq="225" id="1" trigger="edge" />
 
     </protection_domain>
 

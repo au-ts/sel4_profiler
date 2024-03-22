@@ -86,33 +86,49 @@ void putchar_(char character)
 char get_char() {
     struct serial_server *local_server = &client_serial_server;
 
+    // Notify the driver that we want to get a character. In Patrick's design, this increments 
+    // the chars_for_clients value.
+    microkit_notify(SERVER_GETCHAR_CHANNEL);
+
+    /* Now that we have notified the driver, we can attempt to dequeue from the active queue.
+    When the driver has processed an interrupt, it will add the inputted character to the active queue.*/
+    
+    // Address that we will pass to dequeue to store the buffer address
     uintptr_t buffer = 0;
+
+    // Integer to store the length of the buffer
     unsigned int buffer_len = 0; 
 
-    int err = serial_dequeue_active(&local_server->rx_queue, &buffer, &buffer_len);
-
-    if (err != 0) {
-        microkit_dbg_puts(microkit_name);
-        microkit_dbg_puts(": getchar - unable to dequeue from used ring\n");
-        return 0;
+    while (serial_dequeue_active(&local_server->rx_queue, &buffer, &buffer_len) != 0) {
+        /* The queue is currently empty, as there is no character to get. 
+        We will spin here until we have gotten a character. As the driver is a higher priority than us, 
+        it should be able to pre-empt this loop
+        */
+        microkit_dbg_puts(""); /* From Patrick, this is apparently needed to stop the compiler from optimising out the 
+        as it is currently empty. When compiled in a release version the puts statement will be compiled
+        into a nop command.
+        */
     }
 
-    // We are only getting one character at a time, so we just need to cast the buffer to an char
+    // We are only getting one character at a time, so we just need to cast the buffer to an int
     char got_char = *((char *) buffer);
 
-    /* Now that we are finished with the used buffer, we can add it back to the free ring*/
+    /* Now that we are finished with the active buffer, we can add it back to the free queue*/
     int ret = serial_enqueue_free(&local_server->rx_queue, buffer, buffer_len);
 
     if (ret != 0) {
         microkit_dbg_puts(microkit_name);
-        microkit_dbg_puts(": getchar - unable to enqueue used buffer back into free ring\n");
+        microkit_dbg_puts(": getchar - unable to enqueue active buffer back into available queue\n");
     }
 
+
+    microkit_dbg_puts("We got a char in serial server\n");
     return got_char;
 }
 
 // Init function required by microkit, initialise serial datastructres for server here
 void init_serial(void) {
+    microkit_dbg_puts("Init serial\n");
     // Here we need to init ring buffers and other data structures
     microkit_dbg_puts("Initialising serial in serial server\n");
     struct serial_server *local_server = &client_serial_server;
