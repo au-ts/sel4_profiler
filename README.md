@@ -19,7 +19,7 @@ TO-DO:
 
 # Installation
 
-- We require a special kernel configuration. The kernel version can be found at: https://github.com/Kswin01/seL4/tree/Microkit-dev-profiler-irq.
+- We require a special kernel configuration. The kernel version can be found at: https://github.com/Kswin01/seL4/tree/microkit-dev-profiler-irq.
 - We have tested with this version of Microkit: https://github.com/Kswin01/sel4cp/tree/microkit_prof_dev.
 
 # Building example
