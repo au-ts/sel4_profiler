@@ -27,8 +27,6 @@
     <memory_region name="profiler_ring_used" size="0x200_000" page_size="0x200_000"/>
     <memory_region name="profiler_mem" size="0x1_000_000" page_size="0x200_000"/>
 
-    <memory_region name="profiler_control" size="0x1_000" page_size="0x1_000"/>
-
     <!-- Ethernet mmemory regions -->
     <memory_region name="hw_ring_buffer" size="0x10_000" />
     <memory_region name="rx_buffer_data_region" size="0x200_000" page_size="0x200_000" />
@@ -76,7 +74,6 @@
         <map mr="uart" vaddr="0x5_000_000" perms="rw" cached="false" setvar_vaddr="uart_base" />
         
         <map mr="log_buffer" vaddr="0x4_000_000" perms="rw" cached="false" setvar_vaddr="log_buffer" />
-        <map mr="profiler_control" vaddr="0x3_800_000" perms="rw" cached="false" setvar_vaddr="profiler_control"/>
             <!-- shared memory for profiler ring buffer mechanism -->
         <map mr="profiler_ring_free" vaddr="0x8_000_000" perms="rw" cached="true" setvar_vaddr="profiler_ring_free" />
         <map mr="profiler_ring_used" vaddr="0x8_200_000" perms="rw" cached="true" setvar_vaddr="profiler_ring_used" />
@@ -85,7 +82,7 @@
         <irq irq="169" id="21" /> <!-- PMU interrupt -->
     </protection_domain>
 
-    <!-- THIS IS THE SYSTEM WE ARE PROFILING AS CHILD PROTECTION DOMAINS -->
+    <!-- THIS IS THE SYSTEM WE ARE PROFILING -->
 
     <protection_domain name="client1" priority="94" budget="20000">
         <program_image path="echo.elf" />
@@ -104,7 +101,6 @@
 
     <protection_domain name="dummy_prog" priority="50">
         <program_image path="dummy_prog.elf"/>
-            <map mr="profiler_control" vaddr="0x3_800_000" perms="rw" cached="false" setvar_vaddr="profiler_control"/>
     </protection_domain>
 
     <protection_domain name="dummy_prog2" priority="50">

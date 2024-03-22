@@ -7,11 +7,6 @@
 #include "util.h"
 #include "serial_server.h"
 
-#define PROFILER_CH_START 10
-#define PROFILER_CH_END 20
-
-uintptr_t profiler_control;
-
 void endless_loop() {
     uint64_t i = 0;
     int ticker = 0;

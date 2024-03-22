@@ -72,11 +72,6 @@ A demo system can be found in the `example` directory. This includes a TCP echo 
 
 # How to use
 
-## Registering a thread for profiling
-The first thing the user must do is add a line of code to register a thread for profiling. This is provided through the 
-`seL4_ProfilerRegisterThread(int threadId)` syscall. This sets a value within the threads TCB to ensure that 
-samples are recorded during that threads execution. The `threadId` is a user managed identification for the thread. You will have to maintain the appropriate mappings in `include/profiler_config.h` in order for the perf tools to function correctly.
-
 ## Controlling the profiler
 In the `include/config.h` file, there is a #define called `CLIENT_CONFIG`. Set this value to whatever control method that you wish to use. 0 is using serial, 1 is using the network controller. 
 
@@ -90,25 +85,6 @@ This works on the `odroidc4` and `maaxboard`. Ensure that the Makefile is change
 
 ### Network Control
 More details can be found in the `netconn` directory.
-
-## Configuring the PMU
-In the `profiler/profiler.c` `void init()` function, you can add calls to configure certain counters. The function to configure event counters is as follows:
-```
-void configure_eventcnt(int cntr, uint32_t event, uint64_t val, bool sampling)
-```
-
-For example:
-
-```C
-    /* Configures the cycle counter to sample on the period CYCLE_COUNTER_PERIOD. The 1 denotes that we are going to sample on the cycle counter. */
-
-    configure_clkcnt(CYCLE_COUNTER_PERIOD, 1);
-
-    /* Configures event counter 0 to count on L1 Data Cache accesses. Set the period to 16, and denote that we are going to sample on this counter. */
-    configure_eventcnt(EVENT_CTR_0, L1D_CACHE, 16, 1);
-```
-
-The list of available events and counters can be found in `include/profiler.h`.
 
 ## Converting to Perf
 The serial control will output the raw JSON samples. The `netconn` tool will output the correctly formatted JSON file. Please see the `toperf/` directory for more information on using the `toperf` tool.

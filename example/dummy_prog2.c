@@ -7,9 +7,6 @@
 #include "util.h"
 #include "serial_server.h"
 
-
-uintptr_t profiler_control;
-
 void big_loop() {
     for (int i = 0; i < 9999999999999; i++) {
         i = i;
