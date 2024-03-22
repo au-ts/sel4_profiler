@@ -13,7 +13,6 @@ from google.protobuf.json_format import MessageToJson
 # To track if we have sent a message, to ensure json format is correct
 first_msg = 0
 stop_recv = 0
-thread_spawned = 0
 
 class ProfilerClient:
     """
@@ -115,17 +114,13 @@ class ProfilerClient:
         self.recv_thread = threading.Thread(target=self.recv_samples_thread, args=())
         self.recv_thread.daemon = True
         self.recv_thread.start()
-        global thread_spawned
-        thread_spawned = 1
 
     def stop_samples(self):
         global stop_recv
         stop_recv = 1
         # Check that a thread has actually been created
-        global thread_spawned
-        if thread_spawned == 1:
+        if self.recv_thread is not None:
             self.recv_thread.join()
-            thread_spawned = 0
 
 
 if __name__ == "__main__":
