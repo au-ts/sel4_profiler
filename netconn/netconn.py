@@ -35,7 +35,6 @@ class ProfilerClient:
         Params:
             cmd: Command to send
         """
-        print("[send_command] : " + cmd)
         self.socket.send((cmd + "\n").encode('utf-8'))
 
     def get_mappings(self):
@@ -44,17 +43,21 @@ class ProfilerClient:
         """
         self.send_command("MAPPINGS")
         self.output.write("{\n")
-        self.output.write("\"pd_mappings\": {\n")
+        self.output.write("\"elf_tcb_mappings\": {\n")
         data = self.socket.recv(4096).decode()
         print(str(data))
         lines = str(data).split("\n")
-        for line in lines:
-            content = line.split(":")
-            self.output.write(f"\"{content[0]}\": {content[1]},\n")
+        for i in range(0, len(lines)):
+            content = lines[i].split(":")
+            self.output.write(f"\"{content[0]}\": {content[1]}")
+            if (i == len(lines) - 1):
+                self.output.write("\n")
+            else:
+                self.output.write(",\n") 
         self.output.write("}")
     def connect(self):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
+        self.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         try:
             self.socket.connect((self.hostname, self.port))
         except OSError:
@@ -76,11 +79,6 @@ class ProfilerClient:
                 # for the size len
                 raw_len = self.socket.recv(2).decode()
                 len = int(raw_len)
-                # int_len = int.from_bytes(raw_len, 'little')
-                # len = socket.ntohl(int_len)
-                # dataToRead = struct.unpack("L", self.socket.recv(8))[0]    
-                # print(f"This is int_len: {int_len}")
-                # print(f"This is len: {len}")
                 global first_msg
                 if (first_msg == 1):
                     self.output.write(",")
@@ -96,10 +94,15 @@ class ProfilerClient:
 
             except socket.error:
                 global stop_recv
-                if stop_recv:
+                if stop_recv == 1:
+                    # If we have been given a command to stop, refresh socket to 
+                    # get any remaining buffers from the profiler before terminating
+                    # this thread.
+                    stop_recv = 2
+                    self.send_command("REFRESH")
+                elif stop_recv == 2:
                     break
                 else:
-                    print("No data on socket")
                     # Dummy command to refresh socket
                     self.send_command("REFRESH")
 
@@ -115,8 +118,9 @@ class ProfilerClient:
     def stop_samples(self):
         global stop_recv
         stop_recv = 1
-        # time.sleep(10)
-        self.recv_thread.join()
+        # Check that a thread has actually been created
+        if self.recv_thread is not None:
+            self.recv_thread.join()
 
 
 if __name__ == "__main__":
@@ -145,11 +149,8 @@ if __name__ == "__main__":
         elif user_input == "START":
             if client.socket is not None:
                 client.send_command("START")
-                # TODO: Start this in a seperate thread
-                # recvThread = threading.Thread(target=client.recv_samples, args=(f))
-
                 client.recv_samples()
-                # recvThread.start()
+                print("Started profiling!")
             else:
                 print("ERROR: attempted START command before CONNECT command called")
 
@@ -157,16 +158,20 @@ if __name__ == "__main__":
             if client.socket is not None:
                 # Stop the recv thread and close file descriptor
                 client.send_command("STOP")
+                client.send_command("REFRESH")
                 client.stop_samples()
+                print("Stopped profiling!")
             else:
                 print("ERROR: attempted STOP command before CONNECT command called")
 
         elif user_input == "EXIT":
             if client.socket is not None:
                 client.send_command("STOP")
+                client.send_command("REFRESH")
                 client.stop_samples()
                 client.output.write("]\n}\n")
                 client.output.close()
+                print("Finished profiling, exiting netconn tool")
             exit(0)
 
         else:

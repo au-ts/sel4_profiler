@@ -16,8 +16,9 @@ typedef struct _pmu_sample {
     uint64_t time;
     uint32_t cpu;
     uint64_t period;
+    uint64_t nr;
     pb_size_t ips_count;
-    uint64_t ips[4];
+    uint64_t ips[16];
 } pmu_sample;
 
 
@@ -26,8 +27,8 @@ extern "C" {
 #endif
 
 /* Initializer values for message structs */
-#define pmu_sample_init_default                  {0, 0, 0, 0, 0, 0, {0, 0, 0, 0}}
-#define pmu_sample_init_zero                     {0, 0, 0, 0, 0, 0, {0, 0, 0, 0}}
+#define pmu_sample_init_default                  {0, 0, 0, 0, 0, 0, 0, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}}
+#define pmu_sample_init_zero                     {0, 0, 0, 0, 0, 0, 0, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}}
 
 /* Field tags (for use in manual encoding/decoding) */
 #define pmu_sample_ip_tag                        1
@@ -35,7 +36,8 @@ extern "C" {
 #define pmu_sample_time_tag                      3
 #define pmu_sample_cpu_tag                       4
 #define pmu_sample_period_tag                    5
-#define pmu_sample_ips_tag                       6
+#define pmu_sample_nr_tag                        6
+#define pmu_sample_ips_tag                       7
 
 /* Struct field encoding specification for nanopb */
 #define pmu_sample_FIELDLIST(X, a) \
@@ -44,7 +46,8 @@ X(a, STATIC,   SINGULAR, UINT32,   pid,               2) \
 X(a, STATIC,   SINGULAR, UINT64,   time,              3) \
 X(a, STATIC,   SINGULAR, UINT32,   cpu,               4) \
 X(a, STATIC,   SINGULAR, UINT64,   period,            5) \
-X(a, STATIC,   REPEATED, UINT64,   ips,               6)
+X(a, STATIC,   SINGULAR, UINT64,   nr,                6) \
+X(a, STATIC,   REPEATED, UINT64,   ips,               7)
 #define pmu_sample_CALLBACK NULL
 #define pmu_sample_DEFAULT NULL
 
@@ -55,7 +58,7 @@ extern const pb_msgdesc_t pmu_sample_msg;
 
 /* Maximum encoded size of messages (where known) */
 #define PROTOBUF_PMU_SAMPLE_PB_H_MAX_SIZE        pmu_sample_size
-#define pmu_sample_size                          89
+#define pmu_sample_size                          232
 
 #ifdef __cplusplus
 } /* extern "C" */

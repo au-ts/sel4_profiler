@@ -4,7 +4,7 @@
  */
 
 #include <stdint.h>
-#include "util.h"
+#include <sddf/util/printf.h>
 
 typedef  uint8_t  u8_t;
 typedef uint16_t u16_t;
@@ -54,20 +54,18 @@ typedef uintptr_t mem_ptr_t;
 #define LWIP_PLATFORM_HTONL(x) ( (((u32_t)(x))>>24) | (((x)&0xFF0000)>>8) \
                                | (((x)&0xFF00)<<8) | (((x)&0xFF)<<24) )
 
-#include <stdio.h>
-#include <stdlib.h>
+typedef unsigned long long ssize_t;
 
 #define LWIP_RAND                       rand
 
 /* Plaform specific diagnostic output */
 #define LWIP_PLATFORM_DIAG(x)           \
         do {                            \
-            print("lwIP error\n");         \
+            sddf_printf x ;\
         } while(0)
 
-#define LWIP_PLATFORM_ASSERT(x)                                 \
+#define LWIP_PLATFORM_ASSERT(x) \
         do {                                                    \
-            print("Assertion failed\n");               \
+            sddf_printf("Assertion failed: %s\n", #x);              \
             while(1);                                           \
         } while(0)
-

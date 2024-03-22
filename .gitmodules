@@ -1,0 +1,3 @@
+[submodule "sDDF"]
+	path = sDDF
+	url = git@github.com:au-ts/sDDF.git

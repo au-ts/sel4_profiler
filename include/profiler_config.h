@@ -1,33 +1,23 @@
 #pragma once
 
+#include "profiler.h"
+
 /* ----- THE FOLLOWING DEFINES ARE FOR CONFIGURING THE PROFILER ------*/
 
-/* CHANGE THIS VALUE TO CHANGE WHAT PD TO TRACK (WE NEED TO ACCESS THE TCB OF
-A PD TO TRACK PC) */
-#define PD_ID 0
+// TODO: NEED TO HAVE A BETTER WAY OF INJECTING THE MAPPINGS FROM THE SYSTEM DESCRIPTION
 
+/*
+    This is the string that maintains the mapping between profiler id's and elf names.
+    The profiler id is the value with which you make the the seL4_ProfilerRegisterThread(id) syscall.
 
-/* For each counter, set IRQ to 1 to sample on counter, or 0 to not.
+    Please change this string when adding processes to profile. Use the following structure:
 
-If 1 is set, ALSO set the appropriate sampling period. */
+    "<elf_name>: <profiling_id>\n
+    <elf_name>: <profiling_id"
 
-#define IRQ_CYCLE_COUNTER 1
-#define CYCLE_COUNTER_PERIOD 1200000
+    NOTE: Seperate pairs with new lines.
+*/  
 
-#define IRQ_COUNTER0 0
-#define COUNTER0_PERIOD 0
+#define MAPPINGS_STR "echo.elf: 52\ndummy_prog.elf: 1\ndummy_prog2.elf: 2"
 
-#define IRQ_COUNTER1 0
-#define COUNTER1_PERIOD 120
-
-#define IRQ_COUNTER2 0
-#define COUNTER2_PERIOD 1200
-
-#define IRQ_COUNTER3 0
-#define COUNTER3_PERIOD 0
-
-#define IRQ_COUNTER4 0
-#define COUNTER4_PERIOD 0
-
-#define IRQ_COUNTER5 0
-#define COUNTER5_PERIOD 0
+#define CYCLE_COUNTER_PERIOD 1.3e4

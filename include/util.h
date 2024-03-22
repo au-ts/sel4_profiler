@@ -54,7 +54,7 @@ puthex64(uint64_t val)
         buffer[i] = hexchar(val & 0xf);
         val >>= 4;
     }
-    print(buffer);
+    microkit_dbg_puts(buffer);
 }
 
 static char
@@ -73,38 +73,5 @@ put8(uint8_t x)
         tmp[--i] = decchar(c);
         x /= 10;
     } while (x);
-    print(&tmp[i]);
+    microkit_dbg_puts(&tmp[i]);
 }
-
-static void _assert_fail(
-    const char  *assertion,
-    const char  *file,
-    unsigned int line,
-    const char  *function)
-{
-    print("Failed assertion '");
-    print(assertion);
-    print("' at ");
-    print(file);
-    print(":");
-    put8(line);
-    print(" in function ");
-    print(function);
-    print("\n");
-    while (1) {}
-}
-
-#ifdef NO_ASSERT
-
-#define assert(expr)
-
-#else
-
-#define assert(expr) \
-    do { \
-        if (!(expr)) { \
-            _assert_fail(#expr, __FILE__, __LINE__, __FUNCTION__); \
-        } \
-    } while(0)
-
-#endif

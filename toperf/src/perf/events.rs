@@ -106,16 +106,16 @@ impl SampleEvent {
 
         // TODO: check that sample.ips.len matches CALL_STACK_DEPTH
         let callchain = SampleIpCallchain {
-            nr: sample.ips.len() as u64,
+            nr: sample.nr,
             ips: sample.ips,
         };
 
         SampleEvent {
             header,
             ip: sample.ip,
-            pid: sample.pd,
-            tid: sample.pd,
-            time: sample.timestamp,
+            pid: sample.pid,
+            tid: sample.pid,
+            time: sample.time,
             cpu: sample.cpu,
             period: sample.period,
             callchain: callchain,

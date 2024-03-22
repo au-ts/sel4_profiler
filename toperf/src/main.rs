@@ -4,6 +4,8 @@ use toperf::{perf::PerfFile, sample_parser};
 
 use clap::Parser;
 
+use std::process;
+
 #[derive(Parser, Debug)]
 struct Args {
     /// Path to the output perf data file
@@ -36,10 +38,16 @@ fn main() -> std::io::Result<()> {
     for (application, pid) in samples_file.elf_tcb_mappings {
         let elf_path_name = format!("{build_dir}/{application}");
         let elf_path = Path::new(&elf_path_name);
+        // Check if elf path exists
+        if !elf_path.exists() {
+            println!("Elf path: {elf_path_name} does not exist!");
+            process::exit(1);        
+        }
 
         let filename = elf_path.file_name().unwrap().to_str().unwrap();
+
         perf_file.create_comm_event(pid, filename);
-        perf_file.create_mmap_event(pid, &application);
+        perf_file.create_mmap_event(pid, &elf_path_name);
     }
 
     for sample in samples_file.samples {
