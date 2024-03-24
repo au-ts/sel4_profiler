@@ -313,10 +313,7 @@ void init () {
     }
 
     #ifdef CONFIG_PROFILER_ENABLE
-    microkit_dbg_puts("Attempting to enable profiler!\n");
     int res_buf = seL4_BenchmarkSetLogBuffer(log_buffer);
-    microkit_dbg_puts("Finished syscall\n");
-
     if (res_buf) {
         microkit_dbg_puts("Could not set log buffer");
         puthex64(res_buf);

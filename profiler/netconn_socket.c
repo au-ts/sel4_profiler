@@ -172,6 +172,5 @@ int setup_netconn_socket(void)
         return -1;
     }
     tcp_accept(utiliz_socket, netconn_accept_callback);
-    microkit_dbg_puts("Setup netconn socket\n");
     return 0;
 }

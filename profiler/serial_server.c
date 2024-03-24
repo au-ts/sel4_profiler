@@ -128,9 +128,7 @@ char get_char() {
 
 // Init function required by microkit, initialise serial datastructres for server here
 void init_serial(void) {
-    microkit_dbg_puts("Init serial\n");
     // Here we need to init ring buffers and other data structures
-    microkit_dbg_puts("Initialising serial in serial server\n");
     struct serial_server *local_server = &client_serial_server;
     
     // Init the shared ring buffers
