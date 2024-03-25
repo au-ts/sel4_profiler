@@ -36,50 +36,68 @@ Additionally, there are the following channels that can be used to control the p
 The profiler PD is responsible for formatting the sampling data in a generic format. It is the
 responsibility of another user-program to consume that data and do I/O in order to analyse the data.
 
-This project supplies a default `client` PD which is setup to consume the data using the [seL4 Device Driver Framework](https://github.com/au-ts/sddf.git).
+This project supplies a default `client` PD which is setup to consume the data using the
+[seL4 Device Driver Framework](https://github.com/au-ts/sddf.git).
 
 The supplied client can convert the profiling sample data to be transferred over the following devices:
 * serial
 * ethernet
 
-It makes use of sDDF sub-systems to transfer the data in a standardised way. This means that the profiler client is a client of the particular sub-system, just like any other PD's that may utilise the sub-system.
+It makes use of sDDF sub-systems to transfer the data in a standardised way. This means that the profiler
+client is a client of the particular sub-system, just like any other PD's that may utilise the sub-system.
 
 ### Connecting profiler to client
 
-Firstly, the profiler requires a memory region in which it stores sample data. These are: `profiler_ring_free`, `profiler_ring_used`, `profiler_mem`. These memory regions must also be mapped into the client.
+Firstly, the profiler requires a memory region in which it stores sample data. These are:
+`profiler_ring_free`, `profiler_ring_used`, `profiler_mem`. These memory regions must also be mapped
+into the client.
 
-The profiler also requires several channels between itself and the client. The aforementioned control channels, being 10, 20, 30. Additionally, the channel 5 is used for the profiler to signal to the client that its buffer's need emptying. When the buffers are full, the profiler will halt the PMU until it receives a resume (30) signal from the client.
+The profiler also requires several channels between itself and the client. The aforementioned control
+channels, being 10, 20, 30. Additionally, the channel 5 is used for the profiler to signal to the client
+that its buffer's need emptying. When the buffers are full, the profiler will halt the PMU until it
+receives a resume (30) signal from the client.
 
 ### Connecting client to subsystems
 
-The supplied client must be connected to the virtualizers of the needed subsystem. They need to be connected in the same manner as any other client in the system.
+The supplied client must be connected to the virtualizers of the needed subsystem. They need to be
+connected in the same manner as any other client in the system.
 
-To connect to the different subsystems, map in the appropriate memory regions as well as create the necessary channels. For the networking subsystem, the user must also create/modify the `ethernet_config.h`. This is used to setup the correct memory regions for all the clients, as well as MAC addresses. 
+To connect to the different subsystems, map in the appropriate memory regions as well as create the
+necessary channels. For the networking subsystem, the user must also create/modify the `ethernet_config.h`.
+This is used to setup the correct memory regions for all the clients, as well as MAC addresses. 
 
-For an example of how to do this, please reference either the example system in `example/` or in the [sDDF examples](https://github.com/au-ts/sDDF/tree/main/examples).
+For an example of how to do this, please reference either the example system in `example/` or in the
+[sDDF examples](https://github.com/au-ts/sDDF/tree/main/examples).
 
 ### Supplying your own client
 
-However, the user can supply their own `client` PD depending on their needs. They will need to follow the same processes as above in respect to connecting the profiler and client. 
+However, the user can supply their own `client` PD depending on their needs. They will need to follow
+the same processes as above in respect to connecting the profiler and client. 
 
 An example of how all of these components are connected can be found in `example/board/<odroidc4/maaxboard>`.
 
 ## Kernel Log Buffer
 
-The profiler will need to be able to map in a shared memory region with the kernel, known as the kernel log buffer. This memory region must be of 2MiB in size, and of a Large page size. Please include the following if building using Microkit:
+The profiler will need to be able to map in a shared memory region with the kernel, known as the kernel
+log buffer. This memory region must be of 2MiB in size, and of a Large page size. Please include the
+following if building using Microkit:
 ```xml
     <memory_region name="log_buffer" size="0x200_000" page_size="0x200_000"/>
 ```
 
 ## Registering a thread for profiling
 
-The first thing the user must do is add a line of code to register a thread for profiling. This is provided through the
-`seL4_ProfilerRegisterThread(int threadId)` system call. This sets a value within the threads TCB to ensure that
-samples are recorded during that threads execution. The `threadId` is a user managed identification for the thread. You will have to maintain the appropriate mappings in `include/profiler_config.h` in order for the `perf` tools to function correctly.
+The first thing the user must do is add a line of code to register a thread for profiling. This is
+provided through the `seL4_ProfilerRegisterThread(int threadId)` system call. This sets a value
+within the threads TCB to ensure that samples are recorded during that threads execution. The
+`threadId` is a user managed identification for the thread. You will have to maintain the
+appropriate mappings in `include/profiler_config.h` in order for the `perf` tools to function
+correctly.
 
 ## Configuring the PMU
 
-In the `profiler/profiler.c` `void init()` function, you can add calls to configure certain counters. The function to configure event counters is as follows:
+In the `profiler/profiler.c` `void init()` function, you can add calls to configure certain counters.
+The function to configure event counters is as follows:
 ```c
 void configure_eventcnt(int cntr, uint32_t event, uint64_t val, bool sampling)
 ```
@@ -87,11 +105,13 @@ void configure_eventcnt(int cntr, uint32_t event, uint64_t val, bool sampling)
 For example:
 
 ```C
-    /* Configures the cycle counter to sample on the period CYCLE_COUNTER_PERIOD. The 1 denotes that we are going to sample on the cycle counter. */
+    /* Configures the cycle counter to sample on the period CYCLE_COUNTER_PERIOD. The 1 denotes
+    that we are going to sample on the cycle counter. */
 
     configure_clkcnt(CYCLE_COUNTER_PERIOD, 1);
 
-    /* Configures event counter 0 to count on L1 Data Cache accesses. Set the period to 16, and denote that we are going to sample on this counter. */
+    /* Configures event counter 0 to count on L1 Data Cache accesses. Set the period to 16, and
+    denote that we are going to sample on this counter. */
     configure_eventcnt(EVENT_CTR_0, L1D_CACHE, 16, 1);
 ```
 
