@@ -80,7 +80,7 @@
 
 /* Debugging options */
 #define LWIP_DEBUG
-/* Change this to LWIP_DBG_LEVEL_ALL to see a trace 
+/* Change this to LWIP_DBG_LEVEL_ALL to see a trace
 #define LWIP_DBG_MIN_LEVEL              LWIP_DBG_LEVEL_WARNING
 
 #define DHCP_DEBUG                      LWIP_DBG_OFF

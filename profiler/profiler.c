@@ -114,7 +114,7 @@ void configure_cnt5(uint32_t event, uint32_t val) {
 }
 
 void reset_pmu() {
-    // Loop through the pmu registers, if the overflown flag has been set, 
+    // Loop through the pmu registers, if the overflown flag has been set,
     // and we are sampling on this register, reset to max value - count.
     // Otherwise, reset to 0.
     for (int i = 0; i < PMU_NUM_REGS - 1; i++) {
@@ -164,7 +164,7 @@ void configure_eventcnt(int cntr, uint32_t event, uint64_t val, bool sampling) {
 }
 
 /* Add a snapshot of the cycle and event registers to the array. This array needs to become a ring buffer. */
-void add_sample(microkit_id id, uint32_t time, uint64_t pc, uint64_t nr, uint32_t irqFlag, uint64_t *cc, uint64_t period) {    
+void add_sample(microkit_id id, uint32_t time, uint64_t pc, uint64_t nr, uint32_t irqFlag, uint64_t *cc, uint64_t period) {
 
     buff_desc_t buffer;
     int ret = dequeue_free(&profiler_ring, &buffer);
@@ -175,7 +175,7 @@ void add_sample(microkit_id id, uint32_t time, uint64_t pc, uint64_t nr, uint32_
     }
 
     prof_sample_t *temp_sample = (prof_sample_t *) buffer.phys_or_offset;
-    
+
     // Find which counter overflowed, and the corresponding period
 
     temp_sample->ip = pc;
@@ -188,7 +188,7 @@ void add_sample(microkit_id id, uint32_t time, uint64_t pc, uint64_t nr, uint32_
         temp_sample->ips[i] = 0;
         temp_sample->ips[i] = cc[i];
     }
-    
+
     ret = enqueue_used(&profiler_ring, buffer);
 
     if (ret != 0) {
@@ -298,13 +298,13 @@ void init () {
 
     // Init the record buffers
     ring_init(&profiler_ring, (ring_buffer_t *) profiler_ring_free, (ring_buffer_t *) profiler_ring_used, 512);
-    
+
     for (int i = 0; i < NUM_BUFFERS - 1; i++) {
         buff_desc_t buffer;
         buffer.phys_or_offset = profiler_mem + (i * sizeof(prof_sample_t));
         buffer.len = sizeof(prof_sample_t);
         int ret = enqueue_free(&profiler_ring, buffer);
-        
+
         if (ret != 0) {
             microkit_dbg_puts(microkit_name);
             microkit_dbg_puts("Failed to populate buffers for the perf record ring buffer\n");
@@ -317,16 +317,16 @@ void init () {
     if (res_buf) {
         microkit_dbg_puts("Could not set log buffer");
         puthex64(res_buf);
-    } 
+    }
     #endif
 
     init_pmu_regs();
 
     /* INITIALISE WHAT COUNTERS WE WANT TO TRACK IN HERE */
-    
+
     configure_clkcnt(CYCLE_COUNTER_PERIOD, 1);
     // configure_eventcnt(EVENT_CTR_0, L1D_CACHE, 16, 1);
-    
+
     // Make sure that the PMU is not running until we start
     halt_pmu();
 
@@ -344,33 +344,33 @@ void handle_irq(uint32_t irqFlag) {
     if (irqFlag & (pmu_registers[CYCLE_CTR].sampling << 31)) {
         period = pmu_registers[CYCLE_CTR].count;
         pmu_registers[CYCLE_CTR].overflowed = 1;
-    } 
-    
+    }
+
     if (irqFlag & (pmu_registers[0].sampling << 0)) {
         period = pmu_registers[0].count;
         pmu_registers[0].overflowed = 1;
-    } 
-    
+    }
+
     if (irqFlag & (pmu_registers[1].sampling << 1)) {
         period = pmu_registers[1].count;
         pmu_registers[1].overflowed = 1;
     }
-    
+
      if (irqFlag & (pmu_registers[2].sampling << 2)) {
         period = pmu_registers[2].count;
         pmu_registers[2].overflowed = 1;
     }
-    
+
     if (irqFlag & (pmu_registers[3].sampling << 3)) {
         period = pmu_registers[3].count;
         pmu_registers[3].overflowed = 1;
-    } 
-    
+    }
+
     if (irqFlag & (pmu_registers[4].sampling << 4)) {
         period = pmu_registers[4].count;
         pmu_registers[4].overflowed = 1;
     }
-    
+
     if (irqFlag & (pmu_registers[5].sampling << 5)) {
         period = pmu_registers[5].count;
         pmu_registers[5].overflowed = 1;
@@ -418,7 +418,7 @@ void notified(microkit_channel ch) {
 
         handle_irq(irqFlag);
 
-        // Clear the interrupt flag 
+        // Clear the interrupt flag
         uint32_t val = BIT(31);
         MSR(PMOVSCLR_EL0, val);
 

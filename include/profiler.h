@@ -97,7 +97,6 @@ typedef struct pmu_config_args pmu_config_args_t;
 
 struct pmu_reg {
     int (* config_ctr)(uint32_t event, uint32_t val);
-    
     uint32_t event;
     uint64_t count;
     // Save samples on register overflow if set

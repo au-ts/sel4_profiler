@@ -16,7 +16,7 @@
     <elf_name>: <profiling_id"
 
     NOTE: Seperate pairs with new lines.
-*/  
+*/
 
 #define MAPPINGS_STR "echo.elf: 52\ndummy_prog.elf: 1\ndummy_prog2.elf: 2"
 

@@ -82,7 +82,7 @@ uint32_t sys_now(void)
 
 /**
  * Free a pbuf. This also returns the underlying buffer to the receive free ring.
- * 
+ *
  * @param p pbuf to free.
  */
 static void interface_free_buffer(struct pbuf *p)
@@ -125,7 +125,7 @@ static struct pbuf *create_interface_buffer(uintptr_t offset, size_t length)
 
 /**
  * Stores a pbuf to be transmitted upon available transmit buffers.
- * 
+ *
  * @param p pbuf to be stored.
  */
 void enqueue_pbufs(struct pbuf *p)
@@ -144,12 +144,12 @@ void enqueue_pbufs(struct pbuf *p)
     pbuf_ref(p);
 }
 
-/** 
- * Insert pbuf into transmit used queue. If no free buffers available or transmit used queue is full, 
- * stores pbuf to be sent upon buffers becoming available. 
+/**
+ * Insert pbuf into transmit used queue. If no free buffers available or transmit used queue is full,
+ * stores pbuf to be sent upon buffers becoming available.
  * */
 static err_t lwip_eth_send(struct netif *netif, struct pbuf *p)
-{   
+{
     if (p->tot_len > BUFF_SIZE) {
         sddf_dprintf("LWIP|ERROR: attempted to send a packet of size  %llx > BUFFER SIZE  %llx\n", p->tot_len, BUFF_SIZE);
         return ERR_MEM;
@@ -159,7 +159,7 @@ static err_t lwip_eth_send(struct netif *netif, struct pbuf *p)
         enqueue_pbufs(p);
         return ERR_OK;
     }
-    
+
     buff_desc_t buffer;
     int err = dequeue_free(&(state.tx_ring), &buffer);
     assert(!err);
@@ -192,7 +192,7 @@ void transmit(void)
             else if (err != ERR_OK) {
                 sddf_dprintf("LWIP|ERROR: unkown error when trying to send pbuf  %llx\n", state.head);
             }
-            
+
             struct pbuf *temp = state.head;
             state.head = temp->next_chain;
             if (state.head == NULL) state.tail = NULL;
@@ -226,7 +226,7 @@ void receive(void)
                 pbuf_free(p);
             }
         }
-        
+
         request_signal(state.rx_ring.used_ring);
         reprocess = false;
 
@@ -239,7 +239,7 @@ void receive(void)
 
 /**
  * Initialise the network interface data structure.
- * 
+ *
  * @param netif network interface data structuer.
  */
 static err_t ethernet_init(struct netif *netif)
@@ -305,7 +305,7 @@ void init(void)
     netif_set_up(&(state.netif));
 
     if (dhcp_start(&(state.netif))) sddf_dprintf("LWIP|ERROR: failed to start DHCP negotiation\n");
-    
+
     setup_udp_socket();
     setup_tcp_socket();
 
@@ -342,7 +342,7 @@ void notified(microkit_channel ch)
             sddf_dprintf("LWIP|LOG: received notification on unexpected channel: %lu\n", ch);
             break;
     }
-    
+
     if (notify_rx && require_signal(state.rx_ring.free_ring)) {
         cancel_signal(state.rx_ring.free_ring);
         notify_rx = false;

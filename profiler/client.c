@@ -104,12 +104,12 @@ static err_t eth_dump_callback(void *arg, struct tcp_pcb *pcb, uint16_t len)
 {
     buff_desc_t buffer;
 
-    // Check if we are done sending buffers. 
+    // Check if we are done sending buffers.
     // If we are done, set client state to idle and signal profiler to restart profiling
     if (ring_empty(profiler_ring.used_ring)) {
         tcp_reset_callback();
         client_state = CLIENT_IDLE;
-        microkit_notify(30);
+        microkit_notify(RESUME_PMU);
     } else if (!dequeue_used(&profiler_ring, &buffer)) {
 
         // Create a buffer for the sample
@@ -142,14 +142,14 @@ static err_t eth_dump_callback(void *arg, struct tcp_pcb *pcb, uint16_t len)
         }
 
         enqueue_free(&profiler_ring, buffer);
-        
+
         // We first want to send the size of the following buffer, then the buffer itself
         char size_str[8];
         u32_t htonl_size = lwip_htonl(message_len);
         my_itoa(message_len, size_str);
         send_tcp(&size_str, 2);
         send_tcp(&pb_buff, message_len);
-    
+
     }
 
 
@@ -206,7 +206,7 @@ void eth_dump_start() {
         send_tcp(&size_str, 2);
         send_tcp(&pb_buff, message_len);
     }
-    
+
 }
 
 void init() {
@@ -243,7 +243,7 @@ void notified(microkit_channel ch) {
         // Getting a network interrupt
         notified_lwip(ch);
     } else if (ch == 11) {
-        // Getting a notification from serial mux rx. 
+        // Getting a notification from serial mux rx.
         serial_control();
     }
 }

@@ -18,7 +18,7 @@ void endless_loop() {
         } else if (ticker == 5) {
             break;
         }
-        
+
         i += 1;
     }
 }

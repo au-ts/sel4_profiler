@@ -144,11 +144,11 @@ int send_tcp(void *buff, uint32_t len) {
 
 void tcp_sent_callback(tcp_sent_fn callback) {
     tcp_sent(utiliz_socket, callback);
-}  
+}
 
 void tcp_reset_callback() {
     tcp_sent(utiliz_socket, netconn_sent_callback);
-}  
+}
 
 int setup_netconn_socket(void)
 {

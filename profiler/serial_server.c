@@ -33,7 +33,7 @@ void putchar_(char character)
     // Address that we will pass to dequeue to store the buffer address
     uintptr_t buffer = 0;
     // Integer to store the length of the buffer
-    unsigned int buffer_len = 0; 
+    unsigned int buffer_len = 0;
 
     // Dequeue a buffer from the available ring from the tx buffer
     int ret = serial_dequeue_free(&local_server->tx_queue, &buffer, &buffer_len);
@@ -70,8 +70,8 @@ void putchar_(char character)
 
     /*
     First we will check if the transmit used ring is empty. If not empty, then the driver was processing
-    the used ring, however it was not finished, potentially running out of budget and being pre-empted. 
-    Therefore, we can just add the buffer to the used ring, and wait for the driver to resume. However if 
+    the used ring, however it was not finished, potentially running out of budget and being pre-empted.
+    Therefore, we can just add the buffer to the used ring, and wait for the driver to resume. However if
     empty, then we can notify the driver to start processing the used ring.
     */
 
@@ -86,25 +86,25 @@ void putchar_(char character)
 char get_char() {
     struct serial_server *local_server = &client_serial_server;
 
-    // Notify the driver that we want to get a character. In Patrick's design, this increments 
+    // Notify the driver that we want to get a character. In Patrick's design, this increments
     // the chars_for_clients value.
     microkit_notify(SERVER_GETCHAR_CHANNEL);
 
     /* Now that we have notified the driver, we can attempt to dequeue from the active queue.
     When the driver has processed an interrupt, it will add the inputted character to the active queue.*/
-    
+
     // Address that we will pass to dequeue to store the buffer address
     uintptr_t buffer = 0;
 
     // Integer to store the length of the buffer
-    unsigned int buffer_len = 0; 
+    unsigned int buffer_len = 0;
 
     while (serial_dequeue_active(&local_server->rx_queue, &buffer, &buffer_len) != 0) {
-        /* The queue is currently empty, as there is no character to get. 
-        We will spin here until we have gotten a character. As the driver is a higher priority than us, 
+        /* The queue is currently empty, as there is no character to get.
+        We will spin here until we have gotten a character. As the driver is a higher priority than us,
         it should be able to pre-empt this loop
         */
-        microkit_dbg_puts(""); /* From Patrick, this is apparently needed to stop the compiler from optimising out the 
+        microkit_dbg_puts(""); /* From Patrick, this is apparently needed to stop the compiler from optimising out the
         as it is currently empty. When compiled in a release version the puts statement will be compiled
         into a nop command.
         */
@@ -130,11 +130,11 @@ char get_char() {
 void init_serial(void) {
     // Here we need to init ring buffers and other data structures
     struct serial_server *local_server = &client_serial_server;
-    
+
     // Init the shared ring buffers
     serial_queue_init(&local_server->rx_queue, (serial_queue_t *)rx_free_client, (serial_queue_t *)rx_used_client,  0, NUM_ENTRIES, NUM_ENTRIES);
     // We will also need to populate these rings with memory from the shared dma region
-    
+
     // Add buffers to the rx ring
     for (int i = 0; i < NUM_ENTRIES - 1; i++) {
         int ret = serial_enqueue_free(&local_server->rx_queue, shared_dma_rx_client + (i * BUFFER_SIZE), BUFFER_SIZE);
