@@ -126,8 +126,9 @@ This will output a `perf.data` file in the `toperf` directory.
 
 ### Analysing sample data
 
-Now that we have the `perf.data` file, we can use tools such as `perf report` and Mozilla
-profiler to analyse this data.
+Now that we have a `perf.data` file, we can make use of analysis tools that expect the 
+`perf` file format. The following sections give examples on using `perf report` as well as 
+Mozilla profiler, but it is not limited to just these tools. 
 
 #### perf report
 
