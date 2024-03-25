@@ -57,7 +57,7 @@ If you then enter `start` into the netconn tool, this will start recording sampl
  
 If you wish to pause, please enter `stop`, or if you wish to finish profiling, please enter `exit`.
 
-You can also attach an ipbench client to the IP address for `client1`.
+You can also ping the echo server client using the IP address for `client1`.
 
 Once you have entered `exit`, the `netconn` tool will exit, and a `samples.json` file will
  be left in
@@ -78,7 +78,7 @@ LWIP|NOTICE: DHCP request for client1 returned IP address: 172.16.1.217
 ```
 In comparison to the `netconn` configuration, you will only be given one IP address,
 which is used
-to attach an ipbench client to the example system.
+to attach to the echo server system.
 
 The control are much more simplified in the serial configuration. Firstly, ensure
 that the serial input is
