@@ -395,11 +395,6 @@
     </channel>
 
     <channel>
-        <end pd="profiler" id="6" />
-        <end pd="prof_client" id="6" />
-    </channel>
-    
-    <channel>
         <end pd="prof_client" id="30" />
         <end pd="profiler" id="30" />
     </channel>

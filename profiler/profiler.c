@@ -203,7 +203,7 @@ void add_sample(microkit_id id, uint32_t time, uint64_t pc, uint64_t nr, uint32_
     if (ring_empty(profiler_ring.free_ring)) {
         reset_pmu();
         halt_pmu();
-        microkit_notify(CLIENT_CH);
+        microkit_notify(CLIENT_PROFILER_CH);
     } else {
         reset_pmu();
         resume_pmu();
@@ -405,7 +405,7 @@ void notified(microkit_channel ch) {
         profiler_state = PROF_HALT;
         halt_pmu();
         // Purge any buffers that may be leftover
-        microkit_notify(CLIENT_CH);
+        microkit_notify(CLIENT_PROFILER_CH);
     } else if (ch == 30) {
         // Only resume if profiler state is in 'START' state
         if (profiler_state == PROF_START) {

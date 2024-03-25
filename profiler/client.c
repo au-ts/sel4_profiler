@@ -224,7 +224,7 @@ void init() {
 
 void notified(microkit_channel ch) {
     // Notified to empty profiler sample buffers
-    if (ch == CLIENT_CH) {
+    if (ch == CLIENT_PROFILER_CH) {
         // Determine how to dump buffers
         if (CLIENT_CONFIG == CLIENT_CONTROL_SERIAL) {
             // Print over serial

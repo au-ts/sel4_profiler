@@ -3,13 +3,10 @@
 // Maybe try and expand the num of buffers in the future
 #define NUM_BUFFERS 512
 
-#define CLIENT_HALT 6
-#define CLIENT_CH 5
-
 /* CLIENT CONFIG OPTIONS
     Specify how to dump sample buffers
-    0 - Print over serial
-    1 - Use netconn to control and send samples over the network
+    CLIENT_CONTROL_SERIAL - Print and control over serial
+    CLIENT_CONTROL_NETWORK - Use netconn to control and send samples over the network
 */
 
 enum client_control_type {
@@ -19,21 +16,29 @@ enum client_control_type {
 
 #define CLIENT_CONFIG CLIENT_CONTROL_NETWORK
 
+/* This channel is to signal profiler to start recording samples
+PMU counters will be reset to the configured defaults. */
 #ifndef CLIENT_START_PMU_CH
 #define CLIENT_START_PMU_CH 10
 #endif
 
+/* This channel is stop recording profiling samples. */
 #ifndef CLIENT_STOP_PMU_CH
 #define CLIENT_STOP_PMU_CH 20
 #endif
 
+/* This channel is to resume profiling, without reseting
+the PMU counters. */
 #ifndef CLEINT_RESUME_PMU_CH
 #define CLIENT_RESUME_PMU_CH 30
 #endif
 
-#define START_PMU 10
-#define STOP_PMU 20
-#define RESUME_PMU 30
+/* This channel is between the profiler and client.
+The profiler will signal this when it needs the client to
+consume the sample buffer. */
+#ifndef CLIENT_PROFILER_CH
+#define CLIENT_PROFILER_CH 5
+#endif
 
 enum client_state {
     CLIENT_IDLE,
