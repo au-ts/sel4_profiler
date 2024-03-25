@@ -93,10 +93,10 @@ void serial_control() {
 
     if (ctrl_int == 1) {
         // Start the PMU
-        microkit_notify(START_PMU);
+        microkit_notify(CLIENT_START_PMU_CH);
     } else if (ctrl_int == 2) {
         // Stop the PMU
-        microkit_notify(STOP_PMU);
+        microkit_notify(CLIENT_STOP_PMU_CH);
     }
 }
 
@@ -109,7 +109,7 @@ static err_t eth_dump_callback(void *arg, struct tcp_pcb *pcb, uint16_t len)
     if (ring_empty(profiler_ring.used_ring)) {
         tcp_reset_callback();
         client_state = CLIENT_IDLE;
-        microkit_notify(RESUME_PMU);
+        microkit_notify(CLIENT_RESUME_PMU_CH);
     } else if (!dequeue_used(&profiler_ring, &buffer)) {
 
         // Create a buffer for the sample
@@ -165,7 +165,7 @@ void eth_dump_start() {
     if (ring_empty(profiler_ring.used_ring)) {
         // If we are done dumping the buffers, we can resume the PMU
         client_state = CLIENT_IDLE;
-        microkit_notify(RESUME_PMU);
+        microkit_notify(CLIENT_RESUME_PMU_CH);
     } else if (!dequeue_used(&profiler_ring, &buffer)) {
         // // Create a buffer for the sample
         uint8_t pb_buff[256];
@@ -208,9 +208,9 @@ void eth_dump_start() {
 }
 
 void init() {
-    if (CLIENT_CONFIG == 0) {
+    if (CLIENT_CONFIG == CLIENT_CONTROL_SERIAL) {
         init_serial();
-    } else if (CLIENT_CONFIG == 1) {
+    } else if (CLIENT_CONFIG == CLIENT_CONTROL_NETWORK) {
         microkit_dbg_puts("initialising lwip\n");
         init_lwip();
     }
@@ -226,10 +226,10 @@ void notified(microkit_channel ch) {
     // Notified to empty profiler sample buffers
     if (ch == CLIENT_CH) {
         // Determine how to dump buffers
-        if (CLIENT_CONFIG == 0) {
+        if (CLIENT_CONFIG == CLIENT_CONTROL_SERIAL) {
             // Print over serial
             print_dump();
-        } else if (CLIENT_CONFIG == 1) {
+        } else if (CLIENT_CONFIG == CLIENT_CONTROL_NETWORK) {
             // Send over TCP. Only start this if a dump is not already
             // in progress. If a dump isn't in progress, update state.
             if (client_state == CLIENT_IDLE) {
@@ -237,7 +237,7 @@ void notified(microkit_channel ch) {
                 eth_dump_start();
             }
         }
-    } else if(CLIENT_CONFIG == 1) {
+    } else if(CLIENT_CONFIG == CLIENT_CONTROL_NETWORK) {
         // Getting a network interrupt
         notified_lwip(ch);
     } else if (ch == 11) {

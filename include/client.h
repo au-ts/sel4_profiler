@@ -11,7 +11,25 @@
     0 - Print over serial
     1 - Use netconn to control and send samples over the network
 */
-#define CLIENT_CONFIG 1
+
+enum client_control_type {
+    CLIENT_CONTROL_SERIAL,
+    CLIENT_CONTROL_NETWORK
+};
+
+#define CLIENT_CONFIG CLIENT_CONTROL_NETWORK
+
+#ifndef CLIENT_START_PMU_CH
+#define CLIENT_START_PMU_CH 10
+#endif
+
+#ifndef CLIENT_STOP_PMU_CH
+#define CLIENT_STOP_PMU_CH 20
+#endif
+
+#ifndef CLEINT_RESUME_PMU_CH
+#define CLIENT_RESUME_PMU_CH 30
+#endif
 
 #define START_PMU 10
 #define STOP_PMU 20
