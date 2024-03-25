@@ -15,7 +15,7 @@
     <memory_region name="rx_active_serial_driver" size="0x200_000" page_size="0x200_000"/>
     <memory_region name="tx_free_serial_driver" size="0x200_000" page_size="0x200_000"/>
     <memory_region name="tx_active_serial_driver" size="0x200_000" page_size="0x200_000"/>
-    
+
     <!-- shared memory for ring buffer mechanism : client -->
     <memory_region name="rx_free_serial_client" size="0x200_000" page_size="0x200_000"/>
     <memory_region name="rx_active_serial_client" size="0x200_000" page_size="0x200_000"/>
@@ -72,13 +72,13 @@
     <protection_domain name="profiler" priority="105">
         <program_image path="profiler.elf" />
         <map mr="uart" vaddr="0x5_000_000" perms="rw" cached="false" setvar_vaddr="uart_base" />
-        
+
         <map mr="log_buffer" vaddr="0x4_000_000" perms="rw" cached="false" setvar_vaddr="log_buffer" />
         <!-- shared memory for profiler ring buffer mechanism -->
         <map mr="profiler_ring_free" vaddr="0x8_000_000" perms="rw" cached="true" setvar_vaddr="profiler_ring_free" />
         <map mr="profiler_ring_used" vaddr="0x8_200_000" perms="rw" cached="true" setvar_vaddr="profiler_ring_used" />
         <map mr="profiler_mem" vaddr="0x8_600_000" perms="rw" cached="true" setvar_vaddr="profiler_mem" />
-        
+
         <irq irq="23" id="21" /> <!-- PMU interrupt -->
     </protection_domain>
 
@@ -140,12 +140,12 @@
         <!-- shared memory for virt/client ring buffer mechanism -->
         <map mr="tx_free_serial_client" vaddr="0x3_400_000" perms="rw" cached="true" setvar_vaddr="tx_free_client" />
         <map mr="tx_active_serial_client" vaddr="0x3_600_000" perms="rw" cached="true" setvar_vaddr="tx_active_client" />
-      
+
         <map mr="tx_data_driver" vaddr="0x2_200_000" perms="rw" cached="true" setvar_vaddr="tx_data_driver" />
 
         <map mr="tx_data_client" vaddr="0x2_400_000" perms="rw" cached="true" setvar_vaddr="tx_data_client" />
 
-    </protection_domain>            
+    </protection_domain>
 
     <protection_domain name="uart_virt_rx" priority="95" pp="true" budget="200" period="400">
         <program_image path="uart_virt_rx.elf" />
@@ -178,7 +178,7 @@
         <map mr="tx_used_drv" vaddr="0x4_600_000" perms="rw" cached="true" setvar_vaddr="tx_used" />
 
         <irq irq="152" id="0" /> <!--> ethernet interrupt -->
-        
+
         <map mr="uart" vaddr="0x5_000_000" perms="rw" cached="false" />
 
         <!-- we need physical addresses of hw rings and dma region -->
@@ -227,7 +227,7 @@
         <map mr="rx_used_cli1" vaddr="0x4_200_000" perms="rw" cached="true" setvar_vaddr="rx_used_cli" />
 
         <map mr="uart" vaddr="0x5_000_000" perms="rw" cached="false" />
-    </protection_domain>        
+    </protection_domain>
 
     <protection_domain name="eth_virt_tx" priority="100" budget="20000">
         <program_image path="eth_virt_tx.elf" />
@@ -282,7 +282,7 @@
         <map mr="profiler_ring_free" vaddr="0x8_000_000" perms="rw" cached="true" setvar_vaddr="profiler_ring_free" />
         <map mr="profiler_ring_used" vaddr="0x8_200_000" perms="rw" cached="true" setvar_vaddr="profiler_ring_used" />
         <map mr="profiler_mem" vaddr="0x8_600_000" perms="rw" cached="true" setvar_vaddr="profiler_mem" />
-        
+
         <!-- Memory regions for serial client -->
         <map mr="rx_free_serial_client" vaddr="0x3_000_000" perms="rw" cached="true" setvar_vaddr="rx_free_client" />
         <map mr="rx_active_serial_client" vaddr="0x3_200_000" perms="rw" cached="true" setvar_vaddr="rx_used_client" />
