@@ -13,7 +13,6 @@
 #include <sddf/network/shared_ringbuffer.h>
 
 uintptr_t uart_base;
-uintptr_t profiler_control;
 
 uintptr_t profiler_ring_used;
 uintptr_t profiler_ring_free;
@@ -356,7 +355,7 @@ void handle_irq(uint32_t irqFlag) {
         pmu_registers[1].overflowed = 1;
     }
 
-     if (irqFlag & (pmu_registers[2].sampling << 2)) {
+    if (irqFlag & (pmu_registers[2].sampling << 2)) {
         period = pmu_registers[2].count;
         pmu_registers[2].overflowed = 1;
     }
