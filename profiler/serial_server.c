@@ -121,8 +121,6 @@ char get_char() {
         microkit_dbg_puts(": getchar - unable to enqueue active buffer back into available queue\n");
     }
 
-
-    microkit_dbg_puts("We got a char in serial server\n");
     return got_char;
 }
 

@@ -18,7 +18,6 @@
 #include "profiler_printf.h"
 
 uintptr_t uart_base;
-uintptr_t profiler_control;
 
 uintptr_t profiler_ring_used;
 uintptr_t profiler_ring_free;

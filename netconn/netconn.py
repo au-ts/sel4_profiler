@@ -17,7 +17,7 @@ stop_recv = 0
 class ProfilerClient:
     """
     Class encpasulating the logic to control seL4 profiler over network.
-    We 
+    We
     will also recieve samples on this client from the seL4 profiler.
     """
 
