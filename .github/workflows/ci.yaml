@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - ci
+
+jobs:
+  build_profiler_example_linux_x86_64:
+    name: Build example (Linux x86-64)
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Download Microkit SDK
+        run: ./ci/acquire_sdk.sh microkit-sdk.zip ${{ secrets.GITHUB_TOKEN }} linux-x86-64
+        shell: bash
+      - name: Extract Microkit SDK
+        run: unzip microkit-sdk.zip && tar -xf microkit-sdk-1.2.6.tar.gz
+      - name: Install dependencies (via apt)
+        run: sudo apt update && sudo apt install -y make clang lld
+      - name: Install dependencies (via pip)
+        run: pip install protobuf
+      - name: Download and install AArch64 GCC toolchain
+        run: |
+          wget -O aarch64-toolchain.tar.gz https://trustworthy.systems/Downloads/microkit/arm-gnu-toolchain-11.3.rel1-x86_64-aarch64-none-elf.tar.xz%3Frev%3D73ff9780c12348b1b6772a1f54ab4bb3
+          tar xf aarch64-toolchain.tar.gz
+          echo "$(pwd)/arm-gnu-toolchain-11.3.rel1-x86_64-aarch64-none-elf/bin" >> $GITHUB_PATH
+      - name: Build example
+        run: ./ci/example.sh ${PWD}/microkit-sdk-1.2.6
+        shell: bash
+  build_test_toperf_linux_x86_64:
+    name: Build/test toperf (Linux x86-64)
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Install Rust
+        run: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+      - name: Build toperf
+        run: |
+          cd ./toperf/
+          cargo build
+      - name: Test run
+        run: ./ci/test_toperf.sh
