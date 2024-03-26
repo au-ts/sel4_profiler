@@ -130,7 +130,7 @@
 
     </protection_domain>
 
-    <protection_domain name="uart_virt_tx" priority="96" pp="true"  budget="200" period="400">
+    <protection_domain name="uart_virt_tx" priority="96" pp="true"  budget="2000">
         <program_image path="uart_virt_tx.elf" />
 
          <!-- shared memory for driver/virt ring buffer mechanism -->
@@ -147,7 +147,7 @@
 
     </protection_domain>
 
-    <protection_domain name="uart_virt_rx" priority="95" pp="true" budget="200" period="400">
+    <protection_domain name="uart_virt_rx" priority="95" pp="true" budget="2000">
         <program_image path="uart_virt_rx.elf" />
 
          <!-- shared memory for driver/virt ring buffer mechanism -->
