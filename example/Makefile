@@ -22,6 +22,9 @@ CPU := cortex-a55
 else ifeq ($(MICROKIT_BOARD),odroidc4)
 SDDF_PLATFORM_DIR := meson
 CPU := cortex-a53
+else ifeq ($(MICROKIT_BOARD), maaxboard_2_cores)
+SDDF_PLATFORM_DIR := imx
+CPU := cortex-a55
 endif
 
 SYSTEM_DESC := board/$(MICROKIT_BOARD)/profiler.system
@@ -51,7 +54,7 @@ PROFDIR=$(ROOTDIR)/profiler
 SERIALDIR=$(ROOTDIR)/serial
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 
-IMAGES := profiler.elf client.elf uart.elf uart_virt_rx.elf uart_virt_tx.elf eth.elf eth_virt_rx.elf eth_virt_tx.elf eth_copy.elf arp.elf timer.elf echo.elf dummy_prog.elf dummy_prog2.elf
+IMAGES := profiler_thread.elf profiler_main.elf client.elf uart.elf uart_virt_rx.elf uart_virt_tx.elf eth.elf eth_virt_rx.elf eth_virt_tx.elf eth_copy.elf arp.elf timer.elf echo.elf dummy_prog.elf dummy_prog2.elf
 CFLAGS := -mcpu=$(CPU) -mstrict-align -ffreestanding -g3 -O3 -Wall  -Wno-unused-function -fno-omit-frame-pointer
 LDFLAGS := -L$(BOARD_DIR)/lib -L$(SDDF)/lib
 LIBS := -lmicrokit -Tmicrokit.ld -lc
@@ -111,9 +114,10 @@ PROF_LWIPFILES=$(PROFDIR)/lwip.c $(COREFILES) $(CORE4FILES) $(NETIFFILES)
 ECHO_LWIPFILES=$(ECHODIR)/lwip.c $(COREFILES) $(CORE4FILES) $(NETIFFILES)
 
 UART_OBJS := $(UART_DRIVER)/uart.o printf.o putchar_debug.o
-UART_VIRT_TX_OBJS := $(UART_COMPONENTS)/virt_tx.o 
-UART_VIRT_RX_OBJS := $(UART_COMPONENTS)/virt_rx.o 
-PROFILER_OBJS := $(PROFDIR)/profiler.o sddf_network_sharedringbuffer.o
+UART_VIRT_TX_OBJS := $(UART_COMPONENTS)/virt_tx.o
+UART_VIRT_RX_OBJS := $(UART_COMPONENTS)/virt_rx.o
+PROFILER_MAIN_OBJS := $(PROFDIR)/profiler_main.o sddf_network_sharedringbuffer.o
+PROFILER_THREAD_OBJS := $(PROFDIR)/profiler_thread.o
 CLIENT_OBJS := $(PROFDIR)/client.o $(PROFDIR)/serial_server.o  sddf_network_sharedringbuffer.o  \
  $(PROF_LWIPFILES:.c=.o) $(PROFDIR)/lwip.o $(PROFDIR)/netconn_socket.o sddf_timer_client.o \
  $(PROTOBUFDIR)/nanopb/pmu_sample.pb.o $(PROTOBUFDIR)/nanopb/pb_common.o $(PROTOBUFDIR)/nanopb/pb_encode.o \
@@ -121,7 +125,7 @@ CLIENT_OBJS := $(PROFDIR)/client.o $(PROFDIR)/serial_server.o  sddf_network_shar
 
 ECHO_OBJS := $(ECHO_LWIPFILES:.c=.o) $(ECHODIR)/lwip.o sddf_network_sharedringbuffer.o  \
 $(ECHODIR)/udp_echo_socket.o $(ECHODIR)/tcp_echo_socket.o printf.o putchar_serial.o \
-sddf_timer_client.o 
+sddf_timer_client.o
 DUMMY_PROG_OBJS := dummy_prog.o
 DUMMY_PROG2_OBJS := dummy_prog2.o
 
@@ -166,7 +170,10 @@ $(BUILD_DIR)/putchar_debug.o: $(UTIL)/putchar_debug.c
 $(BUILD_DIR)/putchar_serial.o: $(UTIL)/putchar_serial.c
 	$(CC) -c $(CFLAGS) $(UTIL)/putchar_serial.c -o $(BUILD_DIR)/putchar_serial.o
 
-$(BUILD_DIR)/profiler.elf: $(addprefix $(BUILD_DIR)/, $(PROFILER_OBJS))
+$(BUILD_DIR)/profiler_main.elf: $(addprefix $(BUILD_DIR)/, $(PROFILER_MAIN_OBJS))
+	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
+
+$(BUILD_DIR)/profiler_thread.elf: $(addprefix $(BUILD_DIR)/, $(PROFILER_THREAD_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 $(BUILD_DIR)/uart.elf: $(addprefix $(BUILD_DIR)/, $(UART_OBJS))
@@ -180,7 +187,7 @@ $(BUILD_DIR)/uart_virt_tx.elf: $(addprefix $(BUILD_DIR)/, $(UART_VIRT_TX_OBJS))
 
 $(BUILD_DIR)/client.elf: $(addprefix $(BUILD_DIR)/, $(CLIENT_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
-	
+
 $(BUILD_DIR)/eth.elf: $(addprefix $(BUILD_DIR)/, $(ETH_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 

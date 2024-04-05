@@ -5,23 +5,13 @@
 #include <string.h>
 #include "profiler.h"
 #include "util.h"
-#include "serial_server.h"
 #include "snapshot.h"
 #include "timer.h"
 #include "profiler_config.h"
-#include "client.h"
-#include <sddf/network/shared_ringbuffer.h>
+
+#define ADD_SAMPLE_CH 1
 
 uintptr_t uart_base;
-
-uintptr_t profiler_ring_used;
-uintptr_t profiler_ring_free;
-uintptr_t profiler_mem;
-
-uintptr_t log_buffer;
-
-ring_handle_t profiler_ring;
-
 // Array of pmu registers available
 pmu_reg_t pmu_registers[PMU_NUM_REGS];
 
@@ -162,52 +152,6 @@ void configure_eventcnt(int cntr, uint32_t event, uint64_t val, bool sampling) {
     pmu_registers[cntr].config_ctr(event, val);
 }
 
-/* Add a snapshot of the cycle and event registers to the array. This array needs to become a ring buffer. */
-void add_sample(microkit_id id, uint32_t time, uint64_t pc, uint64_t nr, uint32_t irqFlag, uint64_t *cc, uint64_t period) {
-
-    buff_desc_t buffer;
-    int ret = dequeue_free(&profiler_ring, &buffer);
-    if (ret != 0) {
-        microkit_dbg_puts(microkit_name);
-        microkit_dbg_puts("Failed to dequeue from profiler free ring\n");
-        return;
-    }
-
-    prof_sample_t *temp_sample = (prof_sample_t *) buffer.phys_or_offset;
-
-    // Find which counter overflowed, and the corresponding period
-
-    temp_sample->ip = pc;
-    temp_sample->pid = id;
-    temp_sample->time = time;
-    temp_sample->cpu = 0;
-    temp_sample->period = period;
-    temp_sample->nr = nr;
-    for (int i = 0; i < SEL4_PROF_MAX_CALL_DEPTH; i++) {
-        temp_sample->ips[i] = 0;
-        temp_sample->ips[i] = cc[i];
-    }
-
-    ret = enqueue_used(&profiler_ring, buffer);
-
-    if (ret != 0) {
-        microkit_dbg_puts(microkit_name);
-        microkit_dbg_puts("Failed to dequeue from profiler used ring\n");
-        return;
-    }
-
-    // Check if the buffers are full (for testing dumping when we have 10 buffers)
-    // Notify the client that we need to dump. If we are dumping, do not 
-    // restart the PMU until we have managed to purge all buffers over the network.
-    if (ring_empty(profiler_ring.free_ring)) {
-        reset_pmu();
-        halt_pmu();
-        microkit_notify(CLIENT_PROFILER_CH);
-    } else {
-        reset_pmu();
-        resume_pmu();
-    }
-}
 
 /* Dump the values of the cycle counter and event counters 0 to 5*/
 void print_pmu_debug() {
@@ -295,30 +239,6 @@ void init () {
     // Ensure that the PMU is not running
     halt_pmu();
 
-    // Init the record buffers
-    ring_init(&profiler_ring, (ring_buffer_t *) profiler_ring_free, (ring_buffer_t *) profiler_ring_used, 512);
-
-    for (int i = 0; i < NUM_BUFFERS - 1; i++) {
-        buff_desc_t buffer;
-        buffer.phys_or_offset = profiler_mem + (i * sizeof(prof_sample_t));
-        buffer.len = sizeof(prof_sample_t);
-        int ret = enqueue_free(&profiler_ring, buffer);
-
-        if (ret != 0) {
-            microkit_dbg_puts(microkit_name);
-            microkit_dbg_puts("Failed to populate buffers for the perf record ring buffer\n");
-            break;
-        }
-    }
-
-    #ifdef CONFIG_PROFILER_ENABLE
-    int res_buf = seL4_BenchmarkSetLogBuffer(log_buffer);
-    if (res_buf) {
-        microkit_dbg_puts("Could not set log buffer");
-        puthex64(res_buf);
-    }
-    #endif
-
     init_pmu_regs();
 
     /* INITIALISE WHAT COUNTERS WE WANT TO TRACK IN HERE */
@@ -334,77 +254,48 @@ void init () {
 }
 
 void handle_irq(uint32_t irqFlag) {
-    pmu_sample_t *profLogs = (pmu_sample_t *) log_buffer;
-    pmu_sample_t profLog = profLogs[0];
-
-    uint64_t period = 0;
-
     // Update structs to check what counters overflowed
     if (irqFlag & (pmu_registers[CYCLE_CTR].sampling << 31)) {
-        period = pmu_registers[CYCLE_CTR].count;
         pmu_registers[CYCLE_CTR].overflowed = 1;
     }
 
     if (irqFlag & (pmu_registers[0].sampling << 0)) {
-        period = pmu_registers[0].count;
         pmu_registers[0].overflowed = 1;
     }
 
     if (irqFlag & (pmu_registers[1].sampling << 1)) {
-        period = pmu_registers[1].count;
         pmu_registers[1].overflowed = 1;
     }
 
     if (irqFlag & (pmu_registers[2].sampling << 2)) {
-        period = pmu_registers[2].count;
         pmu_registers[2].overflowed = 1;
     }
 
     if (irqFlag & (pmu_registers[3].sampling << 3)) {
-        period = pmu_registers[3].count;
         pmu_registers[3].overflowed = 1;
     }
 
     if (irqFlag & (pmu_registers[4].sampling << 4)) {
-        period = pmu_registers[4].count;
         pmu_registers[4].overflowed = 1;
     }
 
     if (irqFlag & (pmu_registers[5].sampling << 5)) {
-        period = pmu_registers[5].count;
         pmu_registers[5].overflowed = 1;
     }
 
-    if (profLog.valid == 1) {
-        if (irqFlag & (pmu_registers[CYCLE_CTR].sampling << 31) ||
-            irqFlag & (pmu_registers[0].sampling << 0) ||
-            irqFlag & (pmu_registers[1].sampling << 1) ||
-            irqFlag & (pmu_registers[2].sampling << 2) ||
-            irqFlag & (pmu_registers[3].sampling << 3) ||
-            irqFlag & (pmu_registers[4].sampling << 4) ||
-            irqFlag & (pmu_registers[5].sampling << 5)) {
-            add_sample(profLog.pid, profLog.time, profLog.ip, profLog.nr, irqFlag, profLog.ips, period);
-        }
-    } else {
-        // Not a valid sample. Restart PMU.
-        reset_pmu(irqFlag);
-        resume_pmu();
-    }
+    // Notify the main profiler thread that we have a sample for it to record
+    microkit_notify(ADD_SAMPLE_CH);
 }
 
 void notified(microkit_channel ch) {
     if (ch == 10) {
-        microkit_dbg_puts("Starting PMU\n");
         // Set the profiler state to start
         profiler_state = PROF_START;
         resume_pmu();
     } else if (ch == 20) {
-        microkit_dbg_puts("Halting PMU\n");
         // Set the profiler state to halt
         profiler_state = PROF_HALT;
         halt_pmu();
-        // Purge any buffers that may be leftover
-        microkit_notify(CLIENT_PROFILER_CH);
     } else if (ch == 30) {
         // Only resume if profiler state is in 'START' state
         if (profiler_state == PROF_START) {
@@ -422,5 +313,9 @@ void notified(microkit_channel ch) {
         MSR(PMOVSCLR_EL0, val);
 
         microkit_irq_ack(ch);
+    } else if (ch == ADD_SAMPLE_CH) {
+        // We have been notified back by the main thread, restart profiling now
+        reset_pmu();
+        resume_pmu();
     }
 }

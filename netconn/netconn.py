@@ -53,7 +53,7 @@ class ProfilerClient:
             if (i == len(lines) - 1):
                 self.output.write("\n")
             else:
-                self.output.write(",\n") 
+                self.output.write(",\n")
         self.output.write("}")
     def connect(self):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

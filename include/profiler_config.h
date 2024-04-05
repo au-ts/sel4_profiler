@@ -20,4 +20,4 @@
 
 #define MAPPINGS_STR "echo.elf: 52\ndummy_prog.elf: 1\ndummy_prog2.elf: 2"
 
-#define CYCLE_COUNTER_PERIOD 1.3e4
+#define CYCLE_COUNTER_PERIOD 1.3e5
