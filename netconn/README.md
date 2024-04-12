@@ -11,6 +11,12 @@ This tool depends on `protobuf` Python package which can be installed with:
 pip3 install protobuf
 ```
 
+We have tested with protobuf version `4.25.1`. If installing on Mac, please ensure 
+that you have the correct version. An example of this is: 
+```
+pip3 install --force-reinstall -v "protobuf==4.25.1" [--break-system-packages]
+```
+
 ## Usage
 
 ```sh
