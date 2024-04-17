@@ -6,7 +6,7 @@
 
 
 BUILD_DIR ?= build
-MICROKIT_CONFIG ?= profile
+MICROKIT_CONFIG ?= profiler
 
 ifeq ($(strip $(MICROKIT_SDK)),)
 $(error MICROKIT_SDK must be specified)

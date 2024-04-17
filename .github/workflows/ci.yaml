@@ -2,10 +2,10 @@ name: CI
 
 on:
   pull_request:
-  # push:
-  #   branches:
-  #     - main
-  #     - ci
+  push:
+    branches:
+      - main
+      - ci
 
 jobs:
   build_profiler_example_linux_x86_64:
@@ -29,7 +29,9 @@ jobs:
           tar xf aarch64-toolchain.tar.gz
           echo "$(pwd)/arm-gnu-toolchain-11.3.rel1-x86_64-aarch64-none-elf/bin" >> $GITHUB_PATH
       - name: Build example
-        run: ./ci/example.sh ${PWD}/microkit-sdk-1.2.6
+        run: |
+          git submodule update --init --recursive
+          ./ci/example.sh ${PWD}/microkit-sdk-1.2.6
         shell: bash
   build_test_toperf_linux_x86_64:
     name: Build/test toperf (Linux x86-64)

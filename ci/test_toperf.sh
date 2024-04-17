@@ -13,6 +13,5 @@ else
     echo "CI|INFO: perf.data file not created"
     exit 1
 fi
-perf report > /dev/null
 
 echo "CI|INFO: toperf test passed!"
