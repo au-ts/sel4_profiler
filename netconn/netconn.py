@@ -49,7 +49,7 @@ class ProfilerClient:
         print(mappings)
         lines = mappings.split("\n")
         if (len(lines) == 0):
-            print("NC|ERR: NO MAPPINGS PROVIDED!")
+            print("NC|ERR: No mappings provided. Please ensure the correct mappings are placed within the elf_tcb_mappings field.")
         for i in range(0, len(lines)):
             content = lines[i].split(":")
             if (len(content) != 2):
