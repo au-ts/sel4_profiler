@@ -409,21 +409,31 @@ void init () {
     }
 }
 
-void notified(microkit_channel ch) {
-    if (ch == 10) {
-        // Set the profiler state to start
-        profiler_state = PROF_START;
-        resume_pmu();
-    } else if (ch == 20) {
-        // Set the profiler state to halt
-        profiler_state = PROF_HALT;
-        halt_pmu();
-    } else if (ch == 30) {
-        // Only resume if profiler state is in 'START' state
-        if (profiler_state == PROF_START) {
+seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo) {
+    /* This is how the profiler main thread sends control commands */
+    switch(microkit_msginfo_get_label(msginfo)) {
+        case PROFILER_START:
+            profiler_state = PROF_START;
             resume_pmu();
-        }
-    } else if (ch == 21) {
+            break;
+        case PROFILER_STOP:
+            profiler_state = PROF_HALT;
+            halt_pmu();
+            break;
+        case PROFILER_RESTART:
+            reset_pmu();
+            resume_pmu();
+            break;
+        default:
+            microkit_dbg_puts(microkit_name);
+            microkit_dbg_puts(": Invalid ppcall to profiler thread!\n");
+            break;
+    }
+    return microkit_msginfo_new(0,0);
+}
+
+void notified(microkit_channel ch) {
+    if (ch == 21) {
         // Get the interrupt flag from the PMU
         uint32_t irqFlag = 0;
         MRS(PMOVSCLR_EL0, irqFlag);

@@ -73,7 +73,7 @@
     <memory_region name="tcp_echo_packet" size="0x100000" />
     <memory_region name="log_buffer" size="0x200_000" page_size="0x200_000"/>
 
-    <protection_domain name="profiler1" priority="104" cpu="1">
+    <protection_domain name="profiler1" priority="104" cpu="1" pp="true">
         <program_image path="profiler_thread.elf" />
         <map mr="uart" vaddr="0x5_000_000" perms="rw" cached="false" setvar_vaddr="uart_base" />
 
@@ -453,17 +453,8 @@
 
     <channel>
         <end pd="profiler1" id="1" />
-        <end pd="profiler_main" id="3" />
-    </channel>
-
-    <channel>
-        <end pd="profiler1" id="10" />
         <end pd="profiler_main" id="1" />
     </channel>
 
-    <channel>
-        <end pd="profiler1" id="20" />
-        <end pd="profiler_main" id="2" />
-    </channel>
 
 </system>

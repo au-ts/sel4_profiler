@@ -48,24 +48,24 @@ bool prof_thread_waiting[NUM_PROF_THREADS] = {false};
     n + 2 - RECV_SAMPLE((n/3)+3)
 */
 
-#define START0_CH 1
-#define STOP0_CH 2
-#define RECV_SAMPLE0_CH 3
+#define PROF_THREAD1 1
 
 /* State of profiler */
 int profiler_state;
 
 /* TODO: Change these to loop over the ch for all threads */
 void resume_threads() {
-    microkit_notify(START0_CH);
+    microkit_dbg_puts("Attempting to resume thread!\n");
+    microkit_ppcall(PROF_THREAD1, microkit_msginfo_new(PROFILER_START, 0));
+    microkit_dbg_puts("Finsihed resuming thread\n");
 }
 
 void restart_threads() {
-    microkit_notify(RECV_SAMPLE0_CH);
+    microkit_ppcall(PROF_THREAD1, microkit_msginfo_new(PROFILER_RESTART, 0));
 }
 
 void halt_threads() {
-    microkit_notify(STOP0_CH);
+    microkit_ppcall(PROF_THREAD1, microkit_msginfo_new(PROFILER_STOP, 0));
 }
 
 void purge_thread(microkit_channel ch) {
@@ -120,7 +120,7 @@ void purge_thread(microkit_channel ch) {
         prof_thread_waiting[0] = true;
         microkit_notify(CLIENT_PROFILER_CH);
     } else {
-        microkit_notify(ch);
+        microkit_ppcall(PROF_THREAD1, microkit_msginfo_new(PROFILER_START, 0));
     }
 }
 
@@ -156,6 +156,7 @@ void init () {
     profiler_state = PROF_INIT;
 }
 
+// TODO: Move this over to a pp call as well.
 void notified(microkit_channel ch) {
     if (ch == 10) {
         // Set the profiler state to start
