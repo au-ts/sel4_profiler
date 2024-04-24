@@ -16,6 +16,7 @@
 #include "pb_encode.h"
 #include "pmu_sample.pb.h"
 #include "profiler_printf.h"
+#include <sddf/util/printf.h>
 
 uintptr_t uart_base;
 
@@ -78,7 +79,7 @@ void print_dump() {
             } else {
                 printf_("\t\t\"%ld\"\n]\n", sample->ips[i]);
             }
-        } 
+        }
         printf_("}\n");
 
         enqueue_free(&profiler_ring, buffer);
@@ -129,7 +130,7 @@ void eth_dump() {
             pb_sample.ips[i] = sample->ips[i];
         }
 
-        // // Encode the message
+        // Encode the message
         bool status = pb_encode(&stream, pmu_sample_fields, &pb_sample);
         uint32_t message_len = (uint32_t) stream.bytes_written;
 
@@ -137,7 +138,12 @@ void eth_dump() {
             microkit_dbg_puts("Nanopb encoding failed\n");
         }
 
-        enqueue_free(&profiler_ring, buffer);
+        int ret = enqueue_free(&profiler_ring, buffer);
+        if (ret != 0) {
+            microkit_dbg_puts(microkit_name);
+            microkit_dbg_puts(": Failed to enqueue to prof free ring\n");
+            return;
+        }
 
         // We first want to send the size of the following buffer, then the buffer itself
         char size_str[8];

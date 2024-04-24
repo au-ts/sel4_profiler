@@ -23,9 +23,13 @@
     <memory_region name="tx_used_client" size="0x200_000" page_size="0x200_000"/>
 
     <!-- shared memory for ring buffer mechanism : profiler -->
-    <memory_region name="profiler_ring_free" size="0x200_000" page_size="0x200_000"/>
-    <memory_region name="profiler_ring_used" size="0x200_000" page_size="0x200_000"/>
-    <memory_region name="profiler_mem" size="0x1_000_000" page_size="0x200_000"/>
+    <memory_region name="prof_cli_ring_free" size="0x200_000" page_size="0x200_000"/>
+    <memory_region name="prof_cli_ring_used" size="0x200_000" page_size="0x200_000"/>
+    <memory_region name="prof_cli_mem" size="0x1_000_000" page_size="0x200_000"/>
+
+    <memory_region name="profiler_ring_free_t0" size="0x200_000" page_size="0x200_000"/>
+    <memory_region name="profiler_ring_used_t0" size="0x200_000" page_size="0x200_000"/>
+    <memory_region name="profiler_mem_t0" size="0x1_000_000" page_size="0x200_000"/>
 
     <!-- Ethernet mmemory regions -->
     <memory_region name="hw_ring_buffer" size="0x10_000" />
@@ -69,10 +73,15 @@
     <memory_region name="tcp_echo_packet" size="0x100000" />
     <memory_region name="log_buffer" size="0x200_000" page_size="0x200_000"/>
 
-    <protection_domain name="profiler0" priority="104" cpu="1">
+    <protection_domain name="profiler1" priority="104" cpu="1">
         <program_image path="profiler_thread.elf" />
         <map mr="uart" vaddr="0x5_000_000" perms="rw" cached="false" setvar_vaddr="uart_base" />
 
+        <!-- Map in the log buffer -->
+        <map mr="log_buffer" vaddr="0x4_000_000" perms="r" cached="false" setvar_vaddr="log_buffer" />
+        <map mr="profiler_ring_free_t0" vaddr="0x6_000_000" perms="rw" cached="true" setvar_vaddr="profiler_ring_free" />
+        <map mr="profiler_ring_used_t0" vaddr="0x6_200_000" perms="rw" cached="true" setvar_vaddr="profiler_ring_used" />
+        <map mr="profiler_mem_t0" vaddr="0x6_600_000" perms="rw" cached="true" setvar_vaddr="profiler_mem" />
         <irq irq="23" id="21" /> <!-- PMU interrupt -->
     </protection_domain>
 
@@ -81,10 +90,16 @@
         <map mr="uart" vaddr="0x5_000_000" perms="rw" cached="false" setvar_vaddr="uart_base" />
 
         <map mr="log_buffer" vaddr="0x4_000_000" perms="rw" cached="false" setvar_vaddr="log_buffer" />
-            <!-- shared memory for profiler ring buffer mechanism -->
-        <map mr="profiler_ring_free" vaddr="0x8_000_000" perms="rw" cached="true" setvar_vaddr="profiler_ring_free" />
-        <map mr="profiler_ring_used" vaddr="0x8_200_000" perms="rw" cached="true" setvar_vaddr="profiler_ring_used" />
-        <map mr="profiler_mem" vaddr="0x8_600_000" perms="rw" cached="true" setvar_vaddr="profiler_mem" />
+
+        <!-- shared memory for profiler ring buffer mechanism between main and the threads-->
+        <map mr="profiler_ring_free_t0" vaddr="0x6_000_000" perms="rw" cached="true" setvar_vaddr="profiler_ring_free_t0" />
+        <map mr="profiler_ring_used_t0" vaddr="0x6_200_000" perms="rw" cached="true" setvar_vaddr="profiler_ring_used_t0" />
+        <map mr="profiler_mem_t0" vaddr="0x6_600_000" perms="rw" cached="true" setvar_vaddr="profiler_mem_t0" />
+
+        <!-- shared memory for profiler ring buffer mechanism between main and the prof_client -->
+        <map mr="prof_cli_ring_free" vaddr="0x8_000_000" perms="rw" cached="true" setvar_vaddr="prof_cli_ring_free" />
+        <map mr="prof_cli_ring_used" vaddr="0x8_200_000" perms="rw" cached="true" setvar_vaddr="prof_cli_ring_used" />
+        <map mr="prof_cli_mem" vaddr="0x8_600_000" perms="rw" cached="true" setvar_vaddr="prof_cli_mem" />
     </protection_domain>
 
     <!-- THIS IS THE SYSTEM WE ARE PROFILING -->
@@ -284,9 +299,9 @@
         <program_image path="client.elf"/>
         <map mr="uart" vaddr="0x5_000_000" perms="rw" cached="false" setvar_vaddr="uart_base" />
         <!-- Memory regions shared with the profiler -->
-        <map mr="profiler_ring_free" vaddr="0x8_000_000" perms="rw" cached="true" setvar_vaddr="profiler_ring_free" />
-        <map mr="profiler_ring_used" vaddr="0x8_200_000" perms="rw" cached="true" setvar_vaddr="profiler_ring_used" />
-        <map mr="profiler_mem" vaddr="0x8_600_000" perms="rw" cached="true" setvar_vaddr="profiler_mem" />
+        <map mr="prof_cli_ring_free" vaddr="0x8_000_000" perms="rw" cached="true" setvar_vaddr="profiler_ring_free" />
+        <map mr="prof_cli_ring_used" vaddr="0x8_200_000" perms="rw" cached="true" setvar_vaddr="profiler_ring_used" />
+        <map mr="prof_cli_mem" vaddr="0x8_600_000" perms="rw" cached="true" setvar_vaddr="profiler_mem" />
 
         <!-- Memory regions for serial client -->
         <map mr="rx_free_client" vaddr="0x3_000_000" perms="rw" cached="true" setvar_vaddr="rx_free_client" />
@@ -437,17 +452,17 @@
 <!-- Channels between profiler main and profiler threads -->
 
     <channel>
-        <end pd="profiler0" id="1" />
+        <end pd="profiler1" id="1" />
         <end pd="profiler_main" id="3" />
     </channel>
 
     <channel>
-        <end pd="profiler0" id="10" />
+        <end pd="profiler1" id="10" />
         <end pd="profiler_main" id="1" />
     </channel>
 
     <channel>
-        <end pd="profiler0" id="20" />
+        <end pd="profiler1" id="20" />
         <end pd="profiler_main" id="2" />
     </channel>
 

@@ -11,18 +11,27 @@
 #include "profiler_config.h"
 #include "client.h"
 #include <sddf/network/shared_ringbuffer.h>
+#include <sddf/util/printf.h>
 
 uintptr_t uart_base;
-
-uintptr_t profiler_ring_used;
-uintptr_t profiler_ring_free;
-uintptr_t profiler_mem;
-ring_handle_t profiler_ring;
-
 uintptr_t log_buffer;
 
 // TODO: Move these out of here
 #define NUM_PROF_THREADS 1
+
+/* We need to have multiples of the num_prof threads */
+#define PROF_MAIN_NUM_BUFFERS (512 * NUM_PROF_THREADS)
+uintptr_t profiler_ring_used_t0;
+uintptr_t profiler_ring_free_t0;
+uintptr_t profiler_mem_t0;
+ring_handle_t profiler_rings[NUM_PROF_THREADS];
+
+uintptr_t prof_cli_ring_used;
+uintptr_t prof_cli_ring_free;
+uintptr_t prof_cli_mem;
+ring_handle_t prof_cli_ring;
+
+bool prof_thread_waiting[NUM_PROF_THREADS] = {false};
 
 /* LAY THE THREAD CHANNELS OUT AS FOLLOWS:
     1 - START0
@@ -46,6 +55,7 @@ uintptr_t log_buffer;
 /* State of profiler */
 int profiler_state;
 
+/* TODO: Change these to loop over the ch for all threads */
 void resume_threads() {
     microkit_notify(START0_CH);
 }
@@ -58,50 +68,59 @@ void halt_threads() {
     microkit_notify(STOP0_CH);
 }
 
-/* Add a snapshot of the cycle and event registers to the array. This array needs to become a ring buffer. */
-void add_sample(int thread_id) {
-    pmu_sample_t *profLogs = (pmu_sample_t *) log_buffer;
-    // Get the current CPU affinity of this thread.
-    pmu_sample_t profLog = profLogs[thread_id];
+void purge_thread(microkit_channel ch) {
+    /* TODO: Make this safer */
+    int thread = (ch / 3) - 1;
+    /* For now, we will copy from the thread to our ring with the cli.
+       This is definitely not the optimal solution for now. */
 
-    buff_desc_t buffer;
-    int ret = dequeue_free(&profiler_ring, &buffer);
-    if (ret != 0) {
-        microkit_dbg_puts(microkit_name);
-        microkit_dbg_puts("Failed to dequeue from profiler free ring\n");
-        return;
+    int i = 0;
+
+    while (!ring_empty(profiler_rings[0].used_ring) && !ring_empty(prof_cli_ring.free_ring)) {
+        buff_desc_t thread_buffer;
+        buff_desc_t cli_buffer;
+
+        int ret = dequeue_used(&profiler_rings[0], &thread_buffer);
+        if (ret != 0) {
+            microkit_dbg_puts(microkit_name);
+            microkit_dbg_puts("Failed to dequeue from thread used rings\n");
+            break;
+        }
+
+        ret = dequeue_free(&prof_cli_ring, &cli_buffer);
+        if (ret != 0) {
+            microkit_dbg_puts(microkit_name);
+            microkit_dbg_puts("Failed to dequeue from client free rings\n");
+            break;
+        }
+
+        memcpy(cli_buffer.phys_or_offset, thread_buffer.phys_or_offset, thread_buffer.len);
+
+        ret = enqueue_used(&prof_cli_ring, cli_buffer);
+        if (ret != 0) {
+            microkit_dbg_puts(microkit_name);
+            microkit_dbg_puts("Failed to enqueue to client used rings\n");
+            break;
+        }
+
+        ret = enqueue_free(&profiler_rings[0], thread_buffer);
+        if (ret != 0) {
+            microkit_dbg_puts(microkit_name);
+            microkit_dbg_puts("Failed to enqueue to thread free rings\n");
+            break;
+        }
+        i++;
     }
 
-    prof_sample_t *temp_sample = (prof_sample_t *) buffer.phys_or_offset;
-
-    // Find which counter overflowed, and the corresponding period
-
-    temp_sample->ip = profLog.ip;
-    temp_sample->pid = profLog.pid;
-    temp_sample->time = profLog.time;
-    temp_sample->cpu = profLog.cpu;
-    // TO-DO: Figure out how we are going to get the period??
-    temp_sample->period = 0;
-    temp_sample->nr = profLog.nr;
-    for (int i = 0; i < SEL4_PROF_MAX_CALL_DEPTH; i++) {
-        temp_sample->ips[i] = 0;
-        temp_sample->ips[i] = profLog.ips[i];
-    }
-
-    ret = enqueue_used(&profiler_ring, buffer);
-
-    if (ret != 0) {
-        microkit_dbg_puts(microkit_name);
-        microkit_dbg_puts("Failed to dequeue from profiler used ring\n");
-        return;
-    }
-
-    // Notify the client that we need to dump. If we are dumping, do not
-    // restart the PMU until we have managed to purge all buffers over the network.
-    if (ring_empty(profiler_ring.free_ring)) {
+    /* We may not have emptied the threads rings before breaking from above loop.
+        We will still resume the threads, but we will also notify the client to dump our buffers
+        in the background. */
+    if (ring_empty(prof_cli_ring.free_ring)) {
+        /* set the thread state to waiting */
+        prof_thread_waiting[0] = true;
         microkit_notify(CLIENT_PROFILER_CH);
     } else {
-        restart_threads();
+        microkit_notify(ch);
     }
 }
 
@@ -109,13 +128,14 @@ void init () {
     microkit_dbg_puts("Profiler intialising...\n");
 
     // Init the record buffers
-    ring_init(&profiler_ring, (ring_buffer_t *) profiler_ring_free, (ring_buffer_t *) profiler_ring_used, 512);
+    ring_init(&profiler_rings[0], (ring_buffer_t *) profiler_ring_free_t0, (ring_buffer_t *) profiler_ring_used_t0, 512);
+    ring_init(&prof_cli_ring, (ring_buffer_t *) prof_cli_ring_free, (ring_buffer_t *) prof_cli_ring_used, PROF_MAIN_NUM_BUFFERS);
 
-    for (int i = 0; i < NUM_BUFFERS - 1; i++) {
+    for (int i = 0; i < PROF_MAIN_NUM_BUFFERS - 1; i++) {
         buff_desc_t buffer;
-        buffer.phys_or_offset = profiler_mem + (i * sizeof(prof_sample_t));
+        buffer.phys_or_offset = prof_cli_mem + (i * sizeof(prof_sample_t));
         buffer.len = sizeof(prof_sample_t);
-        int ret = enqueue_free(&profiler_ring, buffer);
+        int ret = enqueue_free(&prof_cli_ring, buffer);
 
         if (ret != 0) {
             microkit_dbg_puts(microkit_name);
@@ -139,10 +159,12 @@ void init () {
 void notified(microkit_channel ch) {
     if (ch == 10) {
         // Set the profiler state to start
+        microkit_dbg_puts("Starting PMU threads\n");
         profiler_state = PROF_START;
         resume_threads();
     } else if (ch == 20) {
         // Set the profiler state to halt
+        microkit_dbg_puts("Halting PMU threads\n");
         profiler_state = PROF_HALT;
         halt_threads();
         // Purge any buffers that may be leftover
@@ -152,8 +174,9 @@ void notified(microkit_channel ch) {
         if (profiler_state == PROF_START) {
             restart_threads();
         }
-    } else if (ch == RECV_SAMPLE0_CH) {
-        // Add sample from index 0 of the log buffer
-        add_sample(1);
+    } else {
+        /* This is then a notif from a thread. We want to purge all threads buffers
+        to the client. Can we bypass the prof_main thread here? */
+        purge_thread(ch);
     }
 }
