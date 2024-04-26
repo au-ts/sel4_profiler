@@ -10,13 +10,12 @@
 
 #define ARMV8_PMEVTYPER_EVTCOUNT_MASK 0x3ff
 #define ARMV8_PMCNTENSET_EL0_ENABLE (1<<31) /* *< Enable Perf count reg */
-#define ARMV8_OVSR_MASK 0xffffffff 
+#define ARMV8_OVSR_MASK 0xffffffff
 
 // Flags to pass through Protected Procedure Call to configure PMU
 #define PROFILER_START 0
 #define PROFILER_STOP 1
-#define PROFILER_CONFIGURE 2
-#define PROFILER_READY 3
+#define PROFILER_RESTART 2
 
 // Definitions of counters available on PMU
 #define EVENT_CTR_0 0
