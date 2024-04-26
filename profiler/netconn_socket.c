@@ -86,6 +86,9 @@ static err_t netconn_recv_callback(void *arg, struct tcp_pcb *pcb, struct pbuf *
     } else if (msg_match(data_packet_str, STOP)) {
         microkit_notify(CLIENT_STOP_PMU_CH);
     } else if (msg_match(data_packet_str, MAPPINGS)) {
+        #ifndef MAPPINGS_STR
+        #define MAPPINGS_STR ""
+        #endif
         error = tcp_write(pcb, MAPPINGS_STR, strlen(MAPPINGS_STR), TCP_WRITE_FLAG_COPY);
         if (error) {
             microkit_dbg_puts("Failed to send mappings through netconn peer");
