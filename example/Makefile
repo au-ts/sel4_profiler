@@ -111,9 +111,9 @@ PROF_LWIPFILES=$(PROFDIR)/lwip.c $(COREFILES) $(CORE4FILES) $(NETIFFILES)
 ECHO_LWIPFILES=$(ECHODIR)/lwip.c $(COREFILES) $(CORE4FILES) $(NETIFFILES)
 
 UART_OBJS := $(UART_DRIVER)/uart.o printf.o putchar_debug.o
-UART_VIRT_TX_OBJS := $(UART_COMPONENTS)/virt_tx.o 
-UART_VIRT_RX_OBJS := $(UART_COMPONENTS)/virt_rx.o 
-PROFILER_OBJS := $(PROFDIR)/profiler.o sddf_network_sharedringbuffer.o
+UART_VIRT_TX_OBJS := $(UART_COMPONENTS)/virt_tx.o
+UART_VIRT_RX_OBJS := $(UART_COMPONENTS)/virt_rx.o
+PROFILER_OBJS := $(PROFDIR)/profiler.o sddf_network_sharedringbuffer.o printf.o putchar_debug.o
 CLIENT_OBJS := $(PROFDIR)/client.o $(PROFDIR)/serial_server.o  sddf_network_sharedringbuffer.o  \
  $(PROF_LWIPFILES:.c=.o) $(PROFDIR)/lwip.o $(PROFDIR)/netconn_socket.o sddf_timer_client.o \
  $(PROTOBUFDIR)/nanopb/pmu_sample.pb.o $(PROTOBUFDIR)/nanopb/pb_common.o $(PROTOBUFDIR)/nanopb/pb_encode.o \
@@ -121,7 +121,7 @@ CLIENT_OBJS := $(PROFDIR)/client.o $(PROFDIR)/serial_server.o  sddf_network_shar
 
 ECHO_OBJS := $(ECHO_LWIPFILES:.c=.o) $(ECHODIR)/lwip.o sddf_network_sharedringbuffer.o  \
 $(ECHODIR)/udp_echo_socket.o $(ECHODIR)/tcp_echo_socket.o printf.o putchar_serial.o \
-sddf_timer_client.o 
+sddf_timer_client.o
 DUMMY_PROG_OBJS := dummy_prog.o
 DUMMY_PROG2_OBJS := dummy_prog2.o
 

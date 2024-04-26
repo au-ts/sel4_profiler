@@ -92,10 +92,10 @@ void serial_control() {
 
     if (ctrl_int == 1) {
         // Start the PMU
-        microkit_notify(CLIENT_START_PMU_CH);
+        microkit_ppcall(CLIENT_PROFILER_CH, microkit_msginfo_new(PROFILER_START, 0));
     } else if (ctrl_int == 2) {
         // Stop the PMU
-        microkit_notify(CLIENT_STOP_PMU_CH);
+        microkit_ppcall(CLIENT_PROFILER_CH, microkit_msginfo_new(PROFILER_STOP, 0));
     }
 }
 
@@ -106,7 +106,7 @@ void eth_dump() {
     if (ring_empty(profiler_ring.used_ring)) {
         // If we are done dumping the buffers, we can resume the PMU
         client_state = CLIENT_IDLE;
-        microkit_notify(CLIENT_RESUME_PMU_CH);
+        microkit_ppcall(CLIENT_PROFILER_CH, microkit_msginfo_new(PROFILER_RESTART, 0));
     } else if (!dequeue_used(&profiler_ring, &buffer)) {
         // // Create a buffer for the sample
         uint8_t pb_buff[256];

@@ -11,6 +11,7 @@
 #include "profiler_config.h"
 #include "client.h"
 #include <sddf/network/shared_ringbuffer.h>
+#include <sddf/util/printf.h>
 
 uintptr_t uart_base;
 
@@ -197,7 +198,7 @@ void add_sample(microkit_id id, uint32_t time, uint64_t pc, uint64_t nr, uint32_
     }
 
     // Check if the buffers are full (for testing dumping when we have 10 buffers)
-    // Notify the client that we need to dump. If we are dumping, do not 
+    // Notify the client that we need to dump. If we are dumping, do not
     // restart the PMU until we have managed to purge all buffers over the network.
     if (ring_empty(profiler_ring.free_ring)) {
         reset_pmu();
@@ -392,25 +393,39 @@ void handle_irq(uint32_t irqFlag) {
     }
 }
 
-void notified(microkit_channel ch) {
-    if (ch == 10) {
-        microkit_dbg_puts("Starting PMU\n");
-        // Set the profiler state to start
-        profiler_state = PROF_START;
-        resume_pmu();
-    } else if (ch == 20) {
-        microkit_dbg_puts("Halting PMU\n");
-        // Set the profiler state to halt
-        profiler_state = PROF_HALT;
-        halt_pmu();
-        // Purge any buffers that may be leftover
-        microkit_notify(CLIENT_PROFILER_CH);
-    } else if (ch == 30) {
-        // Only resume if profiler state is in 'START' state
-        if (profiler_state == PROF_START) {
+seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo) {
+    /* This is how the profiler main thread sends control commands */
+    switch(microkit_msginfo_get_label(msginfo)) {
+        case PROFILER_START:
+            profiler_state = PROF_START;
+            sddf_dprintf("Starting PMU\n");
             resume_pmu();
-        }
-    } else if (ch == 21) {
+            break;
+        case PROFILER_STOP:
+            profiler_state = PROF_HALT;
+            sddf_dprintf("Stopping PMU\n");
+            halt_pmu();
+            /* Purge buffers to main first */
+            microkit_notify(CLIENT_PROFILER_CH);
+            break;
+        case PROFILER_RESTART:
+            /* Only restart PMU if we haven't halted */
+            if (profiler_state == PROF_START) {
+                reset_pmu();
+                resume_pmu();
+            }
+            break;
+        default:
+            microkit_dbg_puts(microkit_name);
+            microkit_dbg_puts(": Invalid ppcall to profiler thread!\n");
+            break;
+    }
+    return microkit_msginfo_new(0,0);
+}
+
+
+void notified(microkit_channel ch) {
+    if (ch == 21) {
         // Get the interrupt flag from the PMU
         uint32_t irqFlag = 0;
         MRS(PMOVSCLR_EL0, irqFlag);

@@ -14,6 +14,7 @@ void endless_loop() {
         if (i == 999999999) {
             i = 0;
             ticker++;
+            microkit_notify(6);
         } else if (ticker == 5) {
             break;
         }

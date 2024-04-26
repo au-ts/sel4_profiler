@@ -69,7 +69,7 @@
     <memory_region name="tcp_echo_packet" size="0x100000" />
     <memory_region name="log_buffer" size="0x200_000" page_size="0x200_000"/>
 
-    <protection_domain name="profiler" priority="105">
+    <protection_domain name="profiler" priority="105" pp="true">
         <program_image path="profiler.elf" />
         <map mr="uart" vaddr="0x5_000_000" perms="rw" cached="false" setvar_vaddr="uart_base" />
 
@@ -309,7 +309,12 @@
 
     <!-- These following channels are needed for communication between the server and driver -->
 
- <channel>
+    <channel>
+        <end pd="prof_client" id="30" />
+        <end pd="profiler" id="30" />
+    </channel>
+
+    <channel>
         <end pd="prof_client" id="9"/>
         <end pd="uart_virt_tx" id="1"/>
     </channel>
@@ -327,21 +332,6 @@
     <channel>
         <end pd="uart" id="10"/>
         <end pd="uart_virt_rx" id="11"/>
-    </channel>
-
-    <channel>
-        <end pd="profiler" id="10"/>
-        <end pd="prof_client" id="10"/>
-    </channel>
-
-    <channel>
-        <end pd="profiler" id="20"/>
-        <end pd="prof_client" id="20"/>
-    </channel>
-
-    <channel>
-        <end pd="profiler" id="5"/>
-        <end pd="prof_client" id="5"/>
     </channel>
 
     <channel>
@@ -392,11 +382,6 @@
     <channel>
         <end pd="timer" id="1" />
         <end pd="prof_client" id="1" />
-    </channel>
-
-    <channel>
-        <end pd="prof_client" id="30" />
-        <end pd="profiler" id="30" />
     </channel>
 
     <channel>
