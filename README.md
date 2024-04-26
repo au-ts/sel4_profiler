@@ -17,13 +17,19 @@ Currently completed items:
 - Conversion tool to generate `perf.data` files.
 
 TO-DO:
-- Multicore support.
+- Multicore support. This branch is the development branch for multicore.
 
 # Multicore support
 
 DISCLAIMER: Multicore support is only presently available on the `maaxboard` platform. The `odroidc4` has known
 issues related to it's PMU implementation. More discussion can be found here: https://lore.kernel.org/all/8735pcq63o.wl-maz@kernel.org/
 and: https://lore.kernel.org/lkml/4b1d6f80-db33-b2ea-7214-34b87a7e734c@arm.com/.
+
+The structure of the profiler is that on each core we will have a
+"profiler_thread". This thread is essentially the PMU driver for that thread,
+and will manage the PMU and create samples. These samples are then sent to
+the "profiler_main" thread, which essentially multiplexes/manages the
+profiler threads.
 
 # Installation
 
