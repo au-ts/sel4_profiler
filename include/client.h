@@ -18,7 +18,8 @@ enum client_control_type {
 
 /* This channel is between the profiler and client.
 The profiler will signal this when it needs the client to
-consume the sample buffer. */
+consume the sample buffer. The client will use this to send PPC
+to control the profiler. */
 #ifndef CLIENT_PROFILER_CH
 #define CLIENT_PROFILER_CH 30
 #endif

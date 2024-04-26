@@ -26,11 +26,11 @@ Two PD's that you will need are the `profiler` PD, and the `client` PD.
 
 The `profiler` PD is essentially the PMU driver, as well as the program responsible for creating
 the samples. These samples are places into shared ringbuffers, that can be consumed by the `client`.
-Additionally, there are the following channels that can be used to control the profiler:
-- 10 - start (reset the PMU and starts)
-- 20 - stop
-- 30 - resume (resumes the PMU without modifying registers)`
+Additionally, you will need to setup a channel between the profiler and the profiler client:
+- 30 - Used for PPC to control the profiler. Used by profiler to signal client to dump samples.
 
+This channel number can be configured to whatever you wish, just ensure you change the `CLIENT_PROFILER_CH`
+definition in `client.h`.
 ### Consuming profiler data
 
 The profiler PD is responsible for formatting the sampling data in a generic format. It is the
@@ -52,10 +52,11 @@ Firstly, the profiler requires a memory region in which it stores sample data. T
 `profiler_ring_free`, `profiler_ring_used`, `profiler_mem`. These memory regions must also be mapped
 into the client.
 
-The profiler also requires several channels between itself and the client. The aforementioned control
-channels, being 10, 20, 30. Additionally, the channel 5 is used for the profiler to signal to the client
-that its buffer's need emptying. When the buffers are full, the profiler will halt the PMU until it
-receives a resume (30) signal from the client.
+The profiler needs to have a channel between itself and the client as mentioned before. The client can
+send PPC to the profiler start/stop/restart. You will find definitions in `profiler.h` for the label
+numbers for the respective control commands. Place these in the label field of the `msginfo`. The
+profiler will also signal on this channel to tell the client that its buffers need emptying. The profiler
+will halt the PMU until it receives a PPC to restart.
 
 ### Connecting client to subsystems
 
@@ -64,7 +65,7 @@ connected in the same manner as any other client in the system.
 
 To connect to the different subsystems, map in the appropriate memory regions as well as create the
 necessary channels. For the networking subsystem, the user must also create/modify the `ethernet_config.h`.
-This is used to setup the correct memory regions for all the clients, as well as MAC addresses. 
+This is used to setup the correct memory regions for all the clients, as well as MAC addresses.
 
 For an example of how to do this, please reference either the example system in `example/` or in the
 [sDDF examples](https://github.com/au-ts/sDDF/tree/main/examples).
@@ -72,7 +73,7 @@ For an example of how to do this, please reference either the example system in 
 ### Supplying your own client
 
 However, the user can supply their own `client` PD depending on their needs. They will need to follow
-the same processes as above in respect to connecting the profiler and client. 
+the same processes as above in respect to connecting the profiler and client.
 
 An example of how all of these components are connected can be found in `example/board/<odroidc4/maaxboard>`.
 
