@@ -25,12 +25,14 @@
     <!-- shared memory for ring buffer mechanism : profiler -->
     <memory_region name="prof_cli_ring_free" size="0x200_000" page_size="0x200_000"/>
     <memory_region name="prof_cli_ring_used" size="0x200_000" page_size="0x200_000"/>
-    <memory_region name="prof_cli_mem" size="0x1_000_000" page_size="0x200_000"/>
+    <memory_region name="prof_cli_mem" size="0x200_000" page_size="0x200_000"/>
 
     <memory_region name="profiler_ring_free_t0" size="0x200_000" page_size="0x200_000"/>
     <memory_region name="profiler_ring_used_t0" size="0x200_000" page_size="0x200_000"/>
-    <memory_region name="profiler_mem_t0" size="0x1_000_000" page_size="0x200_000"/>
-
+    <memory_region name="profiler_mem_t0" size="0x200_000" page_size="0x200_000"/>
+    <memory_region name="profiler_ring_free_t1" size="0x200_000" page_size="0x200_000"/>
+    <memory_region name="profiler_ring_used_t1" size="0x200_000" page_size="0x200_000"/>
+    <memory_region name="profiler_mem_t1" size="0x200_000" page_size="0x200_000"/>
     <!-- Ethernet mmemory regions -->
     <memory_region name="hw_ring_buffer" size="0x10_000" />
     <memory_region name="rx_buffer_data_region" size="0x200_000" page_size="0x200_000" />
@@ -73,7 +75,7 @@
     <memory_region name="tcp_echo_packet" size="0x100000" />
     <memory_region name="log_buffer" size="0x200_000" page_size="0x200_000"/>
 
-    <protection_domain name="profiler1" priority="104" cpu="1" pp="true">
+    <protection_domain name="profiler0" priority="104" cpu="0" pp="true">
         <program_image path="profiler_thread.elf" />
         <map mr="uart" vaddr="0x5_000_000" perms="rw" cached="false" setvar_vaddr="uart_base" />
 
@@ -85,7 +87,19 @@
         <irq irq="23" id="21" /> <!-- PMU interrupt -->
     </protection_domain>
 
-    <protection_domain name="profiler_main" priority="105" cpu="0">
+    <protection_domain name="profiler1" priority="104" cpu="1" pp="true">
+        <program_image path="profiler_thread.elf" />
+        <map mr="uart" vaddr="0x5_000_000" perms="rw" cached="false" setvar_vaddr="uart_base" />
+
+        <!-- Map in the log buffer -->
+        <map mr="log_buffer" vaddr="0x4_000_000" perms="r" cached="false" setvar_vaddr="log_buffer" />
+        <map mr="profiler_ring_free_t1" vaddr="0x7_000_000" perms="rw" cached="true" setvar_vaddr="profiler_ring_free" />
+        <map mr="profiler_ring_used_t1" vaddr="0x7_200_000" perms="rw" cached="true" setvar_vaddr="profiler_ring_used" />
+        <map mr="profiler_mem_t1" vaddr="0x7_600_000" perms="rw" cached="true" setvar_vaddr="profiler_mem" />
+        <irq irq="23" id="21" /> <!-- PMU interrupt -->
+    </protection_domain>
+
+    <protection_domain name="profiler_main" priority="105" cpu="0" pp="true">
         <program_image path="profiler_main.elf" />
         <map mr="uart" vaddr="0x5_000_000" perms="rw" cached="false" setvar_vaddr="uart_base" />
 
@@ -95,6 +109,10 @@
         <map mr="profiler_ring_free_t0" vaddr="0x6_000_000" perms="rw" cached="true" setvar_vaddr="profiler_ring_free_t0" />
         <map mr="profiler_ring_used_t0" vaddr="0x6_200_000" perms="rw" cached="true" setvar_vaddr="profiler_ring_used_t0" />
         <map mr="profiler_mem_t0" vaddr="0x6_600_000" perms="rw" cached="true" setvar_vaddr="profiler_mem_t0" />
+
+        <map mr="profiler_ring_free_t1" vaddr="0x7_000_000" perms="rw" cached="true" setvar_vaddr="profiler_ring_free_t1" />
+        <map mr="profiler_ring_used_t1" vaddr="0x7_200_000" perms="rw" cached="true" setvar_vaddr="profiler_ring_used_t1" />
+        <map mr="profiler_mem_t1" vaddr="0x7_600_000" perms="rw" cached="true" setvar_vaddr="profiler_mem_t1" />
 
         <!-- shared memory for profiler ring buffer mechanism between main and the prof_client -->
         <map mr="prof_cli_ring_free" vaddr="0x8_000_000" perms="rw" cached="true" setvar_vaddr="prof_cli_ring_free" />
@@ -124,6 +142,14 @@
     </protection_domain>
 
     <protection_domain name="dummy_prog2" priority="50" cpu="1" budget="25000">
+        <program_image path="dummy_prog2.elf"/>
+    </protection_domain>
+
+    <protection_domain name="dummy_prog3" priority="50" cpu="0" budget="25000">
+        <program_image path="dummy_prog.elf"/>
+    </protection_domain>
+
+    <protection_domain name="dummy_prog4" priority="50" cpu="0" budget="25000">
         <program_image path="dummy_prog2.elf"/>
     </protection_domain>
 
@@ -449,7 +475,16 @@
         <end pd="dummy_prog" id="6"/>
     </channel>
 
+    <channel>
+        <end pd="dummy_prog4" id="6"/>
+        <end pd="dummy_prog3" id="6"/>
+    </channel>
+
 <!-- Channels between profiler main and profiler threads -->
+    <channel>
+        <end pd="profiler0" id="1" />
+        <end pd="profiler_main" id="0" />
+    </channel>
 
     <channel>
         <end pd="profiler1" id="1" />

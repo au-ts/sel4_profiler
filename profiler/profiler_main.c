@@ -16,14 +16,12 @@
 uintptr_t uart_base;
 uintptr_t log_buffer;
 
-// TODO: Move these out of here
-#define NUM_PROF_THREADS 1
-
-/* We need to have multiples of the num_prof threads */
-#define PROF_MAIN_NUM_BUFFERS (512 * NUM_PROF_THREADS)
 uintptr_t profiler_ring_used_t0;
 uintptr_t profiler_ring_free_t0;
 uintptr_t profiler_mem_t0;
+uintptr_t profiler_ring_used_t1;
+uintptr_t profiler_ring_free_t1;
+uintptr_t profiler_mem_t1;
 ring_handle_t profiler_rings[NUM_PROF_THREADS];
 
 uintptr_t prof_cli_ring_used;
@@ -48,39 +46,38 @@ bool prof_thread_waiting[NUM_PROF_THREADS] = {false};
     n + 2 - RECV_SAMPLE((n/3)+3)
 */
 
+#define PROF_THREAD0 0
 #define PROF_THREAD1 1
 
 /* State of profiler */
 int profiler_state;
 
-/* TODO: Change these to loop over the ch for all threads */
 void resume_threads() {
-    microkit_dbg_puts("Attempting to resume thread!\n");
-    microkit_ppcall(PROF_THREAD1, microkit_msginfo_new(PROFILER_START, 0));
-    microkit_dbg_puts("Finsihed resuming thread\n");
+    for (int i = 0; i < NUM_PROF_THREADS; i++) {
+        microkit_ppcall(i, microkit_msginfo_new(PROFILER_START, 0));
+    }
 }
 
 void restart_threads() {
-    microkit_ppcall(PROF_THREAD1, microkit_msginfo_new(PROFILER_RESTART, 0));
+    for (int i = 0; i < NUM_PROF_THREADS; i++) {
+        microkit_ppcall(i, microkit_msginfo_new(PROFILER_RESTART, 0));
+    }
 }
 
 void halt_threads() {
-    microkit_ppcall(PROF_THREAD1, microkit_msginfo_new(PROFILER_STOP, 0));
+    for (int i = 0; i < NUM_PROF_THREADS; i++) {
+        microkit_ppcall(i, microkit_msginfo_new(PROFILER_STOP, 0));
+    }
 }
 
 void purge_thread(microkit_channel ch) {
-    /* TODO: Make this safer */
-    int thread = (ch / 3) - 1;
     /* For now, we will copy from the thread to our ring with the cli.
        This is definitely not the optimal solution for now. */
-
-    int i = 0;
-
-    while (!ring_empty(profiler_rings[0].used_ring) && !ring_empty(prof_cli_ring.free_ring)) {
+    while (!ring_empty(profiler_rings[ch].used_ring) && !ring_empty(prof_cli_ring.free_ring)) {
         buff_desc_t thread_buffer;
         buff_desc_t cli_buffer;
 
-        int ret = dequeue_used(&profiler_rings[0], &thread_buffer);
+        int ret = dequeue_used(&profiler_rings[ch], &thread_buffer);
         if (ret != 0) {
             microkit_dbg_puts(microkit_name);
             microkit_dbg_puts("Failed to dequeue from thread used rings\n");
@@ -103,13 +100,12 @@ void purge_thread(microkit_channel ch) {
             break;
         }
 
-        ret = enqueue_free(&profiler_rings[0], thread_buffer);
+        ret = enqueue_free(&profiler_rings[ch], thread_buffer);
         if (ret != 0) {
             microkit_dbg_puts(microkit_name);
             microkit_dbg_puts("Failed to enqueue to thread free rings\n");
             break;
         }
-        i++;
     }
 
     /* We may not have emptied the threads rings before breaking from above loop.
@@ -117,10 +113,10 @@ void purge_thread(microkit_channel ch) {
         in the background. */
     if (ring_empty(prof_cli_ring.free_ring)) {
         /* set the thread state to waiting */
-        prof_thread_waiting[0] = true;
+        prof_thread_waiting[ch] = true;
         microkit_notify(CLIENT_PROFILER_CH);
     } else {
-        microkit_ppcall(PROF_THREAD1, microkit_msginfo_new(PROFILER_START, 0));
+        microkit_ppcall(ch, microkit_msginfo_new(PROFILER_START, 0));
     }
 }
 
@@ -128,10 +124,11 @@ void init () {
     microkit_dbg_puts("Profiler intialising...\n");
 
     // Init the record buffers
-    ring_init(&profiler_rings[0], (ring_buffer_t *) profiler_ring_free_t0, (ring_buffer_t *) profiler_ring_used_t0, 512);
-    ring_init(&prof_cli_ring, (ring_buffer_t *) prof_cli_ring_free, (ring_buffer_t *) prof_cli_ring_used, PROF_MAIN_NUM_BUFFERS);
+    ring_init(&profiler_rings[0], (ring_buffer_t *) profiler_ring_free_t0, (ring_buffer_t *) profiler_ring_used_t0, NUM_BUFFERS);
+    ring_init(&profiler_rings[1], (ring_buffer_t *) profiler_ring_free_t1, (ring_buffer_t *) profiler_ring_used_t1, NUM_BUFFERS);
+    ring_init(&prof_cli_ring, (ring_buffer_t *) prof_cli_ring_free, (ring_buffer_t *) prof_cli_ring_used, PROF_CLI_NUM_BUFFERS);
 
-    for (int i = 0; i < PROF_MAIN_NUM_BUFFERS - 1; i++) {
+    for (int i = 0; i < PROF_CLI_NUM_BUFFERS - 1; i++) {
         buff_desc_t buffer;
         buffer.phys_or_offset = prof_cli_mem + (i * sizeof(prof_sample_t));
         buffer.len = sizeof(prof_sample_t);

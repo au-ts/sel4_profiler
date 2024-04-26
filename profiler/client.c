@@ -166,7 +166,7 @@ void init() {
     client_state = CLIENT_IDLE;
 
     // Init ring handle between profiler
-    ring_init(&profiler_ring, (ring_buffer_t *) profiler_ring_free, (ring_buffer_t *) profiler_ring_used, 512);
+    ring_init(&profiler_ring, (ring_buffer_t *) profiler_ring_free, (ring_buffer_t *) profiler_ring_used, PROF_CLI_NUM_BUFFERS);
 }
 
 void notified(microkit_channel ch) {

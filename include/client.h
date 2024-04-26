@@ -1,8 +1,5 @@
 #pragma once
 
-// Maybe try and expand the num of buffers in the future
-#define NUM_BUFFERS 512
-
 /* CLIENT CONFIG OPTIONS
     Specify how to dump sample buffers
     CLIENT_CONTROL_SERIAL - Print and control over serial

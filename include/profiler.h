@@ -6,6 +6,12 @@
 
 #define PMU_NUM_REGS 7
 
+/* Number of profiling threads and number of buffers */
+
+#define NUM_PROF_THREADS 2
+#define NUM_BUFFERS 512
+#define PROF_CLI_NUM_BUFFERS (NUM_BUFFERS * NUM_PROF_THREADS)
+
 #define SEL4_USER_CONTEXT_SIZE 0x24
 
 #define ARMV8_PMEVTYPER_EVTCOUNT_MASK 0x3ff
