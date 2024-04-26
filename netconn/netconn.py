@@ -141,30 +141,44 @@ if __name__ == "__main__":
     # Sit in a loop and wait for user commands
     while True:
         user_input = input("> ").upper()
+        user_input_split = user_input.split(" ")
+        if (len(user_input_split) < 1):
+            print("These are the following valid commands (case-agnostic):\n")
+            print("\t1. \"CONNECT\" - This will attempt to connect to the supplied IP address and port. Connect will add the ")
+            print("\t2. \"START [CPU_ID]\" - This will command the seL4 profiler to start measurements and construct samples output file. If no CPU_ID is supplied, it will start all available threads.")
+            print("\t3. \"STOP [CPU_ID]\" - This will command the seL4 profiler to stop measurements. If no CPU_ID is supplied, it will stop all available threads.")
+            print("\t4. \"EXIT\" - This will command the seL4 profiler to stop measurements, close the samples output file and exit this program")
+            continue
         if user_input == "CONNECT":
             client.connect()
             client.get_mappings()
             client.output.write(",\n\"samples\": [\n")
 
-        elif user_input == "START":
+        elif user_input_split[0] == "START":
             if client.socket is not None:
-                client.send_command("START")
+                if (len(user_input_split) == 1):
+                    client.send_command("START")
+                elif (len(user_input_split) == 2):
+                    client.send_command(f"START {user_input_split[1]}")
                 client.recv_samples()
                 print("Started profiling!")
             else:
                 print("ERROR: attempted START command before CONNECT command called")
 
-        elif user_input == "STOP":
+        elif user_input_split[0] == "STOP":
             if client.socket is not None:
                 # Stop the recv thread and close file descriptor
-                client.send_command("STOP")
+                if (len(user_input_split) == 1):
+                    client.send_command("STOP")
+                elif (len(user_input_split) == 2):
+                    client.send_command(f"STOP {user_input_split[1]}")
                 client.send_command("REFRESH")
                 client.stop_samples()
                 print("Stopped profiling!")
             else:
                 print("ERROR: attempted STOP command before CONNECT command called")
 
-        elif user_input == "EXIT":
+        elif user_input_split[0] == "EXIT":
             if client.socket is not None:
                 client.send_command("STOP")
                 client.send_command("REFRESH")
@@ -177,6 +191,6 @@ if __name__ == "__main__":
         else:
             print("These are the following valid commands (case-agnostic):\n")
             print("\t1. \"CONNECT\" - This will attempt to connect to the supplied IP address and port. Connect will add the ")
-            print("\t2. \"START\" - This will command the seL4 profiler to start measurements and construct samples output file.")
-            print("\t3. \"STOP\" - This will command the seL4 profiler to stop measurements.")
+            print("\t2. \"START [THREAD_ID]\" - This will command the seL4 profiler to start measurements and construct samples output file.")
+            print("\t3. \"STOP [THREAD_ID]\" - This will command the seL4 profiler to stop measurements.")
             print("\t4. \"EXIT\" - This will command the seL4 profiler to stop measurements, close the samples output file and exit this program")

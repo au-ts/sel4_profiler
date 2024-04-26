@@ -21,6 +21,8 @@
 #include "util.h"
 #include "client.h"
 #include "profiler_config.h"
+#include "profiler.h"
+#include <sddf/util/printf.h>
 
 /* This file implements a TCP based profiler control process that starts
  * and stops the profiler based on a client's requests.
@@ -49,8 +51,8 @@ uintptr_t data_packet;
 #define HELLO "HELLO\n"
 #define OK_READY "200 OK (Ready to go)\n"
 #define OK "200 OK\n"
-#define START "START\n"
-#define STOP "STOP\n"
+#define START "START"
+#define STOP "STOP"
 #define QUIT "QUIT\n"
 #define ERROR "400 ERROR\n"
 #define MAPPINGS "MAPPINGS\n"
@@ -82,9 +84,31 @@ static err_t netconn_recv_callback(void *arg, struct tcp_pcb *pcb, struct pbuf *
             microkit_dbg_puts("Failed to send OK_READY message through netconn peer");
         }
     } else if (msg_match(data_packet_str, START)) {
-        microkit_ppcall(CLIENT_PROFILER_CH, microkit_msginfo_new(PROFILER_START, 0));
+        /* Start command can have a thead id attached to it */
+        if (data_packet_str[5] == '\n') {
+            microkit_ppcall(CLIENT_PROFILER_CH, microkit_msginfo_new(PROFILER_START, 0));
+        } else {
+            int id = atoi(&data_packet_str[6]);
+            if (id < 0 || id >= NUM_PROF_THREADS) {
+                sddf_dprintf("Attempting to start invalid profiling thread %d!\n", id);
+            }
+            sddf_dprintf("The id was: %d\n", id);
+            microkit_mr_set(0, id);
+            microkit_ppcall(CLIENT_PROFILER_CH, microkit_msginfo_new(PROFILER_START, 1));
+        }
     } else if (msg_match(data_packet_str, STOP)) {
-        microkit_ppcall(CLIENT_PROFILER_CH, microkit_msginfo_new(PROFILER_STOP, 0));
+        /* Start command can have a thead id attached to it */
+        if (data_packet_str[4] == '\n') {
+            microkit_ppcall(CLIENT_PROFILER_CH, microkit_msginfo_new(PROFILER_STOP, 0));
+        } else {
+            int id = atoi(&data_packet_str[5]);
+            if (id < 0 || id >= NUM_PROF_THREADS) {
+                sddf_dprintf("Attempting to start invalid profiling thread %d!\n", id);
+            }
+            sddf_dprintf("The id was: %d\n", id);
+            microkit_mr_set(0, id);
+            microkit_ppcall(CLIENT_PROFILER_CH, microkit_msginfo_new(PROFILER_STOP, 1));
+        }
     } else if (msg_match(data_packet_str, MAPPINGS)) {
         error = tcp_write(pcb, MAPPINGS_STR, strlen(MAPPINGS_STR), TCP_WRITE_FLAG_COPY);
         if (error) {

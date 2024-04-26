@@ -70,6 +70,18 @@ void halt_threads() {
     }
 }
 
+void resume_thread(int thread_id) {
+    microkit_ppcall(thread_id, microkit_msginfo_new(PROFILER_START, 0));
+}
+
+void restart_thread(int thread_id) {
+    microkit_ppcall(thread_id, microkit_msginfo_new(PROFILER_RESTART, 0));
+}
+
+void halt_thread(int thread_id) {
+    microkit_ppcall(thread_id, microkit_msginfo_new(PROFILER_STOP, 0));
+}
+
 void purge_thread(microkit_channel ch) {
     /* For now, we will copy from the thread to our ring with the cli.
        This is definitely not the optimal solution for now. */
@@ -157,13 +169,33 @@ seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo) {
     switch(microkit_msginfo_get_label(msginfo)) {
         case PROFILER_START:
             profiler_state = PROF_START;
-            microkit_dbg_puts("Starting PMU threads\n");
-            resume_threads();
+            uint64_t count = microkit_msginfo_get_count(msginfo);
+            if (count == 0) {
+                microkit_dbg_puts("Starting all PMU threads\n");
+                resume_threads();
+            } else if (count == 1) {
+                int thread = microkit_mr_get(0);
+                if (thread < 0 || thread >= NUM_PROF_THREADS) {
+                    sddf_dprintf("PROF|MAIN: Bad thread id %d!\n", thread);
+                }
+                resume_thread(thread);
+            }
+
             break;
         case PROFILER_STOP:
             profiler_state = PROF_HALT;
-            microkit_dbg_puts("Halting PMU threads\n");
-            halt_threads();
+            count = microkit_msginfo_get_count(msginfo);
+            if (count == 0) {
+                microkit_dbg_puts("Halting all PMU threads\n");
+                halt_threads();
+            } else if (count == 1) {
+                int thread = microkit_mr_get(0);
+                if (thread < 0 || thread >= NUM_PROF_THREADS) {
+                    sddf_dprintf("PROF|MAIN: Bad thread id %d!\n", thread);
+                }
+                sddf_dprintf("Halting PMU thread %d\n", thread);
+                halt_thread(thread);
+            }
             break;
         case PROFILER_RESTART:
             restart_threads();
