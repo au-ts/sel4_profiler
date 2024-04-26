@@ -82,9 +82,9 @@ static err_t netconn_recv_callback(void *arg, struct tcp_pcb *pcb, struct pbuf *
             microkit_dbg_puts("Failed to send OK_READY message through netconn peer");
         }
     } else if (msg_match(data_packet_str, START)) {
-        microkit_notify(CLIENT_START_PMU_CH);
+        microkit_ppcall(CLIENT_PROFILER_CH, microkit_msginfo_new(PROFILER_START, 0));
     } else if (msg_match(data_packet_str, STOP)) {
-        microkit_notify(CLIENT_STOP_PMU_CH);
+        microkit_ppcall(CLIENT_PROFILER_CH, microkit_msginfo_new(PROFILER_STOP, 0));
     } else if (msg_match(data_packet_str, MAPPINGS)) {
         error = tcp_write(pcb, MAPPINGS_STR, strlen(MAPPINGS_STR), TCP_WRITE_FLAG_COPY);
         if (error) {

@@ -256,7 +256,7 @@ void init_pmu_regs() {
 /* Add a snapshot of the cycle and event registers to the array. This array needs to become a ring buffer. */
 void add_sample(microkit_id id, uint32_t time, uint64_t pc, uint64_t nr, uint32_t irqFlag, uint64_t *cc, uint64_t period) {
 
-    // sddf_dprintf("This is the size of the free ring: %d ---- This is the size of the used ring: %d\n", ring_size(profiler_ring.free_ring), ring_size(profiler_ring.used_ring));
+    sddf_dprintf("Adding sample in %s\n", microkit_name);
     buff_desc_t buffer;
     int ret = dequeue_free(&profiler_ring, &buffer);
     if (ret != 0) {
@@ -414,15 +414,23 @@ seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo) {
     switch(microkit_msginfo_get_label(msginfo)) {
         case PROFILER_START:
             profiler_state = PROF_START;
+            sddf_dprintf("Starting pmu on %s\n", microkit_name);
             resume_pmu();
             break;
         case PROFILER_STOP:
             profiler_state = PROF_HALT;
+            sddf_dprintf("Stopping pmu on %s\n", microkit_name);
             halt_pmu();
+            /* Purge buffers to main first */
+            microkit_notify(MAIN_CH);
             break;
         case PROFILER_RESTART:
-            reset_pmu();
-            resume_pmu();
+            /* Only restart PMU if we haven't halted */
+            if (profiler_state == PROF_START) {
+                sddf_dprintf("Restarting pmu on %s\n", microkit_name);
+                reset_pmu();
+                resume_pmu();
+            }
             break;
         default:
             microkit_dbg_puts(microkit_name);

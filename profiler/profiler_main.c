@@ -111,9 +111,8 @@ void purge_thread(microkit_channel ch) {
     /* We may not have emptied the threads rings before breaking from above loop.
         We will still resume the threads, but we will also notify the client to dump our buffers
         in the background. */
-    if (ring_empty(prof_cli_ring.free_ring)) {
+    if (ring_empty(prof_cli_ring.free_ring) || profiler_state == PROF_HALT) {
         /* set the thread state to waiting */
-        prof_thread_waiting[ch] = true;
         microkit_notify(CLIENT_PROFILER_CH);
     } else {
         microkit_ppcall(ch, microkit_msginfo_new(PROFILER_START, 0));
@@ -153,28 +152,39 @@ void init () {
     profiler_state = PROF_INIT;
 }
 
+seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo) {
+    /* This is how the profiler main thread sends control commands */
+    switch(microkit_msginfo_get_label(msginfo)) {
+        case PROFILER_START:
+            profiler_state = PROF_START;
+            microkit_dbg_puts("Starting PMU threads\n");
+            resume_threads();
+            break;
+        case PROFILER_STOP:
+            profiler_state = PROF_HALT;
+            microkit_dbg_puts("Halting PMU threads\n");
+            halt_threads();
+            break;
+        case PROFILER_RESTART:
+            restart_threads();
+            break;
+        default:
+            microkit_dbg_puts(microkit_name);
+            microkit_dbg_puts(": Invalid ppcall to profiler thread!\n");
+            break;
+    }
+    return microkit_msginfo_new(0,0);
+}
+
 // TODO: Move this over to a pp call as well.
 void notified(microkit_channel ch) {
-    if (ch == 10) {
-        // Set the profiler state to start
-        microkit_dbg_puts("Starting PMU threads\n");
-        profiler_state = PROF_START;
-        resume_threads();
-    } else if (ch == 20) {
-        // Set the profiler state to halt
-        microkit_dbg_puts("Halting PMU threads\n");
-        profiler_state = PROF_HALT;
-        halt_threads();
-        // Purge any buffers that may be leftover
-        microkit_notify(CLIENT_PROFILER_CH);
-    } else if (ch == 30) {
-        // Only resume if profiler state is in 'START' state
-        if (profiler_state == PROF_START) {
-            restart_threads();
-        }
-    } else {
+    if (ch >= 0 && ch < NUM_PROF_THREADS) {
         /* This is then a notif from a thread. We want to purge all threads buffers
         to the client. Can we bypass the prof_main thread here? */
+        sddf_dprintf("Purging thread %d's buffers\n", ch);
         purge_thread(ch);
+    } else {
+        sddf_dprintf("Recv an unexpected ch notif: %d\n", ch);
     }
+
 }
