@@ -255,8 +255,6 @@ void init_pmu_regs() {
 
 /* Add a snapshot of the cycle and event registers to the array. This array needs to become a ring buffer. */
 void add_sample(microkit_id id, uint32_t time, uint64_t pc, uint64_t nr, uint32_t irqFlag, uint64_t *cc, uint64_t period) {
-
-    sddf_dprintf("Adding sample in %s\n", microkit_name);
     buff_desc_t buffer;
     int ret = dequeue_free(&profiler_ring, &buffer);
     if (ret != 0) {

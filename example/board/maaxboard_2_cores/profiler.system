@@ -146,11 +146,11 @@
     </protection_domain>
 
     <protection_domain name="dummy_prog3" priority="50" cpu="0" budget="25000">
-        <program_image path="dummy_prog.elf"/>
+        <program_image path="dummy_prog3.elf"/>
     </protection_domain>
 
     <protection_domain name="dummy_prog4" priority="50" cpu="0" budget="25000">
-        <program_image path="dummy_prog2.elf"/>
+        <program_image path="dummy_prog4.elf"/>
     </protection_domain>
 
     <!-- THIS IS THE END OF THE SYSTEM WE ARE PROFILING -->

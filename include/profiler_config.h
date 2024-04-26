@@ -18,6 +18,6 @@
     NOTE: Seperate pairs with new lines.
 */
 
-#define MAPPINGS_STR "echo.elf: 52\ndummy_prog.elf: 1\ndummy_prog2.elf: 2"
+#define MAPPINGS_STR "echo.elf: 52\ndummy_prog.elf: 1\ndummy_prog2.elf: 2\ndummy_prog3.elf: 3\ndummy_prog4.elf: 4"
 
 #define CYCLE_COUNTER_PERIOD 1.3e7

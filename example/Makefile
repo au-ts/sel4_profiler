@@ -54,7 +54,9 @@ PROFDIR=$(ROOTDIR)/profiler
 SERIALDIR=$(ROOTDIR)/serial
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 
-IMAGES := profiler_thread.elf profiler_main.elf client.elf uart.elf uart_virt_rx.elf uart_virt_tx.elf eth.elf eth_virt_rx.elf eth_virt_tx.elf eth_copy.elf arp.elf timer.elf echo.elf dummy_prog.elf dummy_prog2.elf
+IMAGES := profiler_thread.elf profiler_main.elf client.elf uart.elf uart_virt_rx.elf uart_virt_tx.elf \
+eth.elf eth_virt_rx.elf eth_virt_tx.elf eth_copy.elf arp.elf timer.elf echo.elf dummy_prog.elf \
+dummy_prog2.elf dummy_prog3.elf dummy_prog4.elf
 CFLAGS := -mcpu=$(CPU) -mstrict-align -ffreestanding -g3 -O3 -Wall  -Wno-unused-function -fno-omit-frame-pointer
 LDFLAGS := -L$(BOARD_DIR)/lib -L$(SDDF)/lib
 LIBS := -lmicrokit -Tmicrokit.ld -lc
@@ -128,6 +130,8 @@ $(ECHODIR)/udp_echo_socket.o $(ECHODIR)/tcp_echo_socket.o printf.o putchar_seria
 sddf_timer_client.o
 DUMMY_PROG_OBJS := dummy_prog.o
 DUMMY_PROG2_OBJS := dummy_prog2.o
+DUMMY_PROG3_OBJS := dummy_prog3.o
+DUMMY_PROG4_OBJS := dummy_prog4.o
 
 ETH_OBJS := $(ETHERNET_DRIVER)/ethernet.o sddf_network_sharedringbuffer.o printf.o putchar_debug.o
 ETH_VIRT_RX_OBJS := $(SDDF_NETWORK_COMPONENTS)/mux_rx.o sddf_network_sharedringbuffer.o printf.o putchar_debug.o
@@ -213,6 +217,12 @@ $(BUILD_DIR)/dummy_prog.elf: $(addprefix $(BUILD_DIR)/, $(DUMMY_PROG_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 $(BUILD_DIR)/dummy_prog2.elf: $(addprefix $(BUILD_DIR)/, $(DUMMY_PROG2_OBJS))
+	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
+
+$(BUILD_DIR)/dummy_prog3.elf: $(addprefix $(BUILD_DIR)/, $(DUMMY_PROG3_OBJS))
+	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
+
+$(BUILD_DIR)/dummy_prog4.elf: $(addprefix $(BUILD_DIR)/, $(DUMMY_PROG4_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 $(IMAGE_FILE) $(REPORT_FILE): $(addprefix $(BUILD_DIR)/, $(IMAGES)) $(SYSTEM_DESC)
