@@ -1,4 +1,4 @@
-# seL4 Profile
+# seL4 Profiler
 This is a framework for profiling on-top of seL4. It is a statistical profiler that can be configured to
 sample based on different events and frequencies. There is a sample client that can dump packets either
 over serial or the network.
