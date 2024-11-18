@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stdint.h>
+#include <stdbool.h>
 #include <sel4/profiler_types.h>
 
 #define BIT(nr) (1UL << (nr))

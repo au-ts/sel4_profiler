@@ -39,78 +39,42 @@ int profiler_state;
 
 /* Halt the PMU */
 void halt_pmu() {
-    uint32_t value = 0;
-    uint32_t mask = 0;
-
-    /* Disable Performance Counter */
-    MRS(PMCR_EL0, value);
-    mask = 0;
-    mask |= (1 << 0); /* Enable */
-    mask |= (1 << 1); /* Cycle counter reset */
-    mask |= (1 << 2); /* Reset all counters */
-    MSR(PMCR_EL0, (value & ~mask));
-
-    /* Disable cycle counter register */
-    MRS(PMCNTENSET_EL0, value);
-    mask = 0;
-    mask |= (1 << 31);
-    MSR(PMCNTENSET_EL0, (value & ~mask));
+    seL4_ARM_PMUControl_CounterControl(PMU_CONTROL_CAP, 0);
 }
 
 /* Resume the PMU */
 void resume_pmu() {
-    uint64_t val;
-
-    MRS(PMCR_EL0, val);
-
-    val |= BIT(0);
-
-    ISB;
-    MSR(PMCR_EL0, val);
-
-    MSR(PMCNTENSET_EL0, (BIT(31)));
+    seL4_ARM_PMUControl_CounterControl(PMU_CONTROL_CAP, 1);
 }
 
 // Configure event counter 0
 void configure_cnt0(uint32_t event, uint32_t val) {
-    ISB;
-    MSR(PMU_EVENT_CTR0, 0xffffffff - val);
-    MSR(PMU_EVENT_TYP0, event);
+    seL4_ARM_PMUControl_WriteEventCounter(PMU_CONTROL_CAP, 0, 0xffffffff - val, event);
 }
 
 // Configure event counter 1
 void configure_cnt1(uint32_t event, uint32_t val) {
-    ISB;
-    MSR(PMU_EVENT_CTR1, 0xffffffff - val);
-    MSR(PMU_EVENT_TYP1, event);
+    seL4_ARM_PMUControl_WriteEventCounter(PMU_CONTROL_CAP, 1, 0xffffffff - val, event);
 }
 
 // Configure event counter 2
 void configure_cnt2(uint32_t event, uint32_t val) {
-    ISB;
-    MSR(PMU_EVENT_CTR2, 0xffffffff - val);
-    MSR(PMU_EVENT_TYP2, event);
+    seL4_ARM_PMUControl_WriteEventCounter(PMU_CONTROL_CAP, 2, 0xffffffff - val, event);
 }
 
 // Configure event counter 3
 void configure_cnt3(uint32_t event, uint32_t val) {
-    ISB;
-    MSR(PMU_EVENT_CTR3, 0xffffffff - val);
-    MSR(PMU_EVENT_TYP3, event);
+    seL4_ARM_PMUControl_WriteEventCounter(PMU_CONTROL_CAP, 3, 0xffffffff - val, event);
 }
 
 // Configure event counter 4
 void configure_cnt4(uint32_t event, uint32_t val) {
-    ISB;
-    MSR(PMU_EVENT_CTR4, 0xffffffff - val);
-    MSR(PMU_EVENT_TYP4, event);
+    seL4_ARM_PMUControl_WriteEventCounter(PMU_CONTROL_CAP, 4, 0xffffffff - val, event);
 }
 
 // Configure event counter 5
 void configure_cnt5(uint32_t event, uint32_t val) {
-    ISB;
-    MSR(PMU_EVENT_CTR5, 0xffffffff - val);
-    MSR(PMU_EVENT_TYP5, event);
+    seL4_ARM_PMUControl_WriteEventCounter(PMU_CONTROL_CAP, 5, 0xffffffff - val, event);
 }
 
 void reset_pmu() {
@@ -133,7 +97,7 @@ void reset_pmu() {
         if (pmu_registers[CYCLE_CTR].sampling == 1) {
             init_cnt = 0xffffffffffffffff - CYCLE_COUNTER_PERIOD;
         }
-        MSR(PMU_CYCLE_CTR, init_cnt);
+        seL4_ARM_PMUControl_WriteEventCounter(PMU_CONTROL_CAP, 6, init_cnt, 0);
         pmu_registers[CYCLE_CTR].overflowed = 0;
     }
 
@@ -146,7 +110,7 @@ void configure_clkcnt(uint64_t val, bool sampling) {
     pmu_registers[CYCLE_CTR].sampling = sampling;
 
     uint64_t init_cnt = 0xffffffffffffffff - pmu_registers[CYCLE_CTR].count;
-    MSR(PMU_CYCLE_CTR, init_cnt);
+    seL4_ARM_PMUControl_WriteEventCounter(PMU_CONTROL_CAP, 6, init_cnt, 0);
 }
 
 void configure_eventcnt(int cntr, uint32_t event, uint64_t val, bool sampling) {
@@ -211,46 +175,46 @@ void add_sample(microkit_id id, uint32_t time, uint64_t pc, uint64_t nr, uint32_
 }
 
 /* Dump the values of the cycle counter and event counters 0 to 5*/
-void print_pmu_debug() {
-    uint64_t clock = 0;
-    uint32_t c1 = 0;
-    uint32_t c2 = 0;
-    uint32_t c3 = 0;
-    uint32_t c4 = 0;
-    uint32_t c5 = 0;
-    uint32_t c6 = 0;
+// void print_pmu_debug() {
+//     uint64_t clock = 0;
+//     uint32_t c1 = 0;
+//     uint32_t c2 = 0;
+//     uint32_t c3 = 0;
+//     uint32_t c4 = 0;
+//     uint32_t c5 = 0;
+//     uint32_t c6 = 0;
 
-    ISB;
-    MRS(PMU_CYCLE_CTR, clock);
-    ISB;
-    MRS(PMU_EVENT_CTR0, c1);
-    ISB;
-    MRS(PMU_EVENT_CTR1, c2);
-    ISB;
-    MRS(PMU_EVENT_CTR2, c3);
-    ISB;
-    MRS(PMU_EVENT_CTR3, c4);
-    ISB;
-    MRS(PMU_EVENT_CTR4, c5);
-    ISB;
-    MRS(PMU_EVENT_CTR5, c6);
+//     ISB;
+//     MRS(PMU_CYCLE_CTR, clock);
+//     ISB;
+//     MRS(PMU_EVENT_CTR0, c1);
+//     ISB;
+//     MRS(PMU_EVENT_CTR1, c2);
+//     ISB;
+//     MRS(PMU_EVENT_CTR2, c3);
+//     ISB;
+//     MRS(PMU_EVENT_CTR3, c4);
+//     ISB;
+//     MRS(PMU_EVENT_CTR4, c5);
+//     ISB;
+//     MRS(PMU_EVENT_CTR5, c6);
 
-    microkit_dbg_puts("This is the current cycle counter: ");
-    puthex64(clock);
-    microkit_dbg_puts("\nThis is the current event counter 0: ");
-    puthex64(c1);
-    microkit_dbg_puts("\nThis is the current event counter 1: ");
-    puthex64(c2);
-    microkit_dbg_puts("\nThis is the current event counter 2: ");
-    puthex64(c3);
-    microkit_dbg_puts("\nThis is the current event counter 3: ");
-    puthex64(c4);
-    microkit_dbg_puts("\nThis is the current event counter 4: ");
-    puthex64(c5);
-    microkit_dbg_puts("\nThis is the current event counter 5: ");
-    puthex64(c6);
-    microkit_dbg_puts("\n");
-}
+//     microkit_dbg_puts("This is the current cycle counter: ");
+//     puthex64(clock);
+//     microkit_dbg_puts("\nThis is the current event counter 0: ");
+//     puthex64(c1);
+//     microkit_dbg_puts("\nThis is the current event counter 1: ");
+//     puthex64(c2);
+//     microkit_dbg_puts("\nThis is the current event counter 2: ");
+//     puthex64(c3);
+//     microkit_dbg_puts("\nThis is the current event counter 3: ");
+//     puthex64(c4);
+//     microkit_dbg_puts("\nThis is the current event counter 4: ");
+//     puthex64(c5);
+//     microkit_dbg_puts("\nThis is the current event counter 5: ");
+//     puthex64(c6);
+//     microkit_dbg_puts("\n");
+// }
 
 void init_pmu_regs() {
     /* Initialise the register array */
@@ -427,14 +391,10 @@ seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo) {
 void notified(microkit_channel ch) {
     if (ch == 21) {
         // Get the interrupt flag from the PMU
-        uint32_t irqFlag = 0;
-        MRS(PMOVSCLR_EL0, irqFlag);
+        // @kwinter: need to make sure that this actually works. We are masking the PMU interrupt register in the kernel now.
+        seL4_ARM_PMUControl_InterruptValue_t ret = seL4_ARM_PMUControl_InterruptValue(PMU_CONTROL_CAP);
 
-        handle_irq(irqFlag);
-
-        // Clear the interrupt flag
-        uint32_t val = BIT(31);
-        MSR(PMOVSCLR_EL0, val);
+        handle_irq(ret.interrupt_val);
 
         microkit_irq_ack(ch);
     }
