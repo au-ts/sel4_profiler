@@ -180,7 +180,7 @@ $(BUILD_DIR)/uart_virt_tx.elf: $(addprefix $(BUILD_DIR)/, $(UART_VIRT_TX_OBJS))
 
 $(BUILD_DIR)/client.elf: $(addprefix $(BUILD_DIR)/, $(CLIENT_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
-	
+
 $(BUILD_DIR)/eth.elf: $(addprefix $(BUILD_DIR)/, $(ETH_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
@@ -223,6 +223,3 @@ directories:
 clean:
 	rm -f *.o *.elf .depend*
 	find . -name \*.o |xargs --no-run-if-empty rm
-
-
-	
