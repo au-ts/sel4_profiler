@@ -31,17 +31,11 @@ LWIP_DEPS = $(OBJS:.o=.d)
 %.o: %.s Makefile| prof_client
 	$(AS) -g3 -mcpu=$(CPU) $< -o $@
 
-prof_client: all
+prof_client:
 	mkdir -p $@
 
 prof_client.elf: $(addprefix prof_client/, $(notdir $(LWIP_OBJS)))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
-
-%.o:
-	$(CC) $(CFLAGS) -c $(@:.o=.c) -o $@
-
-all: prof_client
-
 
 .PHONY: all depend compile clean
 

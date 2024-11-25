@@ -3,7 +3,7 @@ BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 SYSTEM_FILE := ${ROOTDIR}/example/board/$(MICROKIT_BOARD)/profiler.system
 IMAGE_FILE := loader.img
 REPORT_FILE := report.txt
-IMAGES := prof_client.elf
+IMAGES :=   prof_client.elf profiler.elf
 LWIPDIR:=network/ipstacks/lwip/src
 PROTOBUFDIR := ${ROOTDIR}/protobuf
 UTIL:=$(SDDF)/util
@@ -30,16 +30,15 @@ CFLAGS := -mcpu=$(CPU) \
 	  -MP
 
 LDFLAGS := -L$(BOARD_DIR)/lib -L${LIBC}
-LIBS := --start-group -lmicrokit -Tmicrokit.ld -lc libsddf_util_debug.a --end-group
+LIBS := --start-group -lmicrokit -Tmicrokit.ld -lc libsddf_util.a --end-group
 
 # Need to build libsddf_util_debug.a because it's included in LIBS
 # for the unimplemented libc dependencies
-${IMAGES}: libsddf_util_debug.a
+${IMAGES}: libsddf_util.a
 
 ${IMAGE_FILE} $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
 
-
-# include $(ROOTDIR)/profiler/profiler.mk
-include $(ROOTDIR)/profiler_client/profiler_client.mk
 include ${SDDF}/util/util.mk
+include $(ROOTDIR)/profiler_client/profiler_client.mk
+include $(ROOTDIR)/profiler/profiler.mk
