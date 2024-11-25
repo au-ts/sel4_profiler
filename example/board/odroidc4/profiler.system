@@ -320,7 +320,7 @@
     </channel>
 
    <channel>
-        <end pd="prof_client" id="11"/>
+        <end pd="prof_client" id="12"/>
         <end pd="uart_virt_rx" id="1"/>
     </channel>
 

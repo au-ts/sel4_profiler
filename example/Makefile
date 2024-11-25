@@ -114,7 +114,7 @@ UART_OBJS := $(UART_DRIVER)/uart.o printf.o putchar_debug.o
 UART_VIRT_TX_OBJS := $(UART_COMPONENTS)/virt_tx.o
 UART_VIRT_RX_OBJS := $(UART_COMPONENTS)/virt_rx.o
 PROFILER_OBJS := $(PROFDIR)/profiler.o sddf_network_sharedringbuffer.o printf.o putchar_debug.o
-CLIENT_OBJS := $(PROFDIR)/client.o $(PROFDIR)/serial_server.o  sddf_network_sharedringbuffer.o  \
+CLIENT_OBJS := $(PROFDIR)/client.o sddf_network_sharedringbuffer.o  \
  $(PROF_LWIPFILES:.c=.o) $(PROFDIR)/lwip.o $(PROFDIR)/netconn_socket.o sddf_timer_client.o \
  $(PROTOBUFDIR)/nanopb/pmu_sample.pb.o $(PROTOBUFDIR)/nanopb/pb_common.o $(PROTOBUFDIR)/nanopb/pb_encode.o \
  $(SERIALDIR)/profiler_printf.o printf.o putchar_debug.o
@@ -180,7 +180,7 @@ $(BUILD_DIR)/uart_virt_tx.elf: $(addprefix $(BUILD_DIR)/, $(UART_VIRT_TX_OBJS))
 
 $(BUILD_DIR)/client.elf: $(addprefix $(BUILD_DIR)/, $(CLIENT_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
-	
+
 $(BUILD_DIR)/eth.elf: $(addprefix $(BUILD_DIR)/, $(ETH_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 

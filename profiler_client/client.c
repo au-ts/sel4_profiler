@@ -5,25 +5,37 @@
 #include <sel4/sel4.h>
 #include "client.h"
 #include "profiler.h"
-#include <sddf/network/shared_ringbuffer.h>
+#include <sddf/network/queue.h>
 #include <sddf/serial/queue.h>
-#include "serial_server.h"
 #include "socket.h"
 #include <string.h>
+#include <serial_config.h>
 #include "lwip/ip.h"
 #include "lwip/pbuf.h"
 #include "lwip/tcp.h"
 #include "pb_encode.h"
 #include "pmu_sample.pb.h"
-#include "profiler_printf.h"
 
-uintptr_t uart_base;
+/* Serial communication. */
+#define SERIAL_TX_CH 9
+#define SERIAL_RX_CH 12
 
-uintptr_t profiler_ring_used;
-uintptr_t profiler_ring_free;
+serial_queue_t *rx_queue;
+serial_queue_t *tx_queue;
+
+char *rx_data;
+char *tx_data;
+
+serial_queue_handle_t rx_queue_handle;
+serial_queue_handle_t tx_queue_handle;
+
+/* Profiler communication. */
+// @kwinter: Switch this over to a profiler specific queue implementation
+net_queue_t *profiler_ring_active;
+net_queue_t *profiler_ring_free;
 uintptr_t profiler_mem;
 
-ring_handle_t profiler_ring;
+net_queue_handle_t profiler_ring;
 
 int client_state;
 
@@ -56,32 +68,38 @@ static inline void my_itoa(uint64_t n, char s[])
     my_reverse(s);
 }
 
+char get_char() {
+    char c;
+    serial_dequeue(&rx_queue_handle, &rx_queue_handle.queue->head, &c);
+    return c;
+}
+
 void print_dump() {
-    buff_desc_t buffer;
+    net_buff_desc_t buffer;
 
     // Dequeue from the profiler used ring
-    while(!dequeue_used(&profiler_ring, &buffer)) {
-        prof_sample_t *sample = (prof_sample_t *) buffer.phys_or_offset;
+    while(!net_dequeue_free(&profiler_ring, &buffer)) {
+        prof_sample_t *sample = (prof_sample_t *) buffer.io_or_offset;
 
-        printf_("{\n");
+        sddf_printf("{\n");
         // Print out sample
-        printf_("\t\"ip\": \"%lx\"\n", sample->ip);
-        printf_("\t\"pid\": %d\n", sample->pid);
-        printf_("\t\"time\": \"%lu\"\n", sample->time);
-        printf_("\t\"cpu\": %d\n", sample->cpu);
-        printf_("\t\"period\": \"%ld\"\n", sample->period);
-        printf_("\t\"nr\": \"%ld\"\n", sample->nr);
-        printf_("\t\"ips\": [\n");
+        sddf_printf("\t\"ip\": \"%lx\"\n", sample->ip);
+        sddf_printf("\t\"pid\": %d\n", sample->pid);
+        sddf_printf("\t\"time\": \"%lu\"\n", sample->time);
+        sddf_printf("\t\"cpu\": %d\n", sample->cpu);
+        sddf_printf("\t\"period\": \"%ld\"\n", sample->period);
+        sddf_printf("\t\"nr\": \"%ld\"\n", sample->nr);
+        sddf_printf("\t\"ips\": [\n");
         for (int i = 0; i < SEL4_PROF_MAX_CALL_DEPTH; i++) {
             if (i != SEL4_PROF_MAX_CALL_DEPTH - 1) {
-                printf_("\t\t\"%ld\",\n", sample->ips[i]);
+                sddf_printf("\t\t\"%ld\",\n", sample->ips[i]);
             } else {
-                printf_("\t\t\"%ld\"\n]\n", sample->ips[i]);
+                sddf_printf("\t\t\"%ld\"\n]\n", sample->ips[i]);
             }
-        } 
-        printf_("}\n");
+        }
+        sddf_printf("}\n");
 
-        enqueue_free(&profiler_ring, buffer);
+        net_enqueue_active(&profiler_ring, buffer);
     }
 }
 
@@ -100,21 +118,21 @@ void serial_control() {
 }
 
 void eth_dump() {
-    buff_desc_t buffer;
+    net_buff_desc_t buffer;
 
     // Dequeue from the profiler used ring
-    if (ring_empty(profiler_ring.used_ring)) {
+    if (net_queue_empty_active(&profiler_ring)) {
         // If we are done dumping the buffers, we can resume the PMU
         client_state = CLIENT_IDLE;
         microkit_ppcall(CLIENT_PROFILER_CH, microkit_msginfo_new(PROFILER_RESTART, 0));
-    } else if (!dequeue_used(&profiler_ring, &buffer)) {
+    } else if (!net_dequeue_active(&profiler_ring, &buffer)) {
         // // Create a buffer for the sample
         uint8_t pb_buff[256];
 
         // // Create a pb stream from the pb_buff
         pb_ostream_t stream = pb_ostream_from_buffer(pb_buff, sizeof(pb_buff));
 
-        prof_sample_t *sample = (prof_sample_t *) buffer.phys_or_offset;
+        prof_sample_t *sample = (prof_sample_t *) buffer.io_or_offset;
 
         // Copy the sample to a protobuf struct
         pmu_sample pb_sample;
@@ -137,7 +155,7 @@ void eth_dump() {
             microkit_dbg_puts("Nanopb encoding failed\n");
         }
 
-        enqueue_free(&profiler_ring, buffer);
+        net_enqueue_free(&profiler_ring, buffer);
 
         // We first want to send the size of the following buffer, then the buffer itself
         char size_str[8];
@@ -160,7 +178,11 @@ void init() {
     client_state = CLIENT_IDLE;
 
     // Init ring handle between profiler
-    ring_init(&profiler_ring, (ring_buffer_t *) profiler_ring_free, (ring_buffer_t *) profiler_ring_used, 512);
+    net_queue_init(&profiler_ring, profiler_ring_free, profiler_ring_active, 512);
+
+    // Init serial communication
+    serial_cli_queue_init_sys(microkit_name, &rx_queue_handle, rx_queue, rx_data, &tx_queue_handle, tx_queue, tx_data);
+    // serial_putchar_init(SERIAL_TX_CH, &tx_queue_handle);
 }
 
 void notified(microkit_channel ch) {
@@ -183,8 +205,8 @@ void notified(microkit_channel ch) {
     } else if(CLIENT_CONFIG == CLIENT_CONTROL_NETWORK) {
         // Getting a network interrupt
         notified_lwip(ch);
-    } else if (ch == 11) {
-        // Getting a notification from serial mux rx.
+    } else if (ch == SERIAL_RX_CH) {
+        // Getting a notification from serial virt rx.
         serial_control();
     }
 }

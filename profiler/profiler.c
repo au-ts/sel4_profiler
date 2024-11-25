@@ -2,26 +2,23 @@
 #include <stdint.h>
 #include <microkit.h>
 #include <sel4/sel4.h>
+#include <sel4/profiler_types.h>
 #include <string.h>
 #include "profiler.h"
 #include "util.h"
-#include "serial_server.h"
-#include "snapshot.h"
-#include "timer.h"
 #include "profiler_config.h"
 #include "client.h"
-#include <sddf/network/shared_ringbuffer.h>
 #include <sddf/util/printf.h>
+#include <sddf/network/queue.h>
 
 uintptr_t uart_base;
 
-uintptr_t profiler_ring_used;
-uintptr_t profiler_ring_free;
-uintptr_t profiler_mem;
-
+net_queue_handle_t profiler_ring;
+net_queue_t *profiler_free;
+net_queue_t *profiler_active;
+uintptr_t profiler_data_region;
+size_t profiler_queue_capacity = 0;
 uintptr_t log_buffer;
-
-ring_handle_t profiler_ring;
 
 // Array of pmu registers available
 pmu_reg_t pmu_registers[PMU_NUM_REGS];
@@ -152,7 +149,7 @@ void configure_clkcnt(uint64_t val, bool sampling) {
 void configure_eventcnt(int cntr, uint32_t event, uint64_t val, bool sampling) {
     // First update the struct
     if (cntr < 0 || cntr >= PMU_NUM_REGS) {
-        microkit_dbg_puts("Invalid register index\n");
+        sddf_dprintf("Invalid register index\n");
         return;
     }
     pmu_registers[cntr].event = event;
@@ -164,17 +161,17 @@ void configure_eventcnt(int cntr, uint32_t event, uint64_t val, bool sampling) {
 }
 
 /* Add a snapshot of the cycle and event registers to the array. This array needs to become a ring buffer. */
-void add_sample(microkit_id id, uint32_t time, uint64_t pc, uint64_t nr, uint32_t irqFlag, uint64_t *cc, uint64_t period) {
+void add_sample(microkit_child id, uint32_t time, uint64_t pc, uint64_t nr, uint32_t irqFlag, uint64_t *cc, uint64_t period) {
 
-    buff_desc_t buffer;
-    int ret = dequeue_free(&profiler_ring, &buffer);
+    net_buff_desc_t buffer;
+    int ret = net_dequeue_free(&profiler_ring, &buffer);
     if (ret != 0) {
-        microkit_dbg_puts(microkit_name);
-        microkit_dbg_puts("Failed to dequeue from profiler free ring\n");
+        sddf_dprintf(microkit_name);
+        sddf_dprintf("Failed to dequeue from profiler free ring\n");
         return;
     }
 
-    prof_sample_t *temp_sample = (prof_sample_t *) buffer.phys_or_offset;
+    prof_sample_t *temp_sample = (prof_sample_t *) buffer.io_or_offset;
 
     // Find which counter overflowed, and the corresponding period
 
@@ -189,18 +186,18 @@ void add_sample(microkit_id id, uint32_t time, uint64_t pc, uint64_t nr, uint32_
         temp_sample->ips[i] = cc[i];
     }
 
-    ret = enqueue_used(&profiler_ring, buffer);
+    ret = net_enqueue_active(&profiler_ring, buffer);
 
     if (ret != 0) {
-        microkit_dbg_puts(microkit_name);
-        microkit_dbg_puts("Failed to dequeue from profiler used ring\n");
+        sddf_dprintf(microkit_name);
+        sddf_dprintf("Failed to dequeue from profiler used ring\n");
         return;
     }
 
     // Check if the buffers are full (for testing dumping when we have 10 buffers)
     // Notify the client that we need to dump. If we are dumping, do not
     // restart the PMU until we have managed to purge all buffers over the network.
-    if (ring_empty(profiler_ring.free_ring)) {
+    if (net_queue_empty_free(&profiler_ring)) {
         reset_pmu();
         halt_pmu();
         microkit_notify(CLIENT_PROFILER_CH);
@@ -235,21 +232,21 @@ void print_pmu_debug() {
     ISB;
     MRS(PMU_EVENT_CTR5, c6);
 
-    microkit_dbg_puts("This is the current cycle counter: ");
+    sddf_dprintf("This is the current cycle counter: ");
     puthex64(clock);
-    microkit_dbg_puts("\nThis is the current event counter 0: ");
+    sddf_dprintf("\nThis is the current event counter 0: ");
     puthex64(c1);
-    microkit_dbg_puts("\nThis is the current event counter 1: ");
+    sddf_dprintf("\nThis is the current event counter 1: ");
     puthex64(c2);
-    microkit_dbg_puts("\nThis is the current event counter 2: ");
+    sddf_dprintf("\nThis is the current event counter 2: ");
     puthex64(c3);
-    microkit_dbg_puts("\nThis is the current event counter 3: ");
+    sddf_dprintf("\nThis is the current event counter 3: ");
     puthex64(c4);
-    microkit_dbg_puts("\nThis is the current event counter 4: ");
+    sddf_dprintf("\nThis is the current event counter 4: ");
     puthex64(c5);
-    microkit_dbg_puts("\nThis is the current event counter 5: ");
+    sddf_dprintf("\nThis is the current event counter 5: ");
     puthex64(c6);
-    microkit_dbg_puts("\n");
+    sddf_dprintf("\n");
 }
 
 void init_pmu_regs() {
@@ -291,31 +288,20 @@ void init_pmu_regs() {
 }
 
 void init () {
-    microkit_dbg_puts("Profiler intialising...\n");
+    sddf_dprintf("Profiler intialising...\n");
 
     // Ensure that the PMU is not running
     halt_pmu();
 
     // Init the record buffers
-    ring_init(&profiler_ring, (ring_buffer_t *) profiler_ring_free, (ring_buffer_t *) profiler_ring_used, 512);
+    net_queue_init(&profiler_ring, profiler_free, profiler_active, 512);
 
-    for (int i = 0; i < NUM_BUFFERS - 1; i++) {
-        buff_desc_t buffer;
-        buffer.phys_or_offset = profiler_mem + (i * sizeof(prof_sample_t));
-        buffer.len = sizeof(prof_sample_t);
-        int ret = enqueue_free(&profiler_ring, buffer);
-
-        if (ret != 0) {
-            microkit_dbg_puts(microkit_name);
-            microkit_dbg_puts("Failed to populate buffers for the perf record ring buffer\n");
-            break;
-        }
-    }
+    net_buffers_init(&profiler_ring, 0);
 
     #ifdef CONFIG_PROFILER_ENABLE
     int res_buf = seL4_BenchmarkSetLogBuffer(log_buffer);
     if (res_buf) {
-        microkit_dbg_puts("Could not set log buffer");
+        sddf_dprintf("Could not set log buffer");
         puthex64(res_buf);
     }
     #endif
@@ -416,8 +402,8 @@ seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo) {
             }
             break;
         default:
-            microkit_dbg_puts(microkit_name);
-            microkit_dbg_puts(": Invalid ppcall to profiler thread!\n");
+            sddf_dprintf(microkit_name);
+            sddf_dprintf(": Invalid ppcall to profiler thread!\n");
             break;
     }
     return microkit_msginfo_new(0,0);

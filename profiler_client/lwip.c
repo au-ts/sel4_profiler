@@ -8,11 +8,13 @@
 #include <microkit.h>
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
-#include <sddf/network/shared_ringbuffer.h>
-#include <sddf/network/arp.h>
 #include <sddf/timer/client.h>
+#include <sddf/network/queue.h>
+#include <sddf/network/util.h>
+#include <sddf/serial/queue.h>
 #include <sddf/benchmark/sel4bench.h>
 #include <ethernet_config.h>
+#include <serial_config.h>
 #include <string.h>
 #include "lwip/init.h"
 #include "netif/etharp.h"
@@ -26,21 +28,24 @@
 
 #include "socket.h"
 
+#define SERIAL_TX_CH 0
 #define TIMER  1
 #define RX_CH  2
 #define TX_CH  3
-#define ARP    7
+
+char *serial_tx_data;
+serial_queue_t *serial_tx_queue;
+serial_queue_handle_t serial_tx_queue_handle;
 
 #define LWIP_TICK_MS 100
-#define NUM_PBUFFS 512
+#define NUM_PBUFFS NET_MAX_CLIENT_QUEUE_CAPACITY
 
-uintptr_t rx_free;
-uintptr_t rx_used;
-uintptr_t tx_free;
-uintptr_t tx_used;
+net_queue_t *rx_free;
+net_queue_t *rx_active;
+net_queue_t *tx_free;
+net_queue_t *tx_active;
 uintptr_t rx_buffer_data_region;
 uintptr_t tx_buffer_data_region;
-
 /* Booleans to indicate whether packets have been enqueued during notification handling */
 static bool notify_tx;
 static bool notify_rx;
@@ -61,8 +66,8 @@ LWIP_MEMPOOL_DECLARE(
 typedef struct state {
     struct netif netif;
     uint8_t mac[ETH_HWADDR_LEN];
-    ring_handle_t rx_ring;
-    ring_handle_t tx_ring;
+    net_queue_handle_t rx_queue;
+    net_queue_handle_t tx_queue;
     struct pbuf *head;
     struct pbuf *tail;
 } state_t;
@@ -89,8 +94,8 @@ static void interface_free_buffer(struct pbuf *p)
     SYS_ARCH_DECL_PROTECT(old_level);
     pbuf_custom_offset_t *custom_pbuf_offset = (pbuf_custom_offset_t *)p;
     SYS_ARCH_PROTECT(old_level);
-    buff_desc_t buffer = {custom_pbuf_offset->offset, 0};
-    int err = enqueue_free(&(state.rx_ring), buffer);
+    net_buff_desc_t buffer = {custom_pbuf_offset->offset, 0};
+    int err = net_enqueue_free(&(state.rx_queue), buffer);
     assert(!err);
     notify_rx = true;
     LWIP_MEMPOOL_FREE(RX_POOL, custom_pbuf_offset);
@@ -118,7 +123,7 @@ static struct pbuf *create_interface_buffer(uintptr_t offset, size_t length)
         PBUF_REF,
         &custom_pbuf_offset->custom,
         (void *)(offset + rx_buffer_data_region),
-        BUFF_SIZE
+        NET_BUFFER_SIZE
     );
 }
 
@@ -130,7 +135,7 @@ static struct pbuf *create_interface_buffer(uintptr_t offset, size_t length)
 void enqueue_pbufs(struct pbuf *p)
 {
     /* Indicate to the multiplexer that we require transmit free buffers */
-    request_signal(state.tx_ring.free_ring);
+    net_request_signal_free(&state.tx_queue);
 
     if (state.head == NULL) {
         state.head = p;
@@ -149,29 +154,29 @@ void enqueue_pbufs(struct pbuf *p)
  * */
 static err_t lwip_eth_send(struct netif *netif, struct pbuf *p)
 {
-    if (p->tot_len > BUFF_SIZE) {
-        sddf_dprintf("LWIP|ERROR: attempted to send a packet of size  %llx > BUFFER SIZE  %llx\n", p->tot_len, BUFF_SIZE);
+    if (p->tot_len > NET_BUFFER_SIZE) {
+        sddf_dprintf("LWIP|ERROR: attempted to send a packet of size  %u > BUFFER SIZE  %u\n", p->tot_len, NET_BUFFER_SIZE);
         return ERR_MEM;
     }
 
-    if (ring_empty(state.tx_ring.free_ring)) {
+    if (net_queue_empty_free(&state.tx_queue)) {
         enqueue_pbufs(p);
         return ERR_OK;
     }
 
-    buff_desc_t buffer;
-    int err = dequeue_free(&(state.tx_ring), &buffer);
+    net_buff_desc_t buffer;
+    int err = net_dequeue_free(&state.tx_queue, &buffer);
     assert(!err);
 
-    unsigned char *frame = (unsigned char *)(buffer.phys_or_offset + tx_buffer_data_region);
-    unsigned int copied = 0;
+    uintptr_t frame = buffer.io_or_offset + tx_buffer_data_region;
+    uint16_t copied = 0;
     for (struct pbuf *curr = p; curr != NULL; curr = curr->next) {
-        memcpy(frame + copied, curr->payload, curr->len);
+        memcpy((void *)(frame + copied), curr->payload, curr->len);
         copied += curr->len;
     }
 
     buffer.len = copied;
-    err = enqueue_used(&(state.tx_ring), buffer);
+    err = net_enqueue_active(&state.tx_queue, buffer);
     assert(!err);
 
     notify_tx = true;
@@ -183,28 +188,33 @@ void transmit(void)
 {
     bool reprocess = true;
     while (reprocess) {
-        while(state.head != NULL && !ring_empty(state.tx_ring.free_ring)) {
+        while (state.head != NULL && !net_queue_empty_free(&state.tx_queue)) {
             err_t err = lwip_eth_send(&state.netif, state.head);
             if (err == ERR_MEM) {
-                sddf_dprintf("LWIP|ERROR: attempted to send a packet of size  %llx > BUFFER SIZE  %llx\n", state.head->tot_len, BUFF_SIZE);
-            }
-            else if (err != ERR_OK) {
-                sddf_dprintf("LWIP|ERROR: unkown error when trying to send pbuf  %llx\n", state.head);
+                sddf_dprintf("LWIP|ERROR: attempted to send a packet of size  %u > BUFFER SIZE  %u\n", state.head->tot_len,
+                             NET_BUFFER_SIZE);
+            } else if (err != ERR_OK) {
+                sddf_dprintf("LWIP|ERROR: unkown error when trying to send pbuf  %p\n", state.head);
             }
 
             struct pbuf *temp = state.head;
             state.head = temp->next_chain;
-            if (state.head == NULL) state.tail = NULL;
+            if (state.head == NULL) {
+                state.tail = NULL;
+            }
             pbuf_free(temp);
         }
 
         /* Only request a signal if no more pbufs enqueud to send */
-        if (state.head == NULL || !ring_empty(state.tx_ring.free_ring)) cancel_signal(state.tx_ring.free_ring);
-        else request_signal(state.tx_ring.free_ring);
+        if (state.head == NULL || !net_queue_empty_free(&state.tx_queue)) {
+            net_cancel_signal_free(&state.tx_queue);
+        } else {
+            net_request_signal_free(&state.tx_queue);
+        }
         reprocess = false;
 
-        if (state.head != NULL && !ring_empty(state.tx_ring.free_ring)) {
-            cancel_signal(state.tx_ring.free_ring);
+        if (state.head != NULL && !net_queue_empty_free(&state.tx_queue)) {
+            net_cancel_signal_free(&state.tx_queue);
             reprocess = true;
         }
     }
@@ -214,27 +224,29 @@ void receive(void)
 {
     bool reprocess = true;
     while (reprocess) {
-        while (!ring_empty(state.rx_ring.used_ring)) {
-            buff_desc_t buffer;
-            int err = dequeue_used(&state.rx_ring, &buffer);
+        while (!net_queue_empty_active(&state.rx_queue)) {
+            net_buff_desc_t buffer;
+            int err = net_dequeue_active(&state.rx_queue, &buffer);
             assert(!err);
 
-            struct pbuf *p = create_interface_buffer(buffer.phys_or_offset, buffer.len);
+            struct pbuf *p = create_interface_buffer(buffer.io_or_offset, buffer.len);
+            assert(p != NULL);
             if (state.netif.input(p, &state.netif) != ERR_OK) {
                 sddf_dprintf("LWIP|ERROR: unkown error inputting pbuf into network stack\n");
                 pbuf_free(p);
             }
         }
 
-        request_signal(state.rx_ring.used_ring);
+        net_request_signal_active(&state.rx_queue);
         reprocess = false;
 
-        if (!ring_empty(state.rx_ring.used_ring)) {
-            cancel_signal(state.rx_ring.used_ring);
+        if (!net_queue_empty_active(&state.rx_queue)) {
+            net_cancel_signal_active(&state.rx_queue);
             reprocess = true;
         }
     }
 }
+
 
 /**
  * Initialise the network interface data structure.
@@ -265,26 +277,30 @@ static err_t ethernet_init(struct netif *netif)
 static void netif_status_callback(struct netif *netif)
 {
     if (dhcp_supplied_address(netif)) {
-        bool success = arp_register_ipv4(ARP, ip4_addr_get_u32(netif_ip4_addr(netif)), state.mac);
-        if (!success) {
-            sddf_printf("LWIP|ERR: could not register IP with ARP\n");
-        } else {
-            sddf_printf("LWIP|NOTICE: DHCP request for %s returned IP address: %s\n", microkit_name, ip4addr_ntoa(netif_ip4_addr(netif)));
-        }
+        sddf_printf("LWIP|NOTICE: DHCP request for %s returned IP address: %s\n", microkit_name,
+                    ip4addr_ntoa(netif_ip4_addr(netif)));
     }
 }
 
 void init_lwip(void)
 {
-    cli_ring_init_sys(microkit_name, &state.rx_ring, rx_free, rx_used, &state.tx_ring, tx_free, tx_used);
-    buffers_init((ring_buffer_t *)tx_free, 0, state.tx_ring.free_ring->size);
+    serial_cli_queue_init_sys(microkit_name, NULL, NULL, NULL, &serial_tx_queue_handle, serial_tx_queue, serial_tx_data);
+    // @kwinter: For some reason ld can't find this implementation. Need to fix this.
+    // serial_putchar_init(SERIAL_TX_CH, &serial_tx_queue_handle);
+
+    size_t rx_capacity, tx_capacity;
+    net_cli_queue_capacity(microkit_name, &rx_capacity, &tx_capacity);
+    net_queue_init(&state.rx_queue, rx_free, rx_active, rx_capacity);
+    net_queue_init(&state.tx_queue, tx_free, tx_active, tx_capacity);
+    net_buffers_init(&state.tx_queue, 0);
 
     lwip_init();
     set_timeout();
 
     LWIP_MEMPOOL_INIT(RX_POOL);
 
-    cli_mac_addr_init_sys(microkit_name, state.mac);
+    uint64_t mac_addr = net_cli_mac_addr(microkit_name);
+    net_set_mac_addr(state.mac, mac_addr);
 
     /* Set dummy IP configuration values to get lwIP bootstrapped  */
     struct ip4_addr netmask, ipaddr, gw, multicast;
@@ -307,51 +323,66 @@ void init_lwip(void)
 
     setup_netconn_socket();
 
-    if (notify_rx && require_signal(state.rx_ring.free_ring)) {
-        cancel_signal(state.rx_ring.free_ring);
+    if (notify_rx && net_require_signal_free(&state.rx_queue)) {
+        net_cancel_signal_free(&state.rx_queue);
         notify_rx = false;
-        if (!have_signal) microkit_notify_delayed(RX_CH);
-        else if (signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + RX_CH) microkit_notify(RX_CH);
+        if (!microkit_have_signal) {
+            microkit_deferred_notify(RX_CH);
+        } else if (microkit_signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + RX_CH) {
+            microkit_notify(RX_CH);
+        }
     }
 
-    if (notify_tx && require_signal(state.tx_ring.used_ring)) {
-        cancel_signal(state.tx_ring.used_ring);
+    if (notify_tx && net_require_signal_active(&state.tx_queue)) {
+        net_cancel_signal_active(&state.tx_queue);
         notify_tx = false;
-        if (!have_signal) microkit_notify_delayed(TX_CH);
-        else if (signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + TX_CH) microkit_notify(TX_CH);
+        if (!microkit_have_signal) {
+            microkit_deferred_notify(TX_CH);
+        } else if (microkit_signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + TX_CH) {
+            microkit_notify(TX_CH);
+        }
     }
 }
 
 void notified_lwip(microkit_channel ch)
 {
-    switch(ch) {
-        case RX_CH:
-            receive();
-            break;
-        case TIMER:
-            sys_check_timeouts();
-            set_timeout();
-            break;
-        case TX_CH:
-            transmit();
-            receive();
-            break;
-        default:
-            sddf_dprintf("LWIP|LOG: received notification on unexpected channel: %lu\n", ch);
-            break;
+    switch (ch) {
+    case RX_CH:
+        receive();
+        break;
+    case TIMER:
+        sys_check_timeouts();
+        set_timeout();
+        break;
+    case TX_CH:
+        transmit();
+        receive();
+        break;
+    case SERIAL_TX_CH:
+        // Nothing to do
+        break;
+    default:
+        sddf_dprintf("LWIP|LOG: received notification on unexpected channel: %u\n", ch);
+        break;
     }
 
-    if (notify_rx && require_signal(state.rx_ring.free_ring)) {
-        cancel_signal(state.rx_ring.free_ring);
+    if (notify_rx && net_require_signal_free(&state.rx_queue)) {
+        net_cancel_signal_free(&state.rx_queue);
         notify_rx = false;
-        if (!have_signal) microkit_notify_delayed(RX_CH);
-        else if (signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + RX_CH) microkit_notify(RX_CH);
+        if (!microkit_have_signal) {
+            microkit_deferred_notify(RX_CH);
+        } else if (microkit_signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + RX_CH) {
+            microkit_notify(RX_CH);
+        }
     }
 
-    if (notify_tx && require_signal(state.tx_ring.used_ring)) {
-        cancel_signal(state.tx_ring.used_ring);
+    if (notify_tx && net_require_signal_active(&state.tx_queue)) {
+        net_cancel_signal_active(&state.tx_queue);
         notify_tx = false;
-        if (!have_signal) microkit_notify_delayed(TX_CH);
-        else if (signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + TX_CH) microkit_notify(TX_CH);
+        if (!microkit_have_signal) {
+            microkit_deferred_notify(TX_CH);
+        } else if (microkit_signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + TX_CH) {
+            microkit_notify(TX_CH);
+        }
     }
 }
