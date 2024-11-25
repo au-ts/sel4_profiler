@@ -69,7 +69,7 @@ static inline void my_itoa(uint64_t n, char s[])
 }
 
 char get_char() {
-    char c;
+    char c = 0;
     serial_dequeue(&rx_queue_handle, &rx_queue_handle.queue->head, &c);
     return c;
 }
@@ -166,6 +166,14 @@ void eth_dump() {
 
 }
 
+void init_serial()
+{
+    // Init serial communication
+    serial_cli_queue_init_sys(microkit_name, &rx_queue_handle, rx_queue, rx_data, &tx_queue_handle, tx_queue, tx_data);
+    // serial_putchar_init(SERIAL_TX_CH, &tx_queue_handle);
+
+}
+
 void init() {
     if (CLIENT_CONFIG == CLIENT_CONTROL_SERIAL) {
         init_serial();
@@ -180,9 +188,6 @@ void init() {
     // Init ring handle between profiler
     net_queue_init(&profiler_ring, profiler_ring_free, profiler_ring_active, 512);
 
-    // Init serial communication
-    serial_cli_queue_init_sys(microkit_name, &rx_queue_handle, rx_queue, rx_data, &tx_queue_handle, tx_queue, tx_data);
-    // serial_putchar_init(SERIAL_TX_CH, &tx_queue_handle);
 }
 
 void notified(microkit_channel ch) {
@@ -198,7 +203,7 @@ void notified(microkit_channel ch) {
             if (client_state == CLIENT_IDLE) {
                 client_state = CLIENT_DUMP;
                 // Set the callback
-                tcp_sent_callback(eth_dump);
+                tcp_sent_callback((void *) eth_dump);
                 eth_dump();
             }
         }
