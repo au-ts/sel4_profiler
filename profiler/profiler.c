@@ -13,7 +13,7 @@
 
 uintptr_t uart_base;
 
-net_queue_handle_t profiler_ring;
+net_queue_handle_t profiler_queue;
 net_queue_t *profiler_free;
 net_queue_t *profiler_active;
 uintptr_t profiler_data_region;
@@ -164,7 +164,7 @@ void configure_eventcnt(int cntr, uint32_t event, uint64_t val, bool sampling) {
 void add_sample(microkit_child id, uint32_t time, uint64_t pc, uint64_t nr, uint32_t irqFlag, uint64_t *cc, uint64_t period) {
 
     net_buff_desc_t buffer;
-    int ret = net_dequeue_free(&profiler_ring, &buffer);
+    int ret = net_dequeue_free(&profiler_queue, &buffer);
     if (ret != 0) {
         sddf_dprintf(microkit_name);
         sddf_dprintf("Failed to dequeue from profiler free ring\n");
@@ -186,7 +186,7 @@ void add_sample(microkit_child id, uint32_t time, uint64_t pc, uint64_t nr, uint
         temp_sample->ips[i] = cc[i];
     }
 
-    ret = net_enqueue_active(&profiler_ring, buffer);
+    ret = net_enqueue_active(&profiler_queue, buffer);
 
     if (ret != 0) {
         sddf_dprintf(microkit_name);
@@ -197,7 +197,7 @@ void add_sample(microkit_child id, uint32_t time, uint64_t pc, uint64_t nr, uint
     // Check if the buffers are full (for testing dumping when we have 10 buffers)
     // Notify the client that we need to dump. If we are dumping, do not
     // restart the PMU until we have managed to purge all buffers over the network.
-    if (net_queue_empty_free(&profiler_ring)) {
+    if (net_queue_empty_free(&profiler_queue)) {
         reset_pmu();
         halt_pmu();
         microkit_notify(CLIENT_PROFILER_CH);
@@ -294,9 +294,9 @@ void init () {
     halt_pmu();
 
     // Init the record buffers
-    net_queue_init(&profiler_ring, profiler_free, profiler_active, 512);
+    net_queue_init(&profiler_queue, profiler_free, profiler_active, 512);
 
-    net_buffers_init(&profiler_ring, 0);
+    net_buffers_init(&profiler_queue, 0);
 
     #ifdef CONFIG_PROFILER_ENABLE
     int res_buf = seL4_BenchmarkSetLogBuffer(log_buffer);

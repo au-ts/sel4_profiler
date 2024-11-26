@@ -31,11 +31,11 @@ serial_queue_handle_t tx_queue_handle;
 
 /* Profiler communication. */
 // @kwinter: Switch this over to a profiler specific queue implementation
-net_queue_t *profiler_ring_active;
-net_queue_t *profiler_ring_free;
-uintptr_t profiler_mem;
+net_queue_t *profiler_active;
+net_queue_t *profiler_free;
+uintptr_t profiler_data_region;
 
-net_queue_handle_t profiler_ring;
+net_queue_handle_t profiler_queue;
 
 int client_state;
 
@@ -78,7 +78,7 @@ void print_dump() {
     net_buff_desc_t buffer;
 
     // Dequeue from the profiler used ring
-    while(!net_dequeue_free(&profiler_ring, &buffer)) {
+    while(!net_dequeue_free(&profiler_queue, &buffer)) {
         prof_sample_t *sample = (prof_sample_t *) buffer.io_or_offset;
 
         sddf_printf("{\n");
@@ -99,7 +99,7 @@ void print_dump() {
         }
         sddf_printf("}\n");
 
-        net_enqueue_active(&profiler_ring, buffer);
+        net_enqueue_active(&profiler_queue, buffer);
     }
 }
 
@@ -121,11 +121,11 @@ void eth_dump() {
     net_buff_desc_t buffer;
 
     // Dequeue from the profiler used ring
-    if (net_queue_empty_active(&profiler_ring)) {
+    if (net_queue_empty_active(&profiler_queue)) {
         // If we are done dumping the buffers, we can resume the PMU
         client_state = CLIENT_IDLE;
         microkit_ppcall(CLIENT_PROFILER_CH, microkit_msginfo_new(PROFILER_RESTART, 0));
-    } else if (!net_dequeue_active(&profiler_ring, &buffer)) {
+    } else if (!net_dequeue_active(&profiler_queue, &buffer)) {
         // // Create a buffer for the sample
         uint8_t pb_buff[256];
 
@@ -155,7 +155,7 @@ void eth_dump() {
             microkit_dbg_puts("Nanopb encoding failed\n");
         }
 
-        net_enqueue_free(&profiler_ring, buffer);
+        net_enqueue_free(&profiler_queue, buffer);
 
         // We first want to send the size of the following buffer, then the buffer itself
         char size_str[8];
@@ -178,7 +178,6 @@ void init() {
     if (CLIENT_CONFIG == CLIENT_CONTROL_SERIAL) {
         init_serial();
     } else if (CLIENT_CONFIG == CLIENT_CONTROL_NETWORK) {
-        microkit_dbg_puts("initialising lwip\n");
         init_lwip();
     }
 
@@ -186,7 +185,7 @@ void init() {
     client_state = CLIENT_IDLE;
 
     // Init ring handle between profiler
-    net_queue_init(&profiler_ring, profiler_ring_free, profiler_ring_active, 512);
+    net_queue_init(&profiler_queue, profiler_free, profiler_active, 512);
 
 }
 

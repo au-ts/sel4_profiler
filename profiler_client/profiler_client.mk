@@ -4,6 +4,8 @@
 # SPDX-License-Identifier: BSD-2-Clause
 #
 
+vpath %.c ${ROOTDIR} ${SDDF}
+
 # The issue with this system is that we are NOT executing this build snippet in the
 # build directory. We need to therefore have a different approach.
 
@@ -14,28 +16,31 @@ include ${SDDF}/$(LWIPDIR)/Filelists.mk
 NETIFFILES:=$(LWIPDIR)/netif/ethernet.c
 
 # LWIPFILES: All the above.
-LWIPFILES=  $(addprefix $(SDDF)/, $(COREFILES) $(CORE4FILES) $(NETIFFILES))
+LWIPFILES=   $(COREFILES) $(CORE4FILES) $(NETIFFILES)
 # Do we need to add timer client into here?
-LWIP_OBJS :=  $(LWIPFILES:.c=.o) $(ROOTDIR)/profiler_client/lwip.o $(ROOTDIR)/profiler_client/netconn_socket.o $(ROOTDIR)/profiler_client/client.o \
-			$(PROTOBUFDIR)/nanopb/pmu_sample.pb.o $(PROTOBUFDIR)/nanopb/pb_common.o $(PROTOBUFDIR)/nanopb/pb_encode.o
+
+LWIP_OBJS := $(LWIPFILES:.c=.o)
+PROF_CLIENT_OBJS :=  $(addprefix profiler_client/, lwip.o netconn_socket.o client.o) \
+			$(addprefix protobuf/nanopb/, pmu_sample.pb.o pb_common.o pb_encode.o)
 
 # OBJS := $(addprefix $(BUILD_DIR)/, $(LWIP_OBJS))
-OBJS:= $(LWIP_OBJS)
-LWIP_DEPS = $(OBJS:.o=.d)
+OBJS:= $(LWIP_OBJS) $(PROF_CLIENT_OBJS)
+LWIP_DEPS := $(filter %.d,$(OBJS:.o=.d))
 
--include $(LWIP_DEPS)
+%.elf: %.o
+	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
 
-%.d %.o: %.c Makefile| prof_client
-	$(CC) -c $(CFLAGS) $< -o prof_client/$(notdir $*).o
-
-%.o: %.s Makefile| prof_client
-	$(AS) -g3 -mcpu=$(CPU) $< -o $@
-
-prof_client:
-	mkdir -p $@
-
-prof_client.elf: $(addprefix prof_client/, $(notdir $(LWIP_OBJS)))
+prof_client.elf: $(LWIP_OBJS) $(PROF_CLIENT_OBJS) libsddf_util.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-.PHONY: all depend compile clean
+PROFCLIENTDIR := profiler_client protobuf/nanopb
+$(PROF_CLIENT_OBJS): | ${PROFCLIENTDIR}
+${PROFCLIENTDIR}:
+	mkdir -p $@
 
+LWIPDIRS := $(addprefix ${LWIPDIR}/, core/ipv4 netif api)
+${LWIP_OBJS}: |${LWIPDIRS}
+${LWIPDIRS}:
+	mkdir -p $@
+
+-include $(LWIP_DEPS)

@@ -1,7 +1,7 @@
 # This is a test makefile for the profiler system
 export MICROKIT_CONFIG ?= profiler
-# export BUILD_DIR:=$(abspath build)
-export BUILD_DIR := build
+export BUILD_DIR:=$(abspath build)
+# export BUILD_DIR := build
 
 ifeq ($(strip $(TOOLCHAIN)),)
 	TOOLCHAIN := aarch64-none-elf

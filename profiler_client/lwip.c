@@ -286,7 +286,7 @@ void init_lwip(void)
 {
     serial_cli_queue_init_sys(microkit_name, NULL, NULL, NULL, &serial_tx_queue_handle, serial_tx_queue, serial_tx_data);
     // @kwinter: For some reason ld can't find this implementation. Need to fix this.
-    // serial_putchar_init(SERIAL_TX_CH, &serial_tx_queue_handle);
+    serial_putchar_init(SERIAL_TX_CH, &serial_tx_queue_handle);
 
     size_t rx_capacity, tx_capacity;
     net_cli_queue_capacity(microkit_name, &rx_capacity, &tx_capacity);
