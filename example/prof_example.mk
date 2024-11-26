@@ -41,8 +41,7 @@ CFLAGS := -mcpu=$(CPU) \
 	  -MP
 
 LDFLAGS := -L$(BOARD_DIR)/lib -L${LIBC}
-LIBS := --start-group -lmicrokit -Tmicrokit.ld -lc libsddf_util.a libsddf_util_debug.a --end-group
-
+LIBS := --start-group -lmicrokit -Tmicrokit.ld -lc libsddf_util_debug.a --end-group
 
 %.elf: %.o
 	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
@@ -54,10 +53,10 @@ DUMMY_PROG2_OBJS := dummy_prog2.o
 OBJS := $(DUMMY_PROG_OBJS) $(DUMMY_PROG2_OBJS)
 DEPS := $(filter %.d,$(OBJS:.o=.d))
 
-dummy_prog.elf: $(DUMMY_PROG_OBJS) libsddf_util.a
+dummy_prog.elf: $(DUMMY_PROG_OBJS) libsddf_util_debug.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-dummy_prog2.elf: $(DUMMY_PROG2_OBJS) libsddf_util.a
+dummy_prog2.elf: $(DUMMY_PROG2_OBJS) libsddf_util_debug.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 # This shouldn't be needed as make *should* use the default CC recipe.

@@ -10,7 +10,7 @@
  * @TAG(DATA61_BSD)
  */
 
-#include <string.h>
+#include <sddf/util/string.h>
 #include <microkit.h>
 
 #include "lwip/ip.h"
@@ -57,7 +57,7 @@ uintptr_t data_packet;
 #define MAPPINGS "MAPPINGS\n"
 #define REFRESH "REFRESH\n"
 
-#define msg_match(msg, match) (strncmp(msg, match, strlen(match))==0)
+#define msg_match(msg, match) (sddf_strncmp(msg, match, sddf_strlen(match))==0)
 
 
 static err_t netconn_sent_callback(void *arg, struct tcp_pcb *pcb, u16_t len)
@@ -78,19 +78,21 @@ static err_t netconn_recv_callback(void *arg, struct tcp_pcb *pcb, struct pbuf *
     err_t error;
 
     if (msg_match(data_packet_str, HELLO)) {
-        error = tcp_write(pcb, OK_READY, strlen(OK_READY), TCP_WRITE_FLAG_COPY);
+        error = tcp_write(pcb, OK_READY, sddf_strlen(OK_READY), TCP_WRITE_FLAG_COPY);
         if (error) {
             microkit_dbg_puts("Failed to send OK_READY message through netconn peer");
         }
     } else if (msg_match(data_packet_str, START)) {
+        microkit_dbg_puts("making ppcall\n");
         microkit_ppcall(CLIENT_PROFILER_CH, microkit_msginfo_new(PROFILER_START, 0));
     } else if (msg_match(data_packet_str, STOP)) {
+        microkit_dbg_puts("making ppcall\n");
         microkit_ppcall(CLIENT_PROFILER_CH, microkit_msginfo_new(PROFILER_STOP, 0));
     } else if (msg_match(data_packet_str, MAPPINGS)) {
         #ifndef MAPPINGS_STR
         #define MAPPINGS_STR ""
         #endif
-        error = tcp_write(pcb, MAPPINGS_STR, strlen(MAPPINGS_STR), TCP_WRITE_FLAG_COPY);
+        error = tcp_write(pcb, MAPPINGS_STR, sddf_strlen(MAPPINGS_STR), TCP_WRITE_FLAG_COPY);
         if (error) {
             microkit_dbg_puts("Failed to send mappings through netconn peer");
         }
@@ -101,7 +103,7 @@ static err_t netconn_recv_callback(void *arg, struct tcp_pcb *pcb, struct pbuf *
         microkit_dbg_puts("Received a message that we can't handle ");
         microkit_dbg_puts(data_packet_str);
         microkit_dbg_puts("\n");
-        error = tcp_write(pcb, ERROR, strlen(ERROR), TCP_WRITE_FLAG_COPY);
+        error = tcp_write(pcb, ERROR, sddf_strlen(ERROR), TCP_WRITE_FLAG_COPY);
         if (error) {
             microkit_dbg_puts("Failed to send OK message through netconn peer");
         }
@@ -113,7 +115,7 @@ static err_t netconn_recv_callback(void *arg, struct tcp_pcb *pcb, struct pbuf *
 static err_t netconn_accept_callback(void *arg, struct tcp_pcb *newpcb, err_t err)
 {
     microkit_dbg_puts("Netconn connection established!\n");
-    err_t error = tcp_write(newpcb, WHOAMI, strlen(WHOAMI), TCP_WRITE_FLAG_COPY);
+    err_t error = tcp_write(newpcb, WHOAMI, sddf_strlen(WHOAMI), TCP_WRITE_FLAG_COPY);
     if (error) {
         print("Failed to send WHOAMI message through netconn peer\n");
     }

@@ -14,7 +14,6 @@
 #include <sddf/serial/queue.h>
 #include <sddf/benchmark/sel4bench.h>
 #include <ethernet_config.h>
-#include <serial_config.h>
 #include <string.h>
 #include "lwip/init.h"
 #include "netif/etharp.h"
@@ -28,14 +27,11 @@
 
 #include "socket.h"
 
-#define SERIAL_TX_CH 0
+#define SERIAL_CH 9
 #define TIMER  1
 #define RX_CH  2
 #define TX_CH  3
-
-char *serial_tx_data;
-serial_queue_t *serial_tx_queue;
-serial_queue_handle_t serial_tx_queue_handle;
+#define ARP    7
 
 #define LWIP_TICK_MS 100
 #define NUM_PBUFFS NET_MAX_CLIENT_QUEUE_CAPACITY
@@ -284,9 +280,6 @@ static void netif_status_callback(struct netif *netif)
 
 void init_lwip(void)
 {
-    serial_cli_queue_init_sys(microkit_name, NULL, NULL, NULL, &serial_tx_queue_handle, serial_tx_queue, serial_tx_data);
-    // @kwinter: For some reason ld can't find this implementation. Need to fix this.
-    serial_putchar_init(SERIAL_TX_CH, &serial_tx_queue_handle);
 
     size_t rx_capacity, tx_capacity;
     net_cli_queue_capacity(microkit_name, &rx_capacity, &tx_capacity);
@@ -358,7 +351,7 @@ void notified_lwip(microkit_channel ch)
         transmit();
         receive();
         break;
-    case SERIAL_TX_CH:
+    case SERIAL_CH:
         // Nothing to do
         break;
     default:

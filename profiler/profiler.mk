@@ -1,6 +1,6 @@
 PROFILER_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 
-profiler.elf: profiler/profiler.o
+profiler.elf: profiler/profiler.o libsddf_util_debug.a
 	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
 
 profiler/profiler.o: ${PROFILER_DIR}/profiler.c

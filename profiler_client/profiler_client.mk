@@ -27,11 +27,13 @@ PROF_CLIENT_OBJS :=  $(addprefix profiler_client/, lwip.o netconn_socket.o clien
 OBJS:= $(LWIP_OBJS) $(PROF_CLIENT_OBJS)
 LWIP_DEPS := $(filter %.d,$(OBJS:.o=.d))
 
+PROF_CLIENT_LIBS := --start-group -lmicrokit -Tmicrokit.ld -lc libsddf_util.a --end-group
+
 %.elf: %.o
-	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
+	$(LD) $(LDFLAGS) $< $(PROF_CLIENT_LIBS) -o $@
 
 prof_client.elf: $(LWIP_OBJS) $(PROF_CLIENT_OBJS) libsddf_util.a
-	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
+	$(LD) $(LDFLAGS) $^ $(PROF_CLIENT_LIBS) -o $@
 
 PROFCLIENTDIR := profiler_client protobuf/nanopb
 $(PROF_CLIENT_OBJS): | ${PROFCLIENTDIR}

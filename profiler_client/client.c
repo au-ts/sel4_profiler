@@ -166,18 +166,12 @@ void eth_dump() {
 
 }
 
-void init_serial()
-{
-    // Init serial communication
-    serial_cli_queue_init_sys(microkit_name, &rx_queue_handle, rx_queue, rx_data, &tx_queue_handle, tx_queue, tx_data);
-    // serial_putchar_init(SERIAL_TX_CH, &tx_queue_handle);
-
-}
-
 void init() {
-    if (CLIENT_CONFIG == CLIENT_CONTROL_SERIAL) {
-        init_serial();
-    } else if (CLIENT_CONFIG == CLIENT_CONTROL_NETWORK) {
+    serial_cli_queue_init_sys(microkit_name, &rx_queue_handle, rx_queue, rx_data, &tx_queue_handle, tx_queue, tx_data);
+    serial_putchar_init(SERIAL_TX_CH, &tx_queue_handle);
+    sddf_printf("Serial is fucking working!\n");
+
+    if (CLIENT_CONFIG == CLIENT_CONTROL_NETWORK) {
         init_lwip();
     }
 
@@ -186,7 +180,6 @@ void init() {
 
     // Init ring handle between profiler
     net_queue_init(&profiler_queue, profiler_free, profiler_active, 512);
-
 }
 
 void notified(microkit_channel ch) {
