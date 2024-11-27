@@ -164,7 +164,6 @@ void add_sample(microkit_child id, uint32_t time, uint64_t pc, uint64_t nr, uint
     if (net_queue_empty_free(&profiler_queue)) {
         reset_pmu();
         halt_pmu();
-        microkit_dbg_puts("attempting to add sample!\n");
         microkit_notify(CLIENT_PROFILER_CH);
     } else {
         reset_pmu();

@@ -20,7 +20,7 @@ LWIPFILES=   $(COREFILES) $(CORE4FILES) $(NETIFFILES)
 # Do we need to add timer client into here?
 
 LWIP_OBJS := $(LWIPFILES:.c=.o)
-PROF_CLIENT_OBJS :=  $(addprefix profiler_client/, lwip.o netconn_socket.o client.o) \
+PROF_CLIENT_OBJS :=  $(addprefix profiler_client/, prof_lwip.o netconn_socket.o client.o) \
 			$(addprefix protobuf/nanopb/, pmu_sample.pb.o pb_common.o pb_encode.o)
 
 # OBJS := $(addprefix $(BUILD_DIR)/, $(LWIP_OBJS))

@@ -14,12 +14,14 @@ ETHERNET_DRIVER:=$(SDDF)/drivers/network/$(DRIV_DIR)
 TIMER_DRIVER:=$(SDDF)/drivers/timer/$(TIMER_DRV_DIR)
 NETWORK_COMPONENTS:=$(SDDF)/network/components
 PROF_EXAMPLE:=${ROOTDIR}/example
+ECHO_DIR:=${PROF_EXAMPLE}/echo_server
 
-vpath %.c ${PROF_EXAMPLE} ${ROOT_DIR}
+
+vpath %.c ${PROF_EXAMPLE} ${ROOT_DIR} ${ECHO_DIR}
 
 IMAGES :=   prof_client.elf profiler.elf eth_driver.elf network_virt_rx.elf \
 			network_virt_tx.elf copy.elf timer_driver.elf uart_driver.elf serial_virt_tx.elf \
-			serial_virt_rx.elf dummy_prog.elf dummy_prog2.elf
+			serial_virt_rx.elf dummy_prog.elf dummy_prog2.elf echo.elf
 
 CFLAGS := -mcpu=$(CPU) \
 	  -mstrict-align \
@@ -47,10 +49,21 @@ LIBS := --start-group -lmicrokit -Tmicrokit.ld -lc libsddf_util_debug.a --end-gr
 	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
 
 # Build the test system
+include ${SDDF}/${LWIPDIR}/Filelists.mk
+
+# NETIFFILES: Files implementing various generic network interface functions
+# Override version in Filelists.mk
+NETIFFILES:=$(LWIPDIR)/netif/ethernet.c
+
+# LWIPFILES: All the above.
+LWIPFILES=lwip.c $(COREFILES) $(CORE4FILES) $(NETIFFILES)
+LWIP_OBJS := $(LWIPFILES:.c=.o) lwip.o \
+	     udp_echo_socket.o tcp_echo_socket.o
+
 DUMMY_PROG_OBJS := dummy_prog.o
 DUMMY_PROG2_OBJS := dummy_prog2.o
 
-OBJS := $(DUMMY_PROG_OBJS) $(DUMMY_PROG2_OBJS)
+OBJS := $(DUMMY_PROG_OBJS) $(DUMMY_PROG2_OBJS) $(LWIP_OBJS)
 DEPS := $(filter %.d,$(OBJS:.o=.d))
 
 dummy_prog.elf: $(DUMMY_PROG_OBJS) libsddf_util_debug.a
@@ -59,10 +72,14 @@ dummy_prog.elf: $(DUMMY_PROG_OBJS) libsddf_util_debug.a
 dummy_prog2.elf: $(DUMMY_PROG2_OBJS) libsddf_util_debug.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-# This shouldn't be needed as make *should* use the default CC recipe.
-%.o: %.c Makefile
-	$(CC) -c $(CFLAGS) $< -o $@
+${LWIP_OBJS}: ${CHECK_FLAGS_BOARD_MD5}
+echo.elf: $(LWIP_OBJS) libsddf_util.a
+	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
+LWIPDIRS := $(addprefix ${LWIPDIR}/, core/ipv4 netif api)
+${LWIP_OBJS}: |${BUILD_DIR}/${LWIPDIRS}
+${BUILD_DIR}/${LWIPDIRS}:
+	mkdir -p $@
 
 # Need to build libsddf_util_debug.a because it's included in LIBS
 # for the unimplemented libc dependencies
