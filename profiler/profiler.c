@@ -171,48 +171,6 @@ void add_sample(microkit_child id, uint32_t time, uint64_t pc, uint64_t nr, uint
     }
 }
 
-// /* Dump the values of the cycle counter and event counters 0 to 5*/
-// void print_pmu_debug() {
-//     uint64_t clock = 0;
-//     uint32_t c1 = 0;
-//     uint32_t c2 = 0;
-//     uint32_t c3 = 0;
-//     uint32_t c4 = 0;
-//     uint32_t c5 = 0;
-//     uint32_t c6 = 0;
-
-//     ISB;
-//     MRS(PMU_CYCLE_CTR, clock);
-//     ISB;
-//     MRS(PMU_EVENT_CTR0, c1);
-//     ISB;
-//     MRS(PMU_EVENT_CTR1, c2);
-//     ISB;
-//     MRS(PMU_EVENT_CTR2, c3);
-//     ISB;
-//     MRS(PMU_EVENT_CTR3, c4);
-//     ISB;
-//     MRS(PMU_EVENT_CTR4, c5);
-//     ISB;
-//     MRS(PMU_EVENT_CTR5, c6);
-
-//     sddf_dprintf("This is the current cycle counter: ");
-//     puthex64(clock);
-//     sddf_dprintf("\nThis is the current event counter 0: ");
-//     puthex64(c1);
-//     sddf_dprintf("\nThis is the current event counter 1: ");
-//     puthex64(c2);
-//     sddf_dprintf("\nThis is the current event counter 2: ");
-//     puthex64(c3);
-//     sddf_dprintf("\nThis is the current event counter 3: ");
-//     puthex64(c4);
-//     sddf_dprintf("\nThis is the current event counter 4: ");
-//     puthex64(c5);
-//     sddf_dprintf("\nThis is the current event counter 5: ");
-//     puthex64(c6);
-//     sddf_dprintf("\n");
-// }
-
 void init_pmu_regs() {
     /* Initialise the register array */
     pmu_registers[0].config_ctr = configure_cnt0;
@@ -286,11 +244,8 @@ void init () {
     /* INITIALISE WHAT COUNTERS WE WANT TO TRACK IN HERE */
 
     configure_clkcnt(CYCLE_COUNTER_PERIOD, 1);
-    // configure_eventcnt(EVENT_CTR_0, L1D_CACHE, 16, 1);
-
     // Make sure that the PMU is not running until we start
     halt_pmu();
-    microkit_dbg_puts("Everything is halted and ready to start!\n");
     // Set the profiler state to init
     profiler_state = PROF_INIT;
 }
@@ -367,7 +322,6 @@ seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo) {
             sddf_dprintf("Stopping PMU\n");
             halt_pmu();
             /* Purge buffers to main first */
-            microkit_dbg_puts("attempting to notify profiler client\n");
             microkit_notify(CLIENT_PROFILER_CH);
             break;
         case PROFILER_RESTART:
@@ -389,7 +343,6 @@ seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo) {
 void notified(microkit_channel ch) {
     if (ch == 21) {
         // Get the interrupt flag from the PMU
-        // @kwinter: need to make sure that this actually works. We are masking the PMU interrupt register in the kernel now.
         seL4_ARM_PMUControl_InterruptValue_t ret = seL4_ARM_PMUControl_InterruptValue(PMU_CONTROL_CAP);
 
         handle_irq(ret.interrupt_val);

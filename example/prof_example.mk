@@ -76,11 +76,6 @@ ${ECHO_OBJS}: ${CHECK_FLAGS_BOARD_MD5}
 echo.elf: $(ECHO_OBJS) libsddf_util.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-# LWIPDIRS := $(addprefix ${LWIPDIR}/, core/ipv4 netif api)
-# ${LWIP_OBJS}: |${BUILD_DIR}/${LWIPDIRS}
-# ${BUILD_DIR}/${LWIPDIRS}:
-# 	mkdir -p $@
-
 # Need to build libsddf_util_debug.a because it's included in LIBS
 # for the unimplemented libc dependencies
 ${IMAGES}: libsddf_util.a libsddf_util_debug.a
