@@ -169,7 +169,6 @@ void eth_dump() {
 void init() {
     serial_cli_queue_init_sys(microkit_name, &rx_queue_handle, rx_queue, rx_data, &tx_queue_handle, tx_queue, tx_data);
     serial_putchar_init(SERIAL_TX_CH, &tx_queue_handle);
-    sddf_printf("Serial is fucking working!\n");
 
     if (CLIENT_CONFIG == CLIENT_CONTROL_NETWORK) {
         init_lwip();

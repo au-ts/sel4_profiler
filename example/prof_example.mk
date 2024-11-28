@@ -57,13 +57,13 @@ NETIFFILES:=$(LWIPDIR)/netif/ethernet.c
 
 # LWIPFILES: All the above.
 LWIPFILES=lwip.c $(COREFILES) $(CORE4FILES) $(NETIFFILES)
-LWIP_OBJS := $(LWIPFILES:.c=.o) lwip.o \
+ECHO_OBJS := $(LWIPFILES:.c=.o) lwip.o \
 	     udp_echo_socket.o tcp_echo_socket.o
 
 DUMMY_PROG_OBJS := dummy_prog.o
 DUMMY_PROG2_OBJS := dummy_prog2.o
 
-OBJS := $(DUMMY_PROG_OBJS) $(DUMMY_PROG2_OBJS) $(LWIP_OBJS)
+OBJS := $(DUMMY_PROG_OBJS) $(DUMMY_PROG2_OBJS) $(ECHO_OBJS)
 DEPS := $(filter %.d,$(OBJS:.o=.d))
 
 dummy_prog.elf: $(DUMMY_PROG_OBJS) libsddf_util_debug.a
@@ -72,14 +72,14 @@ dummy_prog.elf: $(DUMMY_PROG_OBJS) libsddf_util_debug.a
 dummy_prog2.elf: $(DUMMY_PROG2_OBJS) libsddf_util_debug.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-${LWIP_OBJS}: ${CHECK_FLAGS_BOARD_MD5}
-echo.elf: $(LWIP_OBJS) libsddf_util.a
+${ECHO_OBJS}: ${CHECK_FLAGS_BOARD_MD5}
+echo.elf: $(ECHO_OBJS) libsddf_util.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-LWIPDIRS := $(addprefix ${LWIPDIR}/, core/ipv4 netif api)
-${LWIP_OBJS}: |${BUILD_DIR}/${LWIPDIRS}
-${BUILD_DIR}/${LWIPDIRS}:
-	mkdir -p $@
+# LWIPDIRS := $(addprefix ${LWIPDIR}/, core/ipv4 netif api)
+# ${LWIP_OBJS}: |${BUILD_DIR}/${LWIPDIRS}
+# ${BUILD_DIR}/${LWIPDIRS}:
+# 	mkdir -p $@
 
 # Need to build libsddf_util_debug.a because it's included in LIBS
 # for the unimplemented libc dependencies

@@ -13,7 +13,7 @@
 #define NUM_NETWORK_CLIENTS 2
 
 #define NET_CLI0_NAME "prof_client"
-#define NET_CLI1_NAME "eth_client"
+#define NET_CLI1_NAME "echo_client"
 #define NET_COPY0_NAME "eth_copy0"
 #define NET_COPY1_NAME "eth_copy1"
 #define NET_VIRT_RX_NAME "eth_virt_rx"
@@ -28,8 +28,8 @@
 #define MAC_ADDR_CLI0                       0x525401000001
 #define MAC_ADDR_CLI1                       0x525401000002
 #elif defined(CONFIG_PLAT_ODROIDC4)
-#define MAC_ADDR_CLI0                       0x525401000003
-#define MAC_ADDR_CLI1                       0x525401000004
+#define MAC_ADDR_CLI0                       0x52540100000C
+#define MAC_ADDR_CLI1                       0x52540100000D
 #elif defined(CONFIG_PLAT_MAAXBOARD)
 #define MAC_ADDR_CLI0                       0x525401000005
 #define MAC_ADDR_CLI1                       0x525401000006

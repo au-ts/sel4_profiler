@@ -280,7 +280,6 @@ static void netif_status_callback(struct netif *netif)
 
 void init_lwip(void)
 {
-
     size_t rx_capacity, tx_capacity;
     net_cli_queue_capacity(microkit_name, &rx_capacity, &tx_capacity);
     net_queue_init(&state.rx_queue, rx_free, rx_active, rx_capacity);
