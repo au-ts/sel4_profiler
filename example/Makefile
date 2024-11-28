@@ -18,7 +18,7 @@ ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
 	export UART_DRIV_DIR := meson
 	export TIMER_DRV_DIR := meson
 	export CPU := cortex-a55
-else ifneq ($(strip $(MICROKIT_BOARD)),maaxboard)
+else ifeq ($(strip $(MICROKIT_BOARD)),maaxboard)
 	export DRIV_DIR := imx
 	export UART_DRIV_DIR := imx
 	export TIMER_DRV_DIR := imx
