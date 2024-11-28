@@ -1,11 +1,7 @@
-#include <stdbool.h>
 #include <stdint.h>
 #include <microkit.h>
 #include <sel4/sel4.h>
-#include <string.h>
-#include "profiler.h"
 #include "util.h"
-#include "serial_server.h"
 
 void endless_loop() {
     uint64_t i = 0;

@@ -2,26 +2,23 @@
 #include <stdint.h>
 #include <microkit.h>
 #include <sel4/sel4.h>
+#include <sel4/profiler_types.h>
 #include <string.h>
 #include "profiler.h"
 #include "util.h"
-#include "serial_server.h"
-#include "snapshot.h"
-#include "timer.h"
 #include "profiler_config.h"
 #include "client.h"
-#include <sddf/network/shared_ringbuffer.h>
 #include <sddf/util/printf.h>
+#include <sddf/network/queue.h>
 
 uintptr_t uart_base;
 
-uintptr_t profiler_ring_used;
-uintptr_t profiler_ring_free;
-uintptr_t profiler_mem;
-
+net_queue_handle_t profiler_queue;
+net_queue_t *profiler_free;
+net_queue_t *profiler_active;
+uintptr_t profiler_data_region;
+size_t profiler_queue_capacity = 0;
 uintptr_t log_buffer;
-
-ring_handle_t profiler_ring;
 
 // Array of pmu registers available
 pmu_reg_t pmu_registers[PMU_NUM_REGS];
@@ -39,78 +36,42 @@ int profiler_state;
 
 /* Halt the PMU */
 void halt_pmu() {
-    uint32_t value = 0;
-    uint32_t mask = 0;
-
-    /* Disable Performance Counter */
-    MRS(PMCR_EL0, value);
-    mask = 0;
-    mask |= (1 << 0); /* Enable */
-    mask |= (1 << 1); /* Cycle counter reset */
-    mask |= (1 << 2); /* Reset all counters */
-    MSR(PMCR_EL0, (value & ~mask));
-
-    /* Disable cycle counter register */
-    MRS(PMCNTENSET_EL0, value);
-    mask = 0;
-    mask |= (1 << 31);
-    MSR(PMCNTENSET_EL0, (value & ~mask));
+    seL4_ARM_PMUControl_CounterControl(PMU_CONTROL_CAP, 0);
 }
 
 /* Resume the PMU */
 void resume_pmu() {
-    uint64_t val;
-
-    MRS(PMCR_EL0, val);
-
-    val |= BIT(0);
-
-    ISB;
-    MSR(PMCR_EL0, val);
-
-    MSR(PMCNTENSET_EL0, (BIT(31)));
+    seL4_ARM_PMUControl_CounterControl(PMU_CONTROL_CAP, 1);
 }
 
 // Configure event counter 0
 void configure_cnt0(uint32_t event, uint32_t val) {
-    ISB;
-    MSR(PMU_EVENT_CTR0, 0xffffffff - val);
-    MSR(PMU_EVENT_TYP0, event);
+    seL4_ARM_PMUControl_WriteEventCounter(PMU_CONTROL_CAP, 0, 0xffffffff - val, event);
 }
 
 // Configure event counter 1
 void configure_cnt1(uint32_t event, uint32_t val) {
-    ISB;
-    MSR(PMU_EVENT_CTR1, 0xffffffff - val);
-    MSR(PMU_EVENT_TYP1, event);
+    seL4_ARM_PMUControl_WriteEventCounter(PMU_CONTROL_CAP, 1, 0xffffffff - val, event);
 }
 
 // Configure event counter 2
 void configure_cnt2(uint32_t event, uint32_t val) {
-    ISB;
-    MSR(PMU_EVENT_CTR2, 0xffffffff - val);
-    MSR(PMU_EVENT_TYP2, event);
+    seL4_ARM_PMUControl_WriteEventCounter(PMU_CONTROL_CAP, 2, 0xffffffff - val, event);
 }
 
 // Configure event counter 3
 void configure_cnt3(uint32_t event, uint32_t val) {
-    ISB;
-    MSR(PMU_EVENT_CTR3, 0xffffffff - val);
-    MSR(PMU_EVENT_TYP3, event);
+    seL4_ARM_PMUControl_WriteEventCounter(PMU_CONTROL_CAP, 3, 0xffffffff - val, event);
 }
 
 // Configure event counter 4
 void configure_cnt4(uint32_t event, uint32_t val) {
-    ISB;
-    MSR(PMU_EVENT_CTR4, 0xffffffff - val);
-    MSR(PMU_EVENT_TYP4, event);
+    seL4_ARM_PMUControl_WriteEventCounter(PMU_CONTROL_CAP, 4, 0xffffffff - val, event);
 }
 
 // Configure event counter 5
 void configure_cnt5(uint32_t event, uint32_t val) {
-    ISB;
-    MSR(PMU_EVENT_CTR5, 0xffffffff - val);
-    MSR(PMU_EVENT_TYP5, event);
+    seL4_ARM_PMUControl_WriteEventCounter(PMU_CONTROL_CAP, 5, 0xffffffff - val, event);
 }
 
 void reset_pmu() {
@@ -133,7 +94,7 @@ void reset_pmu() {
         if (pmu_registers[CYCLE_CTR].sampling == 1) {
             init_cnt = 0xffffffffffffffff - CYCLE_COUNTER_PERIOD;
         }
-        MSR(PMU_CYCLE_CTR, init_cnt);
+        seL4_ARM_PMUControl_WriteEventCounter(PMU_CONTROL_CAP, 6, init_cnt, 0);
         pmu_registers[CYCLE_CTR].overflowed = 0;
     }
 
@@ -146,13 +107,13 @@ void configure_clkcnt(uint64_t val, bool sampling) {
     pmu_registers[CYCLE_CTR].sampling = sampling;
 
     uint64_t init_cnt = 0xffffffffffffffff - pmu_registers[CYCLE_CTR].count;
-    MSR(PMU_CYCLE_CTR, init_cnt);
+    seL4_ARM_PMUControl_WriteEventCounter(PMU_CONTROL_CAP, 6, init_cnt, 0);
 }
 
 void configure_eventcnt(int cntr, uint32_t event, uint64_t val, bool sampling) {
     // First update the struct
     if (cntr < 0 || cntr >= PMU_NUM_REGS) {
-        microkit_dbg_puts("Invalid register index\n");
+        sddf_dprintf("Invalid register index\n");
         return;
     }
     pmu_registers[cntr].event = event;
@@ -164,17 +125,17 @@ void configure_eventcnt(int cntr, uint32_t event, uint64_t val, bool sampling) {
 }
 
 /* Add a snapshot of the cycle and event registers to the array. This array needs to become a ring buffer. */
-void add_sample(microkit_id id, uint32_t time, uint64_t pc, uint64_t nr, uint32_t irqFlag, uint64_t *cc, uint64_t period) {
+void add_sample(microkit_child id, uint32_t time, uint64_t pc, uint64_t nr, uint32_t irqFlag, uint64_t *cc, uint64_t period) {
 
-    buff_desc_t buffer;
-    int ret = dequeue_free(&profiler_ring, &buffer);
+    net_buff_desc_t buffer;
+    int ret = net_dequeue_free(&profiler_queue, &buffer);
     if (ret != 0) {
-        microkit_dbg_puts(microkit_name);
-        microkit_dbg_puts("Failed to dequeue from profiler free ring\n");
+        sddf_dprintf(microkit_name);
+        sddf_dprintf("Failed to dequeue from profiler free ring\n");
         return;
     }
 
-    prof_sample_t *temp_sample = (prof_sample_t *) buffer.phys_or_offset;
+    prof_sample_t *temp_sample = (prof_sample_t *) buffer.io_or_offset;
 
     // Find which counter overflowed, and the corresponding period
 
@@ -189,18 +150,18 @@ void add_sample(microkit_id id, uint32_t time, uint64_t pc, uint64_t nr, uint32_
         temp_sample->ips[i] = cc[i];
     }
 
-    ret = enqueue_used(&profiler_ring, buffer);
+    ret = net_enqueue_active(&profiler_queue, buffer);
 
     if (ret != 0) {
-        microkit_dbg_puts(microkit_name);
-        microkit_dbg_puts("Failed to dequeue from profiler used ring\n");
+        sddf_dprintf(microkit_name);
+        sddf_dprintf("Failed to dequeue from profiler used ring\n");
         return;
     }
 
     // Check if the buffers are full (for testing dumping when we have 10 buffers)
     // Notify the client that we need to dump. If we are dumping, do not
     // restart the PMU until we have managed to purge all buffers over the network.
-    if (ring_empty(profiler_ring.free_ring)) {
+    if (net_queue_empty_free(&profiler_queue)) {
         reset_pmu();
         halt_pmu();
         microkit_notify(CLIENT_PROFILER_CH);
@@ -208,48 +169,6 @@ void add_sample(microkit_id id, uint32_t time, uint64_t pc, uint64_t nr, uint32_
         reset_pmu();
         resume_pmu();
     }
-}
-
-/* Dump the values of the cycle counter and event counters 0 to 5*/
-void print_pmu_debug() {
-    uint64_t clock = 0;
-    uint32_t c1 = 0;
-    uint32_t c2 = 0;
-    uint32_t c3 = 0;
-    uint32_t c4 = 0;
-    uint32_t c5 = 0;
-    uint32_t c6 = 0;
-
-    ISB;
-    MRS(PMU_CYCLE_CTR, clock);
-    ISB;
-    MRS(PMU_EVENT_CTR0, c1);
-    ISB;
-    MRS(PMU_EVENT_CTR1, c2);
-    ISB;
-    MRS(PMU_EVENT_CTR2, c3);
-    ISB;
-    MRS(PMU_EVENT_CTR3, c4);
-    ISB;
-    MRS(PMU_EVENT_CTR4, c5);
-    ISB;
-    MRS(PMU_EVENT_CTR5, c6);
-
-    microkit_dbg_puts("This is the current cycle counter: ");
-    puthex64(clock);
-    microkit_dbg_puts("\nThis is the current event counter 0: ");
-    puthex64(c1);
-    microkit_dbg_puts("\nThis is the current event counter 1: ");
-    puthex64(c2);
-    microkit_dbg_puts("\nThis is the current event counter 2: ");
-    puthex64(c3);
-    microkit_dbg_puts("\nThis is the current event counter 3: ");
-    puthex64(c4);
-    microkit_dbg_puts("\nThis is the current event counter 4: ");
-    puthex64(c5);
-    microkit_dbg_puts("\nThis is the current event counter 5: ");
-    puthex64(c6);
-    microkit_dbg_puts("\n");
 }
 
 void init_pmu_regs() {
@@ -291,19 +210,19 @@ void init_pmu_regs() {
 }
 
 void init () {
-    microkit_dbg_puts("Profiler intialising...\n");
+    sddf_dprintf("Profiler intialising...\n");
 
     // Ensure that the PMU is not running
     halt_pmu();
 
     // Init the record buffers
-    ring_init(&profiler_ring, (ring_buffer_t *) profiler_ring_free, (ring_buffer_t *) profiler_ring_used, 512);
+    net_queue_init(&profiler_queue, profiler_free, profiler_active, 512);
 
     for (int i = 0; i < NUM_BUFFERS - 1; i++) {
-        buff_desc_t buffer;
-        buffer.phys_or_offset = profiler_mem + (i * sizeof(prof_sample_t));
+        net_buff_desc_t buffer;
+        buffer.io_or_offset = profiler_data_region + (i * sizeof(prof_sample_t));
         buffer.len = sizeof(prof_sample_t);
-        int ret = enqueue_free(&profiler_ring, buffer);
+        int ret = net_enqueue_free(&profiler_queue, buffer);
 
         if (ret != 0) {
             microkit_dbg_puts(microkit_name);
@@ -315,7 +234,7 @@ void init () {
     #ifdef CONFIG_PROFILER_ENABLE
     int res_buf = seL4_BenchmarkSetLogBuffer(log_buffer);
     if (res_buf) {
-        microkit_dbg_puts("Could not set log buffer");
+        sddf_dprintf("Could not set log buffer");
         puthex64(res_buf);
     }
     #endif
@@ -325,11 +244,8 @@ void init () {
     /* INITIALISE WHAT COUNTERS WE WANT TO TRACK IN HERE */
 
     configure_clkcnt(CYCLE_COUNTER_PERIOD, 1);
-    // configure_eventcnt(EVENT_CTR_0, L1D_CACHE, 16, 1);
-
     // Make sure that the PMU is not running until we start
     halt_pmu();
-
     // Set the profiler state to init
     profiler_state = PROF_INIT;
 }
@@ -398,7 +314,7 @@ seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo) {
     switch(microkit_msginfo_get_label(msginfo)) {
         case PROFILER_START:
             profiler_state = PROF_START;
-            sddf_dprintf("Starting PMU\n");
+            microkit_dbg_puts("Starting PMU\n");
             resume_pmu();
             break;
         case PROFILER_STOP:
@@ -416,8 +332,8 @@ seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo) {
             }
             break;
         default:
-            microkit_dbg_puts(microkit_name);
-            microkit_dbg_puts(": Invalid ppcall to profiler thread!\n");
+            sddf_dprintf(microkit_name);
+            sddf_dprintf(": Invalid ppcall to profiler thread!\n");
             break;
     }
     return microkit_msginfo_new(0,0);
@@ -427,14 +343,9 @@ seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo) {
 void notified(microkit_channel ch) {
     if (ch == 21) {
         // Get the interrupt flag from the PMU
-        uint32_t irqFlag = 0;
-        MRS(PMOVSCLR_EL0, irqFlag);
+        seL4_ARM_PMUControl_InterruptValue_t ret = seL4_ARM_PMUControl_InterruptValue(PMU_CONTROL_CAP);
 
-        handle_irq(irqFlag);
-
-        // Clear the interrupt flag
-        uint32_t val = BIT(31);
-        MSR(PMOVSCLR_EL0, val);
+        handle_irq(ret.interrupt_val);
 
         microkit_irq_ack(ch);
     }
