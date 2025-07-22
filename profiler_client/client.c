@@ -34,6 +34,7 @@ serial_queue_handle_t tx_queue_handle;
 net_queue_t *profiler_active;
 net_queue_t *profiler_free;
 uintptr_t profiler_data_region;
+__attribute__((__section__(".profiler_config"))) profiler_config_t config;
 
 net_queue_handle_t profiler_queue;
 

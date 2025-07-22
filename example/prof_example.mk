@@ -16,6 +16,15 @@ NETWORK_COMPONENTS:=$(SDDF)/network/components
 PROF_EXAMPLE:=${ROOTDIR}/example
 ECHO_DIR:=${PROF_EXAMPLE}/echo_server
 
+PYTHON ?= python3
+DTC := dtc
+METAPROGRAM := $(PROF_EXAMPLE)/meta.py
+DTS := $(SDDF)/dts/$(MICROKIT_BOARD).dts
+DTB := $(MICROKIT_BOARD).dtb
+
+SDFGEN_HELPER := $(PROF_EXAMPLE)/sdfgen_helper.py
+PROFILER_CONFIG_HEADERS := $(SDDF)/include/sddf/resources/common.h \
+							$(ROOTDIR)/include/config.h
 
 vpath %.c ${PROF_EXAMPLE} ${ROOT_DIR} ${ECHO_DIR}
 
@@ -79,6 +88,32 @@ echo.elf: $(ECHO_OBJS) libsddf_util.a
 # Need to build libsddf_util_debug.a because it's included in LIBS
 # for the unimplemented libc dependencies
 ${IMAGES}: libsddf_util.a libsddf_util_debug.a
+
+$(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
+	$(PYTHON) $(SDFGEN_HELPER) --configs "$(PROFILER_CONFIG_HEADERS)" --output $(PROF_EXAMPLE)/config_structs.py
+	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --dtb $(DTB) --output . --sdf $(SYSTEM_FILE)
+# Profiler config
+	$(OBJCOPY) --update-section .profiler_config=profiler_conn.data profiler.elf
+	$(OBJCOPY) --update-section .profiler_config=prof_client_conn.data prof_client.elf
+# Device class configs
+	$(OBJCOPY) --update-section .device_resources=serial_driver_device_resources.data serial_driver.elf
+	$(OBJCOPY) --update-section .serial_driver_config=serial_driver_config.data serial_driver.elf
+	$(OBJCOPY) --update-section .serial_virt_tx_config=serial_virt_tx.data serial_virt_tx.elf
+	$(OBJCOPY) --update-section .device_resources=ethernet_driver_device_resources.data eth_driver.elf
+	$(OBJCOPY) --update-section .net_driver_config=net_driver.data eth_driver.elf
+	$(OBJCOPY) --update-section .net_virt_rx_config=net_virt_rx.data network_virt_rx.elf
+	$(OBJCOPY) --update-section .net_virt_tx_config=net_virt_tx.data network_virt_tx.elf
+	$(OBJCOPY) --update-section .device_resources=timer_driver_device_resources.data timer_driver.elf
+# Client configs
+	$(OBJCOPY) --update-section .timer_client_config=timer_client_echo.data echo.elf
+	$(OBJCOPY) --update-section .net_client_config=net_client_echo.data echo.elf
+	$(OBJCOPY) --update-section .serial_client_config=serial_client_echo.data echo.elf
+	$(OBJCOPY) --update-section .timer_client_config=timer_client_prof_client.data prof_client.elf
+	$(OBJCOPY) --update-section .net_client_config=net_client_prof_client.data prof_client.elf
+	$(OBJCOPY) --update-section .serial_client_config=serial_client_prof_client.data prof_client.elf
+# Lwip configs
+	$(OBJCOPY) --update-section .lib_sddf_lwip_config=lib_sddf_lwip_config_echo.data echo.elf
+	$(OBJCOPY) --update-section .lib_sddf_lwip_config=lib_sddf_lwip_config_prof_client.data prof_client.elf
 
 ${IMAGE_FILE} $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)

@@ -69,7 +69,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     net_virt_rx = ProtectionDomain("net_virt_rx", "network_virt_rx.elf", priority=99)
     net_system = Sddf.Net(sdf, ethernet_node, ethernet_driver, net_virt_tx, net_virt_rx)
 
-    prof_client = ProtectionDomain("prof_client", "client.elf", priority=94)
+    prof_client = ProtectionDomain("prof_client", "prof_client.elf", priority=94)
     net_system.add_client(prof_client)
     serial_system.add_client(prof_client)
     timer_system.add_client(prof_client)

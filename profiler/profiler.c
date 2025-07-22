@@ -8,6 +8,7 @@
 #include "util.h"
 #include "profiler_config.h"
 #include "client.h"
+#include "config.h"
 #include <sddf/util/printf.h>
 #include <sddf/network/queue.h>
 
@@ -19,6 +20,8 @@ net_queue_t *profiler_active;
 uintptr_t profiler_data_region;
 size_t profiler_queue_capacity = 0;
 uintptr_t log_buffer;
+
+__attribute__((__section__(".profiler_config"))) profiler_config_t config;
 
 // Array of pmu registers available
 pmu_reg_t pmu_registers[PMU_NUM_REGS];
