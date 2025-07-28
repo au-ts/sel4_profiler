@@ -36,7 +36,7 @@ class RegionResource(Serializable):
     def to_struct(self) -> RegionResourceStruct:
         vaddr_arg = c_uint64() if self.vaddr is None else self.vaddr
         size_arg = c_uint64() if self.size is None else self.size
-        return RegionResourceStruct(vaddr_arg,
+        return RegionResourceStruct(vaddr_arg, 
                                     size_arg)
 
 class ProfilerConfig(Serializable):

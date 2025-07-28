@@ -8,7 +8,7 @@ from typing import List, Tuple
 from sdfgen import SystemDescription, Sddf, DeviceTree
 from importlib.metadata import version
 
-assert version("sdfgen").split(".")[1] == "24", "Unexpected sdfgen version"
+assert version("sdfgen").split(".")[1] == "25", "Unexpected sdfgen version"
 
 from sdfgen_helper import *
 from config_structs import *
@@ -57,31 +57,48 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
 
     # Setup all the driver PD's
     timer_driver = ProtectionDomain("timer_driver", "timer_driver.elf", priority=101)
+    sdf.add_pd(timer_driver)
     timer_system = Sddf.Timer(sdf, timer_node, timer_driver)
 
     uart_driver = ProtectionDomain("uart_driver", "serial_driver.elf", priority=100)
+    sdf.add_pd(uart_driver)
     serial_virt_tx = ProtectionDomain("serial_virt_tx", "serial_virt_tx.elf", priority=96)
+    sdf.add_pd(serial_virt_tx)
     serial_virt_rx = ProtectionDomain("serial_virt_rx", "serial_virt_rx.elf", priority=95)
+    sdf.add_pd(serial_virt_rx)
     serial_system = Sddf.Serial(sdf, uart_node, uart_driver, serial_virt_tx, virt_rx=serial_virt_rx)
 
     ethernet_driver = ProtectionDomain("ethernet_driver", "eth_driver.elf", priority=101, budget=100, period=400)
+    sdf.add_pd(ethernet_driver)
     net_virt_tx = ProtectionDomain("net_virt_tx", "network_virt_tx.elf", priority=100, budget=20000)
+    sdf.add_pd(net_virt_tx)
     net_virt_rx = ProtectionDomain("net_virt_rx", "network_virt_rx.elf", priority=99)
+    sdf.add_pd(net_virt_rx)
     net_system = Sddf.Net(sdf, ethernet_node, ethernet_driver, net_virt_tx, net_virt_rx)
 
     prof_client = ProtectionDomain("prof_client", "prof_client.elf", priority=94)
-    net_system.add_client(prof_client)
+    sdf.add_pd(prof_client)
+    net_system.add_client_with_copier(prof_client, None)
     serial_system.add_client(prof_client)
     timer_system.add_client(prof_client)
     prof_client_lwip = Sddf.Lwip(sdf, net_system, prof_client)
 
-    echo_client = ProtectionDomain("echo", "echo.elf", priority=94, budget=20000)
-    net_system.add_client(echo_client)
-    serial_system.add_client(echo_client)
-    timer_system.add_client(echo_client)
-    echo_client_lwip = Sddf.Lwip(sdf, net_system, echo_client)
+    # echo_client = ProtectionDomain("echo", "echo.elf", priority=94, budget=20000)
+    # sdf.add_pd(echo_client)
+    # net_system.add_client_with_copier(echo_client, None)
+    # serial_system.add_client(echo_client)
+    # timer_system.add_client(echo_client)
+    # echo_client_lwip = Sddf.Lwip(sdf, net_system, echo_client)
 
     profiler = ProtectionDomain("profiler", "profiler.elf", priority=105)
+    sdf.add_pd(profiler)
+
+    dummy_prog1 = ProtectionDomain("dummy_prog1", "dummy_prog1.elf", priority=20)
+    profiler.add_child_pd(dummy_prog1)
+    dummy_prog2 = ProtectionDomain("dummy_prog2", "dummy_prog2.elf", priority=21)
+    profiler.add_child_pd(dummy_prog2)
+    dummy_ch = Channel(dummy_prog1, dummy_prog2, a_id=1, b_id=1)
+    sdf.add_channel(dummy_ch)
 
     # Connect the profiler to the profiler client
     profiler_ring_used = MemoryRegion(sdf, "profiler_ring_used", 0x200000)
@@ -95,7 +112,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     sdf.add_mr(profiler_ring_free)
     profiler_ring_free_prof_map = Map(profiler_ring_free, 0x8200000, perms="rw")
     profiler.add_map(profiler_ring_free_prof_map)
-    profiler_ring_free_cli_map = Map(profiler_ring_free, 0x8200000)
+    profiler_ring_free_cli_map = Map(profiler_ring_free, 0x8200000, perms="rw")
     prof_client.add_map(profiler_ring_free_cli_map)
 
     profiler_mem = MemoryRegion(sdf, "profiler_mem", 0x1000000)
@@ -105,7 +122,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     profiler_mem_cli_map = Map(profiler_mem, 0x8600000, perms="rw")
     prof_client.add_map(profiler_mem_cli_map)
 
-    prof_ch = Channel(profiler, prof_client, pp_a=True)
+    prof_ch = Channel(profiler, prof_client, pp_b=True)
     sdf.add_channel(prof_ch)
 
     profiler_conn = ProfilerConfig(RegionResource(profiler_ring_used_prof_map.vaddr, 0x200000),
@@ -127,19 +144,22 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     assert net_system.serialise_config(output_dir)
     assert prof_client_lwip.connect()
     assert prof_client_lwip.serialise_config(output_dir)
-    assert echo_client_lwip.connect()
-    assert echo_client_lwip.serialise_config(output_dir)
+    # assert echo_client_lwip.connect()
+    # assert echo_client_lwip.serialise_config(output_dir)
 
-    data_path = output_dir + "profiler_conn.data"
+    data_path = output_dir + "/profiler_conn.data"
     with open(data_path, "wb+") as f:
         f.write(profiler_conn.serialise())
-    data_path = output_dir + "prof_client_conn.data"
-    with open(data_path, "wb+"):
-        f.write(prof_client_conn.serialise)
+    data_path = output_dir + "/prof_client_conn.data"
+    with open(data_path, "wb+") as f:
+        f.write(prof_client_conn.serialise())
+    with open(f"{output_dir}/{sdf_file}", "w+") as f:
+        f.write(sdf.render())
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--dtb", required=True)
+    parser.add_argument("--sddf", required=True)
     parser.add_argument("--board", required=True, choices=[b.name for b in BOARDS])
     parser.add_argument("--output", required=True)
     parser.add_argument("--sdf", required=True)

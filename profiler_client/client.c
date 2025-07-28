@@ -44,7 +44,6 @@ struct pbuf *tail;
 
 __attribute__((__section__(".profiler_config"))) profiler_config_t prof_config;
 __attribute__((__section__(".serial_client_config"))) serial_client_config_t serial_config;
-// @kwinter: Do we need the timer still??
 __attribute__((__section__(".timer_client_config"))) timer_client_config_t timer_config;
 __attribute__((__section__(".net_client_config"))) net_client_config_t net_config;
 __attribute__((__section__(".lib_sddf_lwip_config"))) lib_sddf_lwip_config_t lwip_config;

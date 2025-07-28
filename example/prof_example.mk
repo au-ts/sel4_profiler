@@ -1,6 +1,6 @@
 MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
-SYSTEM_FILE := ${ROOTDIR}/example/board/$(MICROKIT_BOARD)/profiler.system
+SYSTEM_FILE := profiler.system
 IMAGE_FILE := loader.img
 REPORT_FILE := report.txt
 LWIPDIR:=network/ipstacks/lwip/src
@@ -17,6 +17,7 @@ TIMER_DRIVER:=$(SDDF)/drivers/timer/$(TIMER_DRV_DIR)
 NETWORK_COMPONENTS:=$(SDDF)/network/components
 PROF_EXAMPLE:=${ROOTDIR}/example
 ECHO_DIR:=${PROF_EXAMPLE}/echo_server
+OBJCOPY:=$(TOOLCHAIN)-objcopy
 
 PYTHON ?= python3
 DTC := dtc
@@ -31,8 +32,8 @@ PROFILER_CONFIG_HEADERS := $(SDDF)/include/sddf/resources/common.h \
 vpath %.c ${PROF_EXAMPLE} ${ROOT_DIR} ${ECHO_DIR}
 
 IMAGES :=   prof_client.elf profiler.elf eth_driver.elf network_virt_rx.elf \
-			network_virt_tx.elf copy.elf timer_driver.elf uart_driver.elf serial_virt_tx.elf \
-			serial_virt_rx.elf dummy_prog.elf dummy_prog2.elf echo.elf
+			network_virt_tx.elf copy.elf timer_driver.elf serial_driver.elf serial_virt_tx.elf \
+			serial_virt_rx.elf dummy_prog1.elf dummy_prog2.elf
 
 CFLAGS := -mcpu=$(CPU) \
 	  -mstrict-align \
@@ -92,6 +93,9 @@ echo.elf: $(ECHO_OBJS) libsddf_util.a
 # for the unimplemented libc dependencies
 ${IMAGES}: libsddf_util.a libsddf_util_debug.a
 
+$(DTB): $(DTS)
+	dtc -q -I dts -O dtb $(DTS) > $(DTB)
+
 $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 	$(PYTHON) $(SDFGEN_HELPER) --configs "$(PROFILER_CONFIG_HEADERS)" --output $(PROF_EXAMPLE)/config_structs.py
 	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --dtb $(DTB) --output . --sdf $(SYSTEM_FILE)
@@ -99,7 +103,7 @@ $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 	$(OBJCOPY) --update-section .profiler_config=profiler_conn.data profiler.elf
 	$(OBJCOPY) --update-section .profiler_config=prof_client_conn.data prof_client.elf
 # Device class configs
-	$(OBJCOPY) --update-section .device_resources=serial_driver_device_resources.data serial_driver.elf
+	$(OBJCOPY) --update-section .device_resources=uart_driver_device_resources.data serial_driver.elf
 	$(OBJCOPY) --update-section .serial_driver_config=serial_driver_config.data serial_driver.elf
 	$(OBJCOPY) --update-section .serial_virt_tx_config=serial_virt_tx.data serial_virt_tx.elf
 	$(OBJCOPY) --update-section .device_resources=ethernet_driver_device_resources.data eth_driver.elf
@@ -108,14 +112,14 @@ $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 	$(OBJCOPY) --update-section .net_virt_tx_config=net_virt_tx.data network_virt_tx.elf
 	$(OBJCOPY) --update-section .device_resources=timer_driver_device_resources.data timer_driver.elf
 # Client configs
-	$(OBJCOPY) --update-section .timer_client_config=timer_client_echo.data echo.elf
-	$(OBJCOPY) --update-section .net_client_config=net_client_echo.data echo.elf
-	$(OBJCOPY) --update-section .serial_client_config=serial_client_echo.data echo.elf
+# 	$(OBJCOPY) --update-section .timer_client_config=timer_client_echo.data echo.elf
+# 	$(OBJCOPY) --update-section .net_client_config=net_client_echo.data echo.elf
+# 	$(OBJCOPY) --update-section .serial_client_config=serial_client_echo.data echo.elf
 	$(OBJCOPY) --update-section .timer_client_config=timer_client_prof_client.data prof_client.elf
 	$(OBJCOPY) --update-section .net_client_config=net_client_prof_client.data prof_client.elf
 	$(OBJCOPY) --update-section .serial_client_config=serial_client_prof_client.data prof_client.elf
 # Lwip configs
-	$(OBJCOPY) --update-section .lib_sddf_lwip_config=lib_sddf_lwip_config_echo.data echo.elf
+# 	$(OBJCOPY) --update-section .lib_sddf_lwip_config=lib_sddf_lwip_config_echo.data echo.elf
 	$(OBJCOPY) --update-section .lib_sddf_lwip_config=lib_sddf_lwip_config_prof_client.data prof_client.elf
 
 ${IMAGE_FILE} $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)

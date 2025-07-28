@@ -39,43 +39,78 @@ int profiler_state;
 
 /* Halt the PMU */
 void halt_pmu() {
-    seL4_ARM_PMUControl_CounterControl(PMU_CONTROL_CAP, 0);
+    uint32_t value = 0;
+    uint32_t mask = 0;
+
+    /* Disable Performance Counter */
+    MRS(PMCR_EL0, value);
+    mask = 0;
+    mask |= (1 << 0); /* Enable */
+    mask |= (1 << 1); /* Cycle counter reset */
+    mask |= (1 << 2); /* Reset all counters */
+    MSR(PMCR_EL0, (value & ~mask));
+
+    /* Disable cycle counter register */
+    MRS(PMCNTENSET_EL0, value);
+    mask = 0;
+    mask |= (1 << 31);
+    MSR(PMCNTENSET_EL0, (value & ~mask));
 }
 
 /* Resume the PMU */
 void resume_pmu() {
-    seL4_ARM_PMUControl_CounterControl(PMU_CONTROL_CAP, 1);
+    uint64_t val;
+
+    MRS(PMCR_EL0, val);
+
+    val |= BIT(0);
+
+    ISB;
+    MSR(PMCR_EL0, val);
+
+    MSR(PMCNTENSET_EL0, (BIT(31)));
 }
 
 // Configure event counter 0
 void configure_cnt0(uint32_t event, uint32_t val) {
-    seL4_ARM_PMUControl_WriteEventCounter(PMU_CONTROL_CAP, 0, 0xffffffff - val, event);
+    ISB;
+    MSR(PMU_EVENT_CTR0, 0xffffffff - val);
+    MSR(PMU_EVENT_TYP0, event);
 }
 
 // Configure event counter 1
 void configure_cnt1(uint32_t event, uint32_t val) {
-    seL4_ARM_PMUControl_WriteEventCounter(PMU_CONTROL_CAP, 1, 0xffffffff - val, event);
+    ISB;
+    MSR(PMU_EVENT_CTR1, 0xffffffff - val);
+    MSR(PMU_EVENT_TYP1, event);
 }
 
 // Configure event counter 2
 void configure_cnt2(uint32_t event, uint32_t val) {
-    seL4_ARM_PMUControl_WriteEventCounter(PMU_CONTROL_CAP, 2, 0xffffffff - val, event);
+    ISB;
+    MSR(PMU_EVENT_CTR2, 0xffffffff - val);
+    MSR(PMU_EVENT_TYP2, event);
 }
 
 // Configure event counter 3
 void configure_cnt3(uint32_t event, uint32_t val) {
-    seL4_ARM_PMUControl_WriteEventCounter(PMU_CONTROL_CAP, 3, 0xffffffff - val, event);
+    ISB;
+    MSR(PMU_EVENT_CTR3, 0xffffffff - val);
+    MSR(PMU_EVENT_TYP3, event);
 }
 
 // Configure event counter 4
 void configure_cnt4(uint32_t event, uint32_t val) {
-    seL4_ARM_PMUControl_WriteEventCounter(PMU_CONTROL_CAP, 4, 0xffffffff - val, event);
+    ISB;
+    MSR(PMU_EVENT_CTR4, 0xffffffff - val);
+    MSR(PMU_EVENT_TYP4, event);
 }
 
 // Configure event counter 5
 void configure_cnt5(uint32_t event, uint32_t val) {
-    seL4_ARM_PMUControl_WriteEventCounter(PMU_CONTROL_CAP, 5, 0xffffffff - val, event);
-}
+    ISB;
+    MSR(PMU_EVENT_CTR5, 0xffffffff - val);
+    MSR(PMU_EVENT_TYP5, event);}
 
 void reset_pmu() {
     // Loop through the pmu registers, if the overflown flag has been set,
@@ -97,7 +132,7 @@ void reset_pmu() {
         if (pmu_registers[CYCLE_CTR].sampling == 1) {
             init_cnt = 0xffffffffffffffff - CYCLE_COUNTER_PERIOD;
         }
-        seL4_ARM_PMUControl_WriteEventCounter(PMU_CONTROL_CAP, 6, init_cnt, 0);
+        MSR(PMU_CYCLE_CTR, init_cnt);
         pmu_registers[CYCLE_CTR].overflowed = 0;
     }
 
@@ -110,7 +145,7 @@ void configure_clkcnt(uint64_t val, bool sampling) {
     pmu_registers[CYCLE_CTR].sampling = sampling;
 
     uint64_t init_cnt = 0xffffffffffffffff - pmu_registers[CYCLE_CTR].count;
-    seL4_ARM_PMUControl_WriteEventCounter(PMU_CONTROL_CAP, 6, init_cnt, 0);
+    MSR(PMU_CYCLE_CTR, init_cnt);
 }
 
 void configure_eventcnt(int cntr, uint32_t event, uint64_t val, bool sampling) {
@@ -346,9 +381,10 @@ seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo) {
 void notified(microkit_channel ch) {
     if (ch == 21) {
         // Get the interrupt flag from the PMU
-        seL4_ARM_PMUControl_InterruptValue_t ret = seL4_ARM_PMUControl_InterruptValue(PMU_CONTROL_CAP);
+        uint32_t irqFlag = 0;
+        MRS(PMOVSCLR_EL0, irqFlag);
 
-        handle_irq(ret.interrupt_val);
+        handle_irq(irqFlag);
 
         microkit_irq_ack(ch);
     }

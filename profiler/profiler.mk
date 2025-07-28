@@ -1,4 +1,4 @@
-PROFILER_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
+PROFILER_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 
 profiler.elf: profiler/profiler.o libsddf_util_debug.a
 	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
