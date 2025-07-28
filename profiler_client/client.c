@@ -6,7 +6,11 @@
 #include "client.h"
 #include "profiler.h"
 #include <sddf/network/queue.h>
+#include <sddf/network/lib_sddf_lwip.h>
 #include <sddf/serial/queue.h>
+#include <sddf/serial/config.h>
+#include <sddf/timer/config.h>
+#include <sddf/network/config.h>
 #include "socket.h"
 #include <string.h>
 #include <serial_config.h>
@@ -15,16 +19,11 @@
 #include "lwip/tcp.h"
 #include "pb_encode.h"
 #include "pmu_sample.pb.h"
+#include "config.h"
 
 /* Serial communication. */
 #define SERIAL_TX_CH 9
 #define SERIAL_RX_CH 12
-
-serial_queue_t *rx_queue;
-serial_queue_t *tx_queue;
-
-char *rx_data;
-char *tx_data;
 
 serial_queue_handle_t rx_queue_handle;
 serial_queue_handle_t tx_queue_handle;
@@ -34,10 +33,25 @@ serial_queue_handle_t tx_queue_handle;
 net_queue_t *profiler_active;
 net_queue_t *profiler_free;
 uintptr_t profiler_data_region;
-__attribute__((__section__(".profiler_config"))) profiler_config_t config;
+
+net_queue_handle_t net_rx_handle;
+net_queue_handle_t net_tx_handle;
+
+#define LWIP_TICK_MS 100
+
+struct pbuf *head;
+struct pbuf *tail;
+
+__attribute__((__section__(".profiler_config"))) profiler_config_t prof_config;
+__attribute__((__section__(".serial_client_config"))) serial_client_config_t serial_config;
+// @kwinter: Do we need the timer still??
+__attribute__((__section__(".timer_client_config"))) timer_client_config_t timer_config;
+__attribute__((__section__(".net_client_config"))) net_client_config_t net_config;
+__attribute__((__section__(".lib_sddf_lwip_config"))) lib_sddf_lwip_config_t lwip_config;
 
 net_queue_handle_t profiler_queue;
 
+// @kwinter: Fix this up - use the enum type here
 int client_state;
 
 static inline void my_reverse(char s[])
@@ -69,9 +83,37 @@ static inline void my_itoa(uint64_t n, char s[])
     my_reverse(s);
 }
 
+void netif_status_callback(char *ip_addr)
+{
+    sddf_printf("DHCP request finished, IP address for netif %s is: %s\n", sddf_get_pd_name(), ip_addr);
+}
+
+/**
+ * Stores a pbuf to be transmitted upon available transmit buffers.
+ *
+ * @param p pbuf to be stored.
+ */
+net_sddf_err_t enqueue_pbufs(struct pbuf *p)
+{
+    /* Indicate to the tx virt that we wish to be notified about free tx buffers */
+    net_request_signal_free(&net_tx_handle);
+
+    if (head == NULL) {
+        head = p;
+    } else {
+        tail->next_chain = p;
+    }
+    tail = p;
+
+    /* Increment reference count to ensure this pbuf is not freed by lwip */
+    pbuf_ref(p);
+
+    return SDDF_LWIP_ERR_OK;
+}
+
 char get_char() {
     char c = 0;
-    serial_dequeue(&rx_queue_handle, &rx_queue_handle.queue->head, &c);
+    serial_dequeue(&rx_queue_handle, &c);
     return c;
 }
 
@@ -111,10 +153,10 @@ void serial_control() {
 
     if (ctrl_int == 1) {
         // Start the PMU
-        microkit_ppcall(CLIENT_PROFILER_CH, microkit_msginfo_new(PROFILER_START, 0));
+        microkit_ppcall(prof_config.ch, microkit_msginfo_new(PROFILER_START, 0));
     } else if (ctrl_int == 2) {
         // Stop the PMU
-        microkit_ppcall(CLIENT_PROFILER_CH, microkit_msginfo_new(PROFILER_STOP, 0));
+        microkit_ppcall(prof_config.ch, microkit_msginfo_new(PROFILER_STOP, 0));
     }
 }
 
@@ -125,7 +167,7 @@ void eth_dump() {
     if (net_queue_empty_active(&profiler_queue)) {
         // If we are done dumping the buffers, we can resume the PMU
         client_state = CLIENT_IDLE;
-        microkit_ppcall(CLIENT_PROFILER_CH, microkit_msginfo_new(PROFILER_RESTART, 0));
+        microkit_ppcall(prof_config.ch, microkit_msginfo_new(PROFILER_RESTART, 0));
     } else if (!net_dequeue_active(&profiler_queue, &buffer)) {
         // // Create a buffer for the sample
         uint8_t pb_buff[256];
@@ -168,11 +210,15 @@ void eth_dump() {
 }
 
 void init() {
-    serial_cli_queue_init_sys(microkit_name, &rx_queue_handle, rx_queue, rx_data, &tx_queue_handle, tx_queue, tx_data);
-    serial_putchar_init(SERIAL_TX_CH, &tx_queue_handle);
+    serial_queue_init(&rx_queue_handle, serial_config.rx.queue.vaddr, serial_config.rx.data.size, serial_config.rx.data.vaddr);
+    serial_queue_init(&tx_queue_handle, serial_config.tx.queue.vaddr, serial_config.tx.data.size, serial_config.tx.data.vaddr);
+
+    serial_putchar_init(serial_config.tx.id, &tx_queue_handle);
 
     if (CLIENT_CONFIG == CLIENT_CONTROL_NETWORK) {
-        init_lwip();
+            sddf_lwip_init(&lwip_config, &net_config, &timer_config, net_rx_handle, net_tx_handle, NULL,
+                   netif_status_callback, enqueue_pbufs);
+
     }
 
     // Set client state to idle
@@ -184,7 +230,7 @@ void init() {
 
 void notified(microkit_channel ch) {
     // Notified to empty profiler sample buffers
-    if (ch == CLIENT_PROFILER_CH) {
+    if (ch == prof_config.ch) {
         // Determine how to dump buffers
         if (CLIENT_CONFIG == CLIENT_CONTROL_SERIAL) {
             // Print over serial
@@ -201,8 +247,8 @@ void notified(microkit_channel ch) {
         }
     } else if(CLIENT_CONFIG == CLIENT_CONTROL_NETWORK) {
         // Getting a network interrupt
-        notified_lwip(ch);
-    } else if (ch == SERIAL_RX_CH) {
+        sddf_lwip_maybe_notify();
+    } else if (ch == serial_config.rx.id) {
         // Getting a notification from serial virt rx.
         serial_control();
     }

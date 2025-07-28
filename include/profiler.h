@@ -105,7 +105,7 @@ struct pmu_reg {
 };
 
 typedef struct pmu_reg pmu_reg_t;
-
+#define SEL4_PROF_MAX_CALL_DEPTH 16
 struct prof_sample {
     uint64_t ip;            /* Instruction pointer */
     uint32_t pid;           /* Process ID */

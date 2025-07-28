@@ -20,7 +20,7 @@ LWIPFILES=   $(COREFILES) $(CORE4FILES) $(NETIFFILES)
 # Do we need to add timer client into here?
 
 LWIP_OBJS := $(LWIPFILES:.c=.o)
-PROF_CLIENT_OBJS :=  $(addprefix profiler_client/, prof_lwip.o netconn_socket.o client.o) \
+PROF_CLIENT_OBJS :=  $(addprefix profiler_client/, netconn_socket.o client.o) \
 			$(addprefix protobuf/nanopb/, pmu_sample.pb.o pb_common.o pb_encode.o)
 
 # OBJS := $(addprefix $(BUILD_DIR)/, $(LWIP_OBJS))
@@ -32,7 +32,7 @@ PROF_CLIENT_LIBS := --start-group -lmicrokit -Tmicrokit.ld -lc libsddf_util.a --
 %.elf: %.o
 	$(LD) $(LDFLAGS) $< $(PROF_CLIENT_LIBS) -o $@
 
-prof_client.elf: $(LWIP_OBJS) $(PROF_CLIENT_OBJS) libsddf_util.a
+prof_client.elf: $(LWIP_OBJS) $(PROF_CLIENT_OBJS) libsddf_util.a lib_sddf_lwip_echo.a
 	$(LD) $(LDFLAGS) $^ $(PROF_CLIENT_LIBS) -o $@
 
 PROFCLIENTDIR := profiler_client protobuf/nanopb

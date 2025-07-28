@@ -11,6 +11,8 @@ SERIAL_CONFIG_INCLUDE:=$(PROFILER)/include/serial_config
 SERIAL_COMPONENTS := $(SDDF)/serial/components
 UART_DRIVER := $(SDDF)/drivers/serial/$(UART_DRIV_DIR)
 ETHERNET_DRIVER:=$(SDDF)/drivers/network/$(DRIV_DIR)
+NETWORK_COMPONENTS:=$(SDDF)/network/components
+SDDF_LWIP:=$(SDDF)/network/lib_sddf_lwip
 TIMER_DRIVER:=$(SDDF)/drivers/timer/$(TIMER_DRV_DIR)
 NETWORK_COMPONENTS:=$(SDDF)/network/components
 PROF_EXAMPLE:=${ROOTDIR}/example
@@ -48,6 +50,7 @@ CFLAGS := -mcpu=$(CPU) \
 	  -I${ROOTDIR}/include \
 	  -I$(SEL4_SDK)/include \
 	  -I$(PROTOBUFDIR)/nanopb \
+	  -I$(SDDF)/include/microkit \
 	  -MD \
 	  -MP
 
@@ -121,10 +124,11 @@ ${IMAGE_FILE} $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 include ${SDDF}/util/util.mk
 include $(ROOTDIR)/profiler_client/profiler_client.mk
 include $(ROOTDIR)/profiler/profiler.mk
-include ${SDDF}/network/components/network_components.mk
+include ${NETWORK_COMPONENTS}/network_components.mk
 include ${ETHERNET_DRIVER}/eth_driver.mk
+include ${SDDF_LWIP}/lib_sddf_lwip.mk
 include ${TIMER_DRIVER}/timer_driver.mk
-include ${UART_DRIVER}/uart_driver.mk
+include ${UART_DRIVER}/serial_driver.mk
 include ${SERIAL_COMPONENTS}/serial_components.mk
 
 -include $(DEPS)
