@@ -170,7 +170,7 @@ if __name__ == "__main__":
             else:
                 print("ERROR: attempted STOP command before CONNECT command called")
 
-        elif user_input == "EXIT":
+        elif user_input == "EXIT" or user_input == "q":
             if client.socket is not None:
                 client.send_command("STOP")
                 client.send_command("REFRESH")

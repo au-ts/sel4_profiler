@@ -388,3 +388,54 @@ void notified(microkit_channel ch) {
         microkit_irq_ack(ch);
     }
 }
+
+seL4_Bool fault(microkit_child child, microkit_msginfo msginfo, microkit_msginfo *reply_msginfo) {
+    sddf_dprintf("Received a fault!\n");
+    size_t label = microkit_msginfo_get_label(msginfo);
+
+    if (label == seL4_Fault_PMUEvent) {
+        sddf_dprintf("AND ITS A PMU FAULT!!!\n");
+        // Need to figure out how to get the whole 64 bit PC??
+        uint64_t pc = microkit_mr_get(0);
+        sddf_dprintf("this was the PC: %p and this was the child id: %p\n", pc, child);
+        // uint32_t ccnt_lower = microkit_mr_get(1);
+        // uint32_t ccnt_upper = microkit_mr_get(2);
+        // uint32_t pmovsr = microkit_mr_get(3);
+        // uint64_t time = ((uint64_t) ccnt_upper << 32) | ccnt_lower;
+        // // Halt the PMU -- MOVE THIS TO THE KERNEL
+        // // halt_cnt();
+
+
+        // // Only add a snapshot if the counter we are sampling on is in the interrupt flag
+        // // @kwinter Change this to deal with new counter definitions
+        // if (pmovsr & (IRQ_CYCLE_COUNTER << 31) ||
+        //     pmovsr & (IRQ_COUNTER0 << 0) ||
+        //     pmovsr & (IRQ_COUNTER1 << 1) ||
+        //     pmovsr & (IRQ_COUNTER2 << 2) ||
+        //     pmovsr & (IRQ_COUNTER3 << 3) ||
+        //     pmovsr & (IRQ_COUNTER4 << 4) ||
+        //     pmovsr & (IRQ_COUNTER5 << 5)) {
+        //     add_snapshot(child, time, pc);
+        // }
+
+        // // Check if an overflow has occured
+        // // if(pmu_has_overflowed(pmovsr)) {
+        // //     //printf_("PMU has overflowed\n");
+        // // } else {
+        // //     //printf_("PMU hasn't overflowed\n");
+        // // }
+        
+        // // Reset any counters that overflowed.
+
+        // // @kwinter Need a way to count how many times a certain counter has overflowed, if we 
+        // // are not sampling on it. Add this to the raw data section of the perf sample.
+        // reset_cnt(pmovsr);
+
+        // // Resume counters
+        // resume_cnt();
+    }
+
+    *reply_msginfo = microkit_msginfo_new(0 ,0);
+    return seL4_True;
+
+}
