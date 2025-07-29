@@ -202,7 +202,7 @@ void add_sample(microkit_child id, uint32_t time, uint64_t pc, uint64_t nr, uint
     if (net_queue_empty_free(&profiler_queue)) {
         reset_pmu();
         halt_pmu();
-        microkit_notify(CLIENT_PROFILER_CH);
+        microkit_notify(config.ch);
     } else {
         reset_pmu();
         resume_pmu();
@@ -251,7 +251,7 @@ void init () {
     sddf_dprintf("Profiler intialising...\n");
 
     // Ensure that the PMU is not running
-    // halt_pmu();
+    halt_pmu();
 
     // Init the record buffers
     net_queue_init(&profiler_queue, config.profiler_ring_free.vaddr, config.profiler_ring_used.vaddr, 512);
@@ -277,13 +277,12 @@ void init () {
     }
     #endif
 
-    // init_pmu_regs();
+    init_pmu_regs();
 
     /* INITIALISE WHAT COUNTERS WE WANT TO TRACK IN HERE */
-
-    // configure_clkcnt(CYCLE_COUNTER_PERIOD, 1);
+    configure_clkcnt(CYCLE_COUNTER_PERIOD, 1);
     // Make sure that the PMU is not running until we start
-    // halt_pmu();
+    halt_pmu();
     // Set the profiler state to init
     profiler_state = PROF_INIT;
 }
@@ -360,7 +359,7 @@ seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo) {
             sddf_dprintf("Stopping PMU\n");
             halt_pmu();
             /* Purge buffers to main first */
-            microkit_notify(CLIENT_PROFILER_CH);
+            microkit_notify(config.ch);
             break;
         case PROFILER_RESTART:
             /* Only restart PMU if we haven't halted */

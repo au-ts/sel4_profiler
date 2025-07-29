@@ -55,7 +55,6 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     timer_node = dtb.node(board.timer)
     assert timer_node is not None
 
-    # Setup all the driver PD's
     timer_driver = ProtectionDomain("timer_driver", "timer_driver.elf", priority=101)
     sdf.add_pd(timer_driver)
     timer_system = Sddf.Timer(sdf, timer_node, timer_driver)

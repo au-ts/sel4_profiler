@@ -22,6 +22,11 @@
 #include "client.h"
 #include "profiler_config.h"
 #include "profiler.h"
+#include "config.h"
+
+#define MAX_PACKET_SIZE 0x1000
+
+extern profiler_config_t prof_config;
 
 /* This file implements a TCP based profiler control process that starts
  * and stops the profiler based on a client's requests.
@@ -44,7 +49,7 @@
  */
 
 static struct tcp_pcb *utiliz_socket;
-uintptr_t data_packet;
+char data_packet_str[MAX_PACKET_SIZE];
 
 #define WHOAMI "100 SEL4 PROFILING CLIENT\n"
 #define HELLO "HELLO\n"
@@ -72,9 +77,8 @@ static err_t netconn_recv_callback(void *arg, struct tcp_pcb *pcb, struct pbuf *
         return ERR_OK;
     }
 
-    char *data_packet_str = (char *)data_packet;
 
-    pbuf_copy_partial(p, (void *)data_packet, p->tot_len, 0);
+    pbuf_copy_partial(p, (void *)data_packet_str, p->tot_len, 0);
     err_t error;
 
     if (msg_match(data_packet_str, HELLO)) {
@@ -83,9 +87,9 @@ static err_t netconn_recv_callback(void *arg, struct tcp_pcb *pcb, struct pbuf *
             microkit_dbg_puts("Failed to send OK_READY message through netconn peer");
         }
     } else if (msg_match(data_packet_str, START)) {
-        microkit_ppcall(CLIENT_PROFILER_CH, microkit_msginfo_new(PROFILER_START, 0));
+        microkit_ppcall(prof_config.ch, microkit_msginfo_new(PROFILER_START, 0));
     } else if (msg_match(data_packet_str, STOP)) {
-        microkit_ppcall(CLIENT_PROFILER_CH, microkit_msginfo_new(PROFILER_STOP, 0));
+        microkit_ppcall(prof_config.ch, microkit_msginfo_new(PROFILER_STOP, 0));
     } else if (msg_match(data_packet_str, MAPPINGS)) {
         #ifndef MAPPINGS_STR
         #define MAPPINGS_STR ""

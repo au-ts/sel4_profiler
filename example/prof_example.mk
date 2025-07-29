@@ -32,7 +32,7 @@ PROFILER_CONFIG_HEADERS := $(SDDF)/include/sddf/resources/common.h \
 vpath %.c ${PROF_EXAMPLE} ${ROOT_DIR} ${ECHO_DIR}
 
 IMAGES :=   prof_client.elf profiler.elf eth_driver.elf network_virt_rx.elf \
-			network_virt_tx.elf copy.elf timer_driver.elf serial_driver.elf serial_virt_tx.elf \
+			network_virt_tx.elf network_copy.elf timer_driver.elf serial_driver.elf serial_virt_tx.elf \
 			serial_virt_rx.elf dummy_prog1.elf dummy_prog2.elf
 
 CFLAGS := -mcpu=$(CPU) \

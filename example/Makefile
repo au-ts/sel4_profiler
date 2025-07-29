@@ -1,4 +1,4 @@
-export MICROKIT_CONFIG ?= debug
+export MICROKIT_CONFIG ?= profiling
 # export BUILD_DIR:=$(abspath build)
 export BUILD_DIR := build
 ifeq ($(strip $(MICROKIT_SDK)),)

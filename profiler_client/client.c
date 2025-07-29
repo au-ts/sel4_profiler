@@ -9,6 +9,7 @@
 #include <sddf/network/lib_sddf_lwip.h>
 #include <sddf/serial/queue.h>
 #include <sddf/serial/config.h>
+#include <sddf/timer/client.h>
 #include <sddf/timer/config.h>
 #include <sddf/network/config.h>
 #include "socket.h"
@@ -85,6 +86,14 @@ void netif_status_callback(char *ip_addr)
 }
 
 /**
+ * Sets a timeout for the next lwip tick.
+ */
+void set_timeout(void)
+{
+    sddf_timer_set_timeout(timer_config.driver_id, LWIP_TICK_MS * NS_IN_MS);
+}
+
+/**
  * Stores a pbuf to be transmitted upon available transmit buffers.
  *
  * @param p pbuf to be stored.
@@ -105,6 +114,42 @@ net_sddf_err_t enqueue_pbufs(struct pbuf *p)
     pbuf_ref(p);
 
     return SDDF_LWIP_ERR_OK;
+}
+
+void transmit(void)
+{
+    bool reprocess = true;
+    while (reprocess) {
+        while (head != NULL && !net_queue_empty_free(&net_tx_handle)) {
+            net_sddf_err_t err = sddf_lwip_transmit_pbuf(head);
+            if (err == SDDF_LWIP_ERR_PBUF) {
+                sddf_dprintf("LWIP|ERROR: attempted to send a packet of size %u > BUFFER SIZE %u\n", head->tot_len,
+                             NET_BUFFER_SIZE);
+            } else if (err != SDDF_LWIP_ERR_OK) {
+                sddf_dprintf("LWIP|ERROR: unkown error when trying to send pbuf %p\n", head);
+            }
+
+            struct pbuf *temp = head;
+            head = temp->next_chain;
+            if (head == NULL) {
+                tail = NULL;
+            }
+            pbuf_free(temp);
+        }
+
+        /* Only request a signal if there are more pending pbufs to send */
+        if (head == NULL || !net_queue_empty_free(&net_tx_handle)) {
+            net_cancel_signal_free(&net_tx_handle);
+        } else {
+            net_request_signal_free(&net_tx_handle);
+        }
+        reprocess = false;
+
+        if (head != NULL && !net_queue_empty_free(&net_tx_handle)) {
+            net_cancel_signal_free(&net_tx_handle);
+            reprocess = true;
+        }
+    }
 }
 
 char get_char() {
@@ -212,6 +257,7 @@ void init() {
     serial_putchar_init(serial_config.tx.id, &tx_queue_handle);
 
     if (CLIENT_CONFIG == CLIENT_CONTROL_NETWORK) {
+        sddf_dprintf("Initialising the network!\n");
         net_queue_init(&net_rx_handle, net_config.rx.free_queue.vaddr, net_config.rx.active_queue.vaddr,
                    net_config.rx.num_buffers);
         net_queue_init(&net_tx_handle, net_config.tx.free_queue.vaddr, net_config.tx.active_queue.vaddr,
@@ -220,6 +266,12 @@ void init() {
 
         sddf_lwip_init(&lwip_config, &net_config, &timer_config, net_rx_handle, net_tx_handle, NULL,
                 netif_status_callback, enqueue_pbufs);
+
+        set_timeout();
+
+        sddf_lwip_maybe_notify();
+
+        setup_netconn_socket();
     }
 
     // Set client state to idle
@@ -246,11 +298,17 @@ void notified(microkit_channel ch) {
                 eth_dump();
             }
         }
-    } else if(CLIENT_CONFIG == CLIENT_CONTROL_NETWORK) {
-        // Getting a network interrupt
-        sddf_lwip_maybe_notify();
+    } else if(ch == net_config.rx.id) {
+        sddf_lwip_process_rx();
+    } else if (ch == net_config.tx.id) {
+        transmit();
+    } else if (ch == timer_config.driver_id) {
+        sddf_lwip_process_timeout();
+        set_timeout();
     } else if (ch == serial_config.rx.id) {
         // Getting a notification from serial virt rx.
         serial_control();
     }
+
+    sddf_lwip_maybe_notify();
 }
