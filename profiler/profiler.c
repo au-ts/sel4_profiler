@@ -251,14 +251,14 @@ void init () {
     sddf_dprintf("Profiler intialising...\n");
 
     // Ensure that the PMU is not running
-    halt_pmu();
+    // halt_pmu();
 
     // Init the record buffers
-    net_queue_init(&profiler_queue, profiler_free, profiler_active, 512);
+    net_queue_init(&profiler_queue, config.profiler_ring_free.vaddr, config.profiler_ring_used.vaddr, 512);
 
     for (int i = 0; i < NUM_BUFFERS - 1; i++) {
         net_buff_desc_t buffer;
-        buffer.io_or_offset = profiler_data_region + (i * sizeof(prof_sample_t));
+        buffer.io_or_offset = (uint64_t)config.profiler_mem.vaddr + (i * sizeof(prof_sample_t));
         buffer.len = sizeof(prof_sample_t);
         int ret = net_enqueue_free(&profiler_queue, buffer);
 
@@ -277,13 +277,13 @@ void init () {
     }
     #endif
 
-    init_pmu_regs();
+    // init_pmu_regs();
 
     /* INITIALISE WHAT COUNTERS WE WANT TO TRACK IN HERE */
 
-    configure_clkcnt(CYCLE_COUNTER_PERIOD, 1);
+    // configure_clkcnt(CYCLE_COUNTER_PERIOD, 1);
     // Make sure that the PMU is not running until we start
-    halt_pmu();
+    // halt_pmu();
     // Set the profiler state to init
     profiler_state = PROF_INIT;
 }

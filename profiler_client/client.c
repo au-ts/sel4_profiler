@@ -30,9 +30,6 @@ serial_queue_handle_t tx_queue_handle;
 
 /* Profiler communication. */
 // @kwinter: Switch this over to a profiler specific queue implementation
-net_queue_t *profiler_active;
-net_queue_t *profiler_free;
-uintptr_t profiler_data_region;
 
 net_queue_handle_t net_rx_handle;
 net_queue_handle_t net_tx_handle;
@@ -215,16 +212,21 @@ void init() {
     serial_putchar_init(serial_config.tx.id, &tx_queue_handle);
 
     if (CLIENT_CONFIG == CLIENT_CONTROL_NETWORK) {
-            sddf_lwip_init(&lwip_config, &net_config, &timer_config, net_rx_handle, net_tx_handle, NULL,
-                   netif_status_callback, enqueue_pbufs);
+        net_queue_init(&net_rx_handle, net_config.rx.free_queue.vaddr, net_config.rx.active_queue.vaddr,
+                   net_config.rx.num_buffers);
+        net_queue_init(&net_tx_handle, net_config.tx.free_queue.vaddr, net_config.tx.active_queue.vaddr,
+                   net_config.tx.num_buffers);
+        net_buffers_init(&net_tx_handle, 0);
 
+        sddf_lwip_init(&lwip_config, &net_config, &timer_config, net_rx_handle, net_tx_handle, NULL,
+                netif_status_callback, enqueue_pbufs);
     }
 
     // Set client state to idle
     client_state = CLIENT_IDLE;
 
     // Init ring handle between profiler
-    net_queue_init(&profiler_queue, profiler_free, profiler_active, 512);
+    net_queue_init(&profiler_queue, prof_config.profiler_ring_free.vaddr, prof_config.profiler_ring_used.vaddr, 512);
 }
 
 void notified(microkit_channel ch) {
