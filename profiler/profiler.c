@@ -11,15 +11,19 @@
 #include "config.h"
 #include <sddf/util/printf.h>
 #include <sddf/network/queue.h>
+#include <vspace.h>
 
-uintptr_t uart_base;
+// The user provides the following mapping regions.
+// The small mapping region must be of page_size 0x1000
+// THe large mapping region must be of page_size 0x200000
+uintptr_t small_mapping_mr;
+uintptr_t large_mapping_mr;
 
 net_queue_handle_t profiler_queue;
 net_queue_t *profiler_free;
 net_queue_t *profiler_active;
 uintptr_t profiler_data_region;
 size_t profiler_queue_capacity = 0;
-uintptr_t log_buffer;
 
 __attribute__((__section__(".profiler_config"))) profiler_config_t config;
 
@@ -258,6 +262,10 @@ void init () {
         sddf_dprintf("This is the TCB flag for %d: %b\n", i, ret.flags);
     }
 
+    // Setup the mapping regions for libvspace to use.
+    libvspace_set_small_mapping_region(small_mapping_mr);
+    libvspace_set_large_mapping_region(large_mapping_mr);
+
     // Ensure that the PMU is not running
     halt_pmu();
 
@@ -277,14 +285,6 @@ void init () {
         }
     }
 
-    #ifdef CONFIG_PROFILER_ENABLE
-    int res_buf = seL4_BenchmarkSetLogBuffer(log_buffer);
-    if (res_buf) {
-        sddf_dprintf("Could not set log buffer");
-        puthex64(res_buf);
-    }
-    #endif
-
     init_pmu_regs();
 
     /* INITIALISE WHAT COUNTERS WE WANT TO TRACK IN HERE */
@@ -296,62 +296,59 @@ void init () {
 }
 
 void handle_irq(uint32_t irqFlag) {
-    pmu_sample_t *profLogs = (pmu_sample_t *) log_buffer;
-    pmu_sample_t profLog = profLogs[0];
 
-    uint64_t period = 0;
+    // // Update structs to check what counters overflowed
+    // if (irqFlag & (pmu_registers[CYCLE_CTR].sampling << 31)) {
+    //     period = pmu_registers[CYCLE_CTR].count;
+    //     pmu_registers[CYCLE_CTR].overflowed = 1;
+    // }
 
-    // Update structs to check what counters overflowed
-    if (irqFlag & (pmu_registers[CYCLE_CTR].sampling << 31)) {
-        period = pmu_registers[CYCLE_CTR].count;
-        pmu_registers[CYCLE_CTR].overflowed = 1;
-    }
+    // if (irqFlag & (pmu_registers[0].sampling << 0)) {
+    //     period = pmu_registers[0].count;
+    //     pmu_registers[0].overflowed = 1;
+    // }
 
-    if (irqFlag & (pmu_registers[0].sampling << 0)) {
-        period = pmu_registers[0].count;
-        pmu_registers[0].overflowed = 1;
-    }
+    // if (irqFlag & (pmu_registers[1].sampling << 1)) {
+    //     period = pmu_registers[1].count;
+    //     pmu_registers[1].overflowed = 1;
+    // }
 
-    if (irqFlag & (pmu_registers[1].sampling << 1)) {
-        period = pmu_registers[1].count;
-        pmu_registers[1].overflowed = 1;
-    }
+    // if (irqFlag & (pmu_registers[2].sampling << 2)) {
+    //     period = pmu_registers[2].count;
+    //     pmu_registers[2].overflowed = 1;
+    // }
 
-    if (irqFlag & (pmu_registers[2].sampling << 2)) {
-        period = pmu_registers[2].count;
-        pmu_registers[2].overflowed = 1;
-    }
+    // if (irqFlag & (pmu_registers[3].sampling << 3)) {
+    //     period = pmu_registers[3].count;
+    //     pmu_registers[3].overflowed = 1;
+    // }
 
-    if (irqFlag & (pmu_registers[3].sampling << 3)) {
-        period = pmu_registers[3].count;
-        pmu_registers[3].overflowed = 1;
-    }
+    // if (irqFlag & (pmu_registers[4].sampling << 4)) {
+    //     period = pmu_registers[4].count;
+    //     pmu_registers[4].overflowed = 1;
+    // }
 
-    if (irqFlag & (pmu_registers[4].sampling << 4)) {
-        period = pmu_registers[4].count;
-        pmu_registers[4].overflowed = 1;
-    }
+    // if (irqFlag & (pmu_registers[5].sampling << 5)) {
+    //     period = pmu_registers[5].count;
+    //     pmu_registers[5].overflowed = 1;
+    // }
 
-    if (irqFlag & (pmu_registers[5].sampling << 5)) {
-        period = pmu_registers[5].count;
-        pmu_registers[5].overflowed = 1;
-    }
-
-    if (profLog.valid == 1) {
-        if (irqFlag & (pmu_registers[CYCLE_CTR].sampling << 31) ||
-            irqFlag & (pmu_registers[0].sampling << 0) ||
-            irqFlag & (pmu_registers[1].sampling << 1) ||
-            irqFlag & (pmu_registers[2].sampling << 2) ||
-            irqFlag & (pmu_registers[3].sampling << 3) ||
-            irqFlag & (pmu_registers[4].sampling << 4) ||
-            irqFlag & (pmu_registers[5].sampling << 5)) {
-            add_sample(profLog.pid, profLog.time, profLog.ip, profLog.nr, irqFlag, profLog.ips, period);
-        }
-    } else {
-        // Not a valid sample. Restart PMU.
-        reset_pmu(irqFlag);
-        resume_pmu();
-    }
+    // if (profLog.valid == 1) {
+    //     if (irqFlag & (pmu_registers[CYCLE_CTR].sampling << 31) ||
+    //         irqFlag & (pmu_registers[0].sampling << 0) ||
+    //         irqFlag & (pmu_registers[1].sampling << 1) ||
+    //         irqFlag & (pmu_registers[2].sampling << 2) ||
+    //         irqFlag & (pmu_registers[3].sampling << 3) ||
+    //         irqFlag & (pmu_registers[4].sampling << 4) ||
+    //         irqFlag & (pmu_registers[5].sampling << 5)) {
+    //         // add_sample(profLog.pid, profLog.time, profLog.ip, profLog.nr, irqFlag, profLog.ips, period);
+    //     }
+    // } else {
+    //     // Not a valid sample. Restart PMU.
+    //     reset_pmu(irqFlag);
+    //     resume_pmu();
+    // }
+    return;
 }
 
 seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo) {

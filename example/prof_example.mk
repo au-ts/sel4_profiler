@@ -3,24 +3,33 @@ BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 SYSTEM_FILE := profiler.system
 IMAGE_FILE := loader.img
 REPORT_FILE := report.txt
+
+# Network files
 LWIPDIR:=network/ipstacks/lwip/src
-PROTOBUFDIR := ${ROOTDIR}/protobuf
-UTIL:=$(SDDF)/util
-ETHERNET_CONFIG_INCLUDE:=$(PROFILER)/include/ethernet_config
-SERIAL_CONFIG_INCLUDE:=$(PROFILER)/include/serial_config
-SERIAL_COMPONENTS := $(SDDF)/serial/components
-UART_DRIVER := $(SDDF)/drivers/serial/$(UART_DRIV_DIR)
 ETHERNET_DRIVER:=$(SDDF)/drivers/network/$(DRIV_DIR)
 NETWORK_COMPONENTS:=$(SDDF)/network/components
 SDDF_LWIP:=$(SDDF)/network/lib_sddf_lwip
+
+# Serial files
+SERIAL_CONFIG_INCLUDE:=$(PROFILER)/include/serial_config
+SERIAL_COMPONENTS := $(SDDF)/serial/components
+UART_DRIVER := $(SDDF)/drivers/serial/$(UART_DRIV_DIR)
+
+# Timer files
 TIMER_DRIVER:=$(SDDF)/drivers/timer/$(TIMER_DRV_DIR)
-NETWORK_COMPONENTS:=$(SDDF)/network/components
+
+# Util files
+PROTOBUFDIR := ${ROOTDIR}/protobuf
+UTIL:=$(SDDF)/util
+
+# Example systems
 PROF_EXAMPLE:=${ROOTDIR}/example
 ECHO_DIR:=${PROF_EXAMPLE}/echo_server
-OBJCOPY:=$(TOOLCHAIN)-objcopy
 
+# Tools
 PYTHON ?= python3
 DTC := dtc
+OBJCOPY:=$(TOOLCHAIN)-objcopy
 METAPROGRAM := $(PROF_EXAMPLE)/meta.py
 DTS := $(SDDF)/dts/$(MICROKIT_BOARD).dts
 DTB := $(MICROKIT_BOARD).dtb
@@ -52,11 +61,12 @@ CFLAGS := -mcpu=$(CPU) \
 	  -I$(SEL4_SDK)/include \
 	  -I$(PROTOBUFDIR)/nanopb \
 	  -I$(SDDF)/include/microkit \
+	  -I$(LIBVSPACE_DIR) \
 	  -MD \
 	  -MP
 
 LDFLAGS := -L$(BOARD_DIR)/lib -L${LIBC}
-LIBS := --start-group -lmicrokit -Tmicrokit.ld -lc libsddf_util_debug.a --end-group
+LIBS := --start-group -lmicrokit -Tmicrokit.ld -lc libsddf_util_debug.a libvspace.a --end-group
 
 %.elf: %.o
 	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
@@ -91,7 +101,7 @@ echo.elf: $(ECHO_OBJS) libsddf_util.a
 
 # Need to build libsddf_util_debug.a because it's included in LIBS
 # for the unimplemented libc dependencies
-${IMAGES}: libsddf_util.a libsddf_util_debug.a
+${IMAGES}: libsddf_util.a libsddf_util_debug.a libvspace.a
 
 $(DTB): $(DTS)
 	dtc -q -I dts -O dtb $(DTS) > $(DTB)
@@ -135,5 +145,6 @@ include ${SDDF_LWIP}/lib_sddf_lwip.mk
 include ${TIMER_DRIVER}/timer_driver.mk
 include ${UART_DRIVER}/serial_driver.mk
 include ${SERIAL_COMPONENTS}/serial_components.mk
+include ${LIBVSPACE_DIR}/libvspace.mk
 
 -include $(DEPS)

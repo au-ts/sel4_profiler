@@ -35,6 +35,7 @@ export RANLIB := $(TOOLCHAIN)-ranlib
 export SDDF=$(abspath ../sDDF)
 export ROOTDIR=$(abspath ../)
 export MICROKIT_SDK:=$(abspath ${MICROKIT_SDK})
+export LIBVSPACE_DIR:=${ROOTDIR}/libvspace
 IMAGE_FILE := $(BUILD_DIR)/loader.img
 REPORT_FILE := $(BUILD_DIR)/report.txt
 
