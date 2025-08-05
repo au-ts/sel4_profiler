@@ -19,6 +19,8 @@ class ProfilerConfigStruct(LittleEndianStructure):
                  ("profiler_ring_free", RegionResourceStruct),
                  # C type: region_resource_t
                  ("profiler_mem", RegionResourceStruct),
+                 # C type: uint16_t
+                 ("num_cli", c_uint16),
                  # C type: uint8_t
                  ("ch", c_uint8)]
 
@@ -40,10 +42,11 @@ class RegionResource(Serializable):
                                     size_arg)
 
 class ProfilerConfig(Serializable):
-    def __init__(self, profiler_ring_used: RegionResource, profiler_ring_free: RegionResource, profiler_mem: RegionResource, ch: int):
+    def __init__(self, profiler_ring_used: RegionResource, profiler_ring_free: RegionResource, profiler_mem: RegionResource, num_cli: int, ch: int):
         self.profiler_ring_used = profiler_ring_used
         self.profiler_ring_free = profiler_ring_free
         self.profiler_mem = profiler_mem
+        self.num_cli = num_cli
         self.ch = ch
         self.section_name = "profiler_config"
 
@@ -51,9 +54,11 @@ class ProfilerConfig(Serializable):
         profiler_ring_used_arg = RegionResourceStruct() if self.profiler_ring_used is None else self.profiler_ring_used.to_struct()
         profiler_ring_free_arg = RegionResourceStruct() if self.profiler_ring_free is None else self.profiler_ring_free.to_struct()
         profiler_mem_arg = RegionResourceStruct() if self.profiler_mem is None else self.profiler_mem.to_struct()
+        num_cli_arg = c_uint16() if self.num_cli is None else self.num_cli
         ch_arg = c_uint8() if self.ch is None else self.ch
         return ProfilerConfigStruct(profiler_ring_used_arg, 
                                     profiler_ring_free_arg, 
                                     profiler_mem_arg, 
+                                    num_cli_arg, 
                                     ch_arg)
 

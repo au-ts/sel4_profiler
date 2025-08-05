@@ -12,9 +12,6 @@ void big_loop() {
 }
 
 void init() {
-    #ifdef CONFIG_PROFILER_ENABLE
-    seL4_ProfilerRegisterThread(2);
-    #endif
 }
 
 void notified (microkit_channel ch) {

@@ -17,7 +17,7 @@ ProtectionDomain = SystemDescription.ProtectionDomain
 MemoryRegion = SystemDescription.MemoryRegion
 Map = SystemDescription.Map
 Channel = SystemDescription.Channel
-
+Irq = SystemDescription.Irq
 
 @dataclass
 class Board:
@@ -124,14 +124,19 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     prof_ch = Channel(profiler, prof_client, pp_b=True)
     sdf.add_channel(prof_ch)
 
+    pmu_irq = Irq(23, id=21)
+    profiler.add_irq(pmu_irq)
+
     profiler_conn = ProfilerConfig(RegionResource(profiler_ring_used_prof_map.vaddr, 0x200000),
                                    RegionResource(profiler_ring_free_prof_map.vaddr, 0x200000),
                                    RegionResource(profiler_mem_prof_map.vaddr, 0x1000000),
+                                   2,
                                    prof_ch.pd_a_id)
 
     prof_client_conn = ProfilerConfig(RegionResource(profiler_ring_used_cli_map.vaddr, 0x200000),
                                    RegionResource(profiler_ring_free_cli_map.vaddr, 0x200000),
                                    RegionResource(profiler_mem_cli_map.vaddr, 0x1000000),
+                                   2,
                                    prof_ch.pd_b_id)
 
 

@@ -170,7 +170,7 @@ if __name__ == "__main__":
             else:
                 print("ERROR: attempted STOP command before CONNECT command called")
 
-        elif user_input == "EXIT" or user_input == "q":
+        elif user_input == "EXIT" or user_input == "Q":
             if client.socket is not None:
                 client.send_command("STOP")
                 client.send_command("REFRESH")
@@ -185,4 +185,4 @@ if __name__ == "__main__":
             print("\t1. \"CONNECT\" - This will attempt to connect to the supplied IP address and port. Connect will add the ")
             print("\t2. \"START\" - This will command the seL4 profiler to start measurements and construct samples output file.")
             print("\t3. \"STOP\" - This will command the seL4 profiler to stop measurements.")
-            print("\t4. \"EXIT\" - This will command the seL4 profiler to stop measurements, close the samples output file and exit this program")
+            print("\t4. \"EXIT\" or \"q\" - This will command the seL4 profiler to stop measurements, close the samples output file and exit this program")

@@ -20,9 +20,6 @@ void endless_loop() {
 }
 
 void init() {
-    #ifdef CONFIG_PROFILER_ENABLE
-    seL4_ProfilerRegisterThread(1);
-    #endif
     endless_loop();
 }
 
