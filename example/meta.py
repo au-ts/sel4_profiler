@@ -55,7 +55,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     timer_node = dtb.node(board.timer)
     assert timer_node is not None
 
-    timer_driver = ProtectionDomain("timer_driver", "timer_driver.elf", priority=101)
+    timer_driver = ProtectionDomain("timer_driver", "timer_driver.elf", priority=120)
     sdf.add_pd(timer_driver)
     timer_system = Sddf.Timer(sdf, timer_node, timer_driver)
 
@@ -89,8 +89,19 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     # timer_system.add_client(echo_client)
     # echo_client_lwip = Sddf.Lwip(sdf, net_system, echo_client)
 
-    profiler = ProtectionDomain("profiler", "profiler.elf", priority=105)
+    profiler = ProtectionDomain("profiler", "profiler.elf", priority=105, child_pts=True)
     sdf.add_pd(profiler)
+    timer_system.add_client(profiler)
+
+    small_mapping_region = MemoryRegion(sdf, "small_region", 0x1000)
+    sdf.add_mr(small_mapping_region)
+    small_map = Map(small_mapping_region, 0x900000, "rw", setvar_vaddr="small_mapping_mr")
+    profiler.add_map(small_map)
+
+    large_mapping_region = MemoryRegion(sdf, "large_region", 0x200000, page_size=MemoryRegion.PageSize.LargePage)
+    sdf.add_mr(large_mapping_region)
+    large_map = Map(large_mapping_region, 0xa00000, "rw", setvar_vaddr="large_mapping_mr")
+    profiler.add_map(large_map)
 
     dummy_prog1 = ProtectionDomain("dummy_prog1", "dummy_prog1.elf", priority=20)
     profiler.add_child_pd(dummy_prog1)

@@ -111,6 +111,7 @@ $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --dtb $(DTB) --output . --sdf $(SYSTEM_FILE)
 # Profiler config
 	$(OBJCOPY) --update-section .profiler_config=profiler_conn.data profiler.elf
+	$(OBJCOPY) --update-section .timer_client_config=timer_client_profiler.data profiler.elf
 	$(OBJCOPY) --update-section .profiler_config=prof_client_conn.data prof_client.elf
 # Device class configs
 	$(OBJCOPY) --update-section .device_resources=uart_driver_device_resources.data serial_driver.elf

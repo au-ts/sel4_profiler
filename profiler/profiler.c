@@ -12,6 +12,8 @@
 #include <sddf/util/printf.h>
 #include <sddf/network/queue.h>
 #include <vspace.h>
+#include <sddf/timer/client.h>
+#include <sddf/timer/config.h>
 
 // The user provides the following mapping regions.
 // The small mapping region must be of page_size 0x1000
@@ -26,6 +28,7 @@ uintptr_t profiler_data_region;
 size_t profiler_queue_capacity = 0;
 
 __attribute__((__section__(".profiler_config"))) profiler_config_t config;
+__attribute__((__section__(".timer_client_config"))) timer_client_config_t timer_config;
 
 // Array of pmu registers available
 pmu_reg_t pmu_registers[PMU_NUM_REGS];
@@ -75,57 +78,44 @@ void resume_pmu() {
     MSR(PMCNTENSET_EL0, (BIT(31)));
 }
 
-// Configure event counter 0
-void configure_cnt0(uint32_t event, uint32_t val) {
-    ISB;
-    MSR(PMU_EVENT_CTR0, 0xffffffff - val);
-    MSR(PMU_EVENT_TYP0, event);
+void write_counter_val(uint32_t cnt, uint32_t val) {
+    MSR(PMSELR_EL0, cnt);
+    MSR(PMXEVCNTR_EL0, val);
 }
 
-// Configure event counter 1
-void configure_cnt1(uint32_t event, uint32_t val) {
-    ISB;
-    MSR(PMU_EVENT_CTR1, 0xffffffff - val);
-    MSR(PMU_EVENT_TYP1, event);
+uint32_t read_counter_val(uint32_t cnt) {
+    MSR(PMSELR_EL0, cnt);
+    uint32_t val = 0;
+    MRS(PMXEVCNTR_EL0, val);
 }
 
-// Configure event counter 2
-void configure_cnt2(uint32_t event, uint32_t val) {
-    ISB;
-    MSR(PMU_EVENT_CTR2, 0xffffffff - val);
-    MSR(PMU_EVENT_TYP2, event);
+void write_event_val(uint32_t cnt, uint32_t event) {
+    MSR(PMSELR_EL0, cnt);
+    MSR(PMXEVTYPER_EL0, cnt);
 }
 
-// Configure event counter 3
-void configure_cnt3(uint32_t event, uint32_t val) {
-    ISB;
-    MSR(PMU_EVENT_CTR3, 0xffffffff - val);
-    MSR(PMU_EVENT_TYP3, event);
-}
+/* Configure cycle counter*/
+void configure_clkcnt(uint64_t val, bool sampling) {
+    sddf_dprintf("configuring the cycle counter\n");
+    // Update the struct
+    pmu_registers[CYCLE_CTR].count = val;
+    pmu_registers[CYCLE_CTR].sampling = sampling;
 
-// Configure event counter 4
-void configure_cnt4(uint32_t event, uint32_t val) {
-    ISB;
-    MSR(PMU_EVENT_CTR4, 0xffffffff - val);
-    MSR(PMU_EVENT_TYP4, event);
+    uint64_t init_cnt = UINT64_MAX - pmu_registers[CYCLE_CTR].count;
+    MSR(PMU_CYCLE_CTR, init_cnt);
 }
-
-// Configure event counter 5
-void configure_cnt5(uint32_t event, uint32_t val) {
-    ISB;
-    MSR(PMU_EVENT_CTR5, 0xffffffff - val);
-    MSR(PMU_EVENT_TYP5, event);}
 
 void reset_pmu() {
     // Loop through the pmu registers, if the overflown flag has been set,
     // and we are sampling on this register, reset to max value - count.
     // Otherwise, reset to 0.
-    for (int i = 0; i < PMU_NUM_REGS - 1; i++) {
+    for (int i = 0; i < PMU_NUM_REGS; i++) {
         if (pmu_registers[i].overflowed == 1 && pmu_registers[i].sampling == 1) {
-            pmu_registers[i].config_ctr(pmu_registers[i].event, pmu_registers[i].count);
+            write_counter_val(i, UINT32_MAX - pmu_registers[i].count);
+            write_event_val(i, pmu_registers[i].event);
             pmu_registers[i].overflowed = 0;
         } else if (pmu_registers[i].overflowed == 1) {
-            pmu_registers[i].config_ctr(pmu_registers[i].event, 0xffffffff);
+            write_counter_val(i, 0);
             pmu_registers[i].overflowed = 0;
         }
     }
@@ -134,7 +124,8 @@ void reset_pmu() {
     if (pmu_registers[CYCLE_CTR].overflowed == 1) {
         uint64_t init_cnt = 0;
         if (pmu_registers[CYCLE_CTR].sampling == 1) {
-            init_cnt = 0xffffffffffffffff - CYCLE_COUNTER_PERIOD;
+            sddf_dprintf("resetting the cycle counter!\n");
+            init_cnt = UINT64_MAX - pmu_registers[CYCLE_CTR].count;
         }
         MSR(PMU_CYCLE_CTR, init_cnt);
         pmu_registers[CYCLE_CTR].overflowed = 0;
@@ -142,15 +133,7 @@ void reset_pmu() {
 
 }
 
-/* Configure cycle counter*/
-void configure_clkcnt(uint64_t val, bool sampling) {
-    // Update the struct
-    pmu_registers[CYCLE_CTR].count = val;
-    pmu_registers[CYCLE_CTR].sampling = sampling;
 
-    uint64_t init_cnt = 0xffffffffffffffff - pmu_registers[CYCLE_CTR].count;
-    MSR(PMU_CYCLE_CTR, init_cnt);
-}
 
 void configure_eventcnt(int cntr, uint32_t event, uint64_t val, bool sampling) {
     // First update the struct
@@ -206,49 +189,102 @@ void add_sample(microkit_child id, uint32_t time, uint64_t pc, uint64_t nr, uint
     if (net_queue_empty_free(&profiler_queue)) {
         reset_pmu();
         halt_pmu();
+        sddf_dprintf("trying to dump queue!\n");
         microkit_notify(config.ch);
     } else {
+        sddf_dprintf("Buffers were not full, resuming PMU!\n");
         reset_pmu();
         resume_pmu();
     }
 }
 
-void init_pmu_regs() {
-    /* Initialise the register array */
-    pmu_registers[0].config_ctr = configure_cnt0;
-    pmu_registers[0].count = 0;
-    pmu_registers[0].event = 0;
-    pmu_registers[0].sampling = 0;
-    pmu_registers[0].overflowed = 0;
-    pmu_registers[1].config_ctr = configure_cnt1;
-    pmu_registers[1].count = 0;
-    pmu_registers[1].event = 0;
-    pmu_registers[1].sampling = 0;
-    pmu_registers[1].overflowed = 0;
-    pmu_registers[2].config_ctr = configure_cnt2;
-    pmu_registers[2].count = 0;
-    pmu_registers[2].event = 0;
-    pmu_registers[2].sampling = 0;
-    pmu_registers[2].overflowed = 0;
-    pmu_registers[3].config_ctr = configure_cnt3;
-    pmu_registers[3].count = 0;
-    pmu_registers[3].event = 0;
-    pmu_registers[3].sampling = 0;
-    pmu_registers[3].overflowed = 0;
-    pmu_registers[4].config_ctr = configure_cnt4;
-    pmu_registers[4].count = 0;
-    pmu_registers[4].event = 0;
-    pmu_registers[4].sampling = 0;
-    pmu_registers[4].overflowed = 0;
-    pmu_registers[5].config_ctr = configure_cnt5;
-    pmu_registers[5].count = 0;
-    pmu_registers[5].event = 0;
-    pmu_registers[5].sampling = 0;
-    pmu_registers[5].overflowed = 0;
-    pmu_registers[CYCLE_CTR].count = 0;
-    pmu_registers[CYCLE_CTR].event = 0;
-    pmu_registers[CYCLE_CTR].sampling = 0;
-    pmu_registers[CYCLE_CTR].overflowed = 0;
+int callstack_unwind(microkit_channel ch, uintptr_t fp_addr, int depth, uint64_t *callstack)
+{
+    int nr = 0;
+    // Loop and read the start of the frame pointer, save the lr value and load the next fp
+    for (int i = 0; i < depth; i++) {
+        // The LR should be one word above the FP
+        seL4_Word lr_addr = fp_addr + sizeof(seL4_Word);
+
+        // We need to traverse the frame stack chain. We want to save the value of the LR in the frame
+        // entry as part of our perf callchain, and then look at the next frame record.
+        uint64_t lr = 0;
+        uint64_t fp = 0;
+        uint32_t err_lr  = libvspace_read_word(ch, lr_addr, &lr);
+        uint32_t err_fp = libvspace_read_word(ch, fp_addr, &fp);
+        if (err_lr == 0 && err_fp == 0) {
+            // Set the fp value to the next frame entry
+            fp_addr = fp;
+            // If the fp is 0, then we have reached the end of the frame stack chain
+            sddf_dprintf("This is the LR: %p\n", lr);
+            callstack[i] = lr;
+            nr++;
+            if (fp_addr == 0) {
+                break;
+            }
+        } else {
+            // If we are unable to read, then we have reached the end of our stack unwinding
+            sddf_dprintf("Unable to read a word, we have reached the end of the call stack unwind\n");
+            break;
+        }
+    }
+    return nr;
+}
+
+void handle_event(microkit_channel child, uint32_t irqFlag, uint64_t pc, uint64_t fp, uint64_t time) {
+    uint32_t period = 0;
+
+    uint64_t callstack[4] = {0,0,0,0};
+
+    int nr = callstack_unwind(child, fp, 4, callstack);
+
+    // Update structs to check what counters overflowed
+    if (irqFlag & (pmu_registers[CYCLE_CTR].sampling << 31)) {
+        sddf_dprintf("The cycle counter overflowed!\n");
+        period = pmu_registers[CYCLE_CTR].count;
+        pmu_registers[CYCLE_CTR].overflowed = 1;
+        add_sample(child, time, pc, nr, irqFlag, callstack, period);
+    }
+
+    for (int i = 0; i < PMU_NUM_REGS; i++) {
+        if (irqFlag & (pmu_registers[i].sampling << i)) {
+            period = pmu_registers[i].count;
+            pmu_registers[i].overflowed = 1;
+            add_sample(child, time, pc, nr, irqFlag, callstack, period);
+        }
+    }
+
+    return;
+}
+
+seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo) {
+    /* This is how the profiler main thread sends control commands */
+    switch(microkit_msginfo_get_label(msginfo)) {
+        case PROFILER_START:
+            profiler_state = PROF_START;
+            microkit_dbg_puts("Starting PMU\n");
+            resume_pmu();
+            break;
+        case PROFILER_STOP:
+            profiler_state = PROF_HALT;
+            sddf_dprintf("Stopping PMU\n");
+            halt_pmu();
+            /* Purge buffers to main first */
+            microkit_notify(config.ch);
+            break;
+        case PROFILER_RESTART:
+            /* Only restart PMU if we haven't halted */
+            if (profiler_state == PROF_START) {
+                reset_pmu();
+                resume_pmu();
+            }
+            break;
+        default:
+            sddf_dprintf(microkit_name);
+            sddf_dprintf(": Invalid ppcall to profiler thread!\n");
+            break;
+    }
+    return microkit_msginfo_new(0,0);
 }
 
 void init () {
@@ -285,102 +321,13 @@ void init () {
         }
     }
 
-    init_pmu_regs();
-
     /* INITIALISE WHAT COUNTERS WE WANT TO TRACK IN HERE */
-    configure_clkcnt(CYCLE_COUNTER_PERIOD, 1);
+    configure_clkcnt(CYCLE_COUNTER_PERIOD, true);
     // Make sure that the PMU is not running until we start
     halt_pmu();
     // Set the profiler state to init
     profiler_state = PROF_INIT;
 }
-
-void handle_irq(uint32_t irqFlag) {
-
-    // // Update structs to check what counters overflowed
-    // if (irqFlag & (pmu_registers[CYCLE_CTR].sampling << 31)) {
-    //     period = pmu_registers[CYCLE_CTR].count;
-    //     pmu_registers[CYCLE_CTR].overflowed = 1;
-    // }
-
-    // if (irqFlag & (pmu_registers[0].sampling << 0)) {
-    //     period = pmu_registers[0].count;
-    //     pmu_registers[0].overflowed = 1;
-    // }
-
-    // if (irqFlag & (pmu_registers[1].sampling << 1)) {
-    //     period = pmu_registers[1].count;
-    //     pmu_registers[1].overflowed = 1;
-    // }
-
-    // if (irqFlag & (pmu_registers[2].sampling << 2)) {
-    //     period = pmu_registers[2].count;
-    //     pmu_registers[2].overflowed = 1;
-    // }
-
-    // if (irqFlag & (pmu_registers[3].sampling << 3)) {
-    //     period = pmu_registers[3].count;
-    //     pmu_registers[3].overflowed = 1;
-    // }
-
-    // if (irqFlag & (pmu_registers[4].sampling << 4)) {
-    //     period = pmu_registers[4].count;
-    //     pmu_registers[4].overflowed = 1;
-    // }
-
-    // if (irqFlag & (pmu_registers[5].sampling << 5)) {
-    //     period = pmu_registers[5].count;
-    //     pmu_registers[5].overflowed = 1;
-    // }
-
-    // if (profLog.valid == 1) {
-    //     if (irqFlag & (pmu_registers[CYCLE_CTR].sampling << 31) ||
-    //         irqFlag & (pmu_registers[0].sampling << 0) ||
-    //         irqFlag & (pmu_registers[1].sampling << 1) ||
-    //         irqFlag & (pmu_registers[2].sampling << 2) ||
-    //         irqFlag & (pmu_registers[3].sampling << 3) ||
-    //         irqFlag & (pmu_registers[4].sampling << 4) ||
-    //         irqFlag & (pmu_registers[5].sampling << 5)) {
-    //         // add_sample(profLog.pid, profLog.time, profLog.ip, profLog.nr, irqFlag, profLog.ips, period);
-    //     }
-    // } else {
-    //     // Not a valid sample. Restart PMU.
-    //     reset_pmu(irqFlag);
-    //     resume_pmu();
-    // }
-    return;
-}
-
-seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo) {
-    /* This is how the profiler main thread sends control commands */
-    switch(microkit_msginfo_get_label(msginfo)) {
-        case PROFILER_START:
-            profiler_state = PROF_START;
-            microkit_dbg_puts("Starting PMU\n");
-            resume_pmu();
-            break;
-        case PROFILER_STOP:
-            profiler_state = PROF_HALT;
-            sddf_dprintf("Stopping PMU\n");
-            halt_pmu();
-            /* Purge buffers to main first */
-            microkit_notify(config.ch);
-            break;
-        case PROFILER_RESTART:
-            /* Only restart PMU if we haven't halted */
-            if (profiler_state == PROF_START) {
-                reset_pmu();
-                resume_pmu();
-            }
-            break;
-        default:
-            sddf_dprintf(microkit_name);
-            sddf_dprintf(": Invalid ppcall to profiler thread!\n");
-            break;
-    }
-    return microkit_msginfo_new(0,0);
-}
-
 
 void notified(microkit_channel ch) {
     // sddf_dprintf("Got a notification\n");
@@ -389,7 +336,6 @@ void notified(microkit_channel ch) {
         uint32_t irqFlag = 0;
         MRS(PMOVSCLR_EL0, irqFlag);
 
-        // handle_irq(irqFlag);
         reset_pmu(irqFlag);
         resume_pmu();
 
@@ -407,9 +353,22 @@ seL4_Bool fault(microkit_child child, microkit_msginfo msginfo, microkit_msginfo
         uint64_t pc = microkit_mr_get(0);
         uint64_t fp = microkit_mr_get(1);
         sddf_dprintf("this was the PC: %p and this was the child id: %p and this was the fp: %p\n", pc, child, fp);
+        sddf_dprintf("Attempting a call stack unwind!\n");
+        // Get the interrupt flag from the PMU
+        uint32_t irqFlag = 0;
+        MRS(PMOVSCLR_EL0, irqFlag);
+
+        handle_event(child, irqFlag, pc, fp, sddf_timer_time_now(timer_config.driver_id));
+        sddf_dprintf("resetting the PMU!\n");
+
+        // Clear the interrupt flag
+        MSR(PMOVSCLR_EL0, irqFlag | BIT(31));
+
+        // reset_pmu(irqFlag);
+        // resume_pmu();
+        // microkit_irq_ack(21);
     }
 
     *reply_msginfo = microkit_msginfo_new(0 ,0);
-    return seL4_True;
-
+    return true;
 }

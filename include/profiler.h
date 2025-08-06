@@ -5,7 +5,7 @@
 
 #define BIT(nr) (1UL << (nr))
 
-#define PMU_NUM_REGS 7
+#define PMU_NUM_REGS 6
 
 #define SEL4_USER_CONTEXT_SIZE 0x24
 
@@ -75,6 +75,12 @@
 #define PMCR_EL0 "pmcr_el0"
 #define PMCNTENSET_EL0 "pmcntenset_el0"
 #define PMOVSCLR_EL0 "pmovsclr_el0"
+
+/* Event select register */
+#define PMSELR_EL0 "pmselr_el0"
+#define PMXEVCNTR_EL0 "pmxevcntr_el0"
+#define PMXEVTYPER_EL0 "pmxevtyper_el0"
+
 
 /* Different profiler states */
 enum profiler_states {
