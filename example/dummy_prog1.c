@@ -7,7 +7,7 @@ void endless_loop() {
     uint64_t i = 0;
     int ticker = 0;
     while(1) {
-        if (i == 999999999) {
+        if (i == 9999999999) {
             i = 0;
             ticker++;
             microkit_notify(1);
