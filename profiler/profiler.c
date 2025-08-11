@@ -46,36 +46,59 @@ int profiler_state;
 
 /* Halt the PMU */
 void halt_pmu() {
-    uint32_t value = 0;
-    uint32_t mask = 0;
+    uint32_t val = 0;
 
     /* Disable Performance Counter */
-    MRS(PMCR_EL0, value);
-    mask = 0;
-    mask |= (1 << 0); /* Enable */
-    mask |= (1 << 1); /* Cycle counter reset */
-    mask |= (1 << 2); /* Reset all counters */
-    MSR(PMCR_EL0, (value & ~mask));
-
-    /* Disable cycle counter register */
-    MRS(PMCNTENSET_EL0, value);
-    mask = 0;
-    mask |= (1 << 31);
-    MSR(PMCNTENSET_EL0, (value & ~mask));
+    MRS(PMCR_EL0, val);
+    val &= ~PMCR_EN;
+    MSR(PMCR_EL0, val);
 }
 
 /* Resume the PMU */
 void resume_pmu() {
+    sddf_dprintf("resuming pmu!\n");
     uint64_t val;
-
     MRS(PMCR_EL0, val);
-
-    val |= BIT(0);
-
-    ISB;
+    val |= PMCR_EN;
     MSR(PMCR_EL0, val);
+}
 
-    MSR(PMCNTENSET_EL0, (BIT(31)));
+void enable_cycle_counter() {
+    uint64_t val;
+    MRS(PMCNTENSET_EL0, val);
+    // Cycle counter control is at bit 31
+    val |= BIT(31);
+    MSR(PMCNTENSET_EL0, val);
+}
+
+void disable_cycle_counter() {
+    uint64_t val;
+    MRS(PMCNTENSET_EL0, val);
+    // Cycle counter control is at bit 31
+    val &= ~BIT(31);
+    MSR(PMCNTENSET_EL0, val);
+}
+
+void enable_event_counter(uint32_t cnt) {
+    if (cnt >= PMU_NUM_REGS) {
+        sddf_dprintf("Tried to enable a non-existant counter! Counter: %d must be less than %d",
+                        cnt, PMU_NUM_REGS);
+    }
+    uint64_t val;
+    MRS(PMCNTENSET_EL0, val);
+    val |= BIT(cnt);
+    MSR(PMCNTENSET_EL0, val);
+}
+
+void disable_event_counter(uint32_t cnt) {
+    if (cnt >= PMU_NUM_REGS) {
+        sddf_dprintf("Tried to disable a non-existant counter! Counter: %d must be less than %d",
+                        cnt, PMU_NUM_REGS);
+    }
+    uint64_t val;
+    MRS(PMCNTENSET_EL0, val);
+    val &= ~BIT(cnt);
+    MSR(PMCNTENSET_EL0, val);
 }
 
 void write_counter_val(uint32_t cnt, uint32_t val) {
@@ -105,32 +128,50 @@ void configure_clkcnt(uint64_t val, bool sampling) {
     MSR(PMU_CYCLE_CTR, init_cnt);
 }
 
-void reset_pmu() {
-    // Loop through the pmu registers, if the overflown flag has been set,
-    // and we are sampling on this register, reset to max value - count.
-    // Otherwise, reset to 0.
+void reset_pmu(uint32_t irqFlag) {
+    sddf_dprintf("resetting pmu!\n");
+
     for (int i = 0; i < PMU_NUM_REGS; i++) {
-        if (pmu_registers[i].overflowed == 1 && pmu_registers[i].sampling == 1) {
+        if ((irqFlag & (1 << i)) && pmu_registers[i].sampling) {
             write_counter_val(i, UINT32_MAX - pmu_registers[i].count);
             write_event_val(i, pmu_registers[i].event);
-            pmu_registers[i].overflowed = 0;
-        } else if (pmu_registers[i].overflowed == 1) {
-            write_counter_val(i, 0);
-            pmu_registers[i].overflowed = 0;
         }
+        pmu_registers[i].overflowed = 0;
     }
 
-    // Handle the cycle counter.
-    if (pmu_registers[CYCLE_CTR].overflowed == 1) {
-        uint64_t init_cnt = 0;
-        if (pmu_registers[CYCLE_CTR].sampling == 1) {
-            sddf_dprintf("resetting the cycle counter!\n");
-            init_cnt = UINT64_MAX - pmu_registers[CYCLE_CTR].count;
-        }
-        MSR(PMU_CYCLE_CTR, init_cnt);
+    if (irqFlag & (1 << 31) && pmu_registers[CYCLE_CTR].sampling) {
+        // Case for cycle counter!
+        sddf_dprintf("resetting the cycle counter?\n");
+        uint64_t cnt = UINT64_MAX - CYCLE_COUNTER_PERIOD;
+        MSR(PMU_CYCLE_CTR, cnt);
+    } else if (irqFlag & (1 << 31)) {
         pmu_registers[CYCLE_CTR].overflowed = 0;
     }
 
+    // Loop through the pmu registers, if the overflown flag has been set,
+    // and we are sampling on this register, reset to max value - count.
+    // Otherwise, reset to 0.
+    // for (int i = 0; i < PMU_NUM_REGS; i++) {
+    //     if (pmu_registers[i].overflowed == 1 && pmu_registers[i].sampling == 1) {
+    //         write_counter_val(i, UINT32_MAX - pmu_registers[i].count);
+    //         write_event_val(i, pmu_registers[i].event);
+    //         pmu_registers[i].overflowed = 0;
+    //     } else if (pmu_registers[i].overflowed == 1) {
+    //         write_counter_val(i, 0);
+    //         pmu_registers[i].overflowed = 0;
+    //     }
+    // }
+
+    // // Handle the cycle counter.
+    // if (pmu_registers[CYCLE_CTR].overflowed == 1) {
+    //     uint64_t init_cnt = 0;
+    //     if (pmu_registers[CYCLE_CTR].sampling == 1) {
+    //         sddf_dprintf("resetting the cycle counter!\n");
+    //         init_cnt = UINT64_MAX - CYCLE_COUNTER_PERIOD;
+    //     }
+    //     MSR(PMU_CYCLE_CTR, init_cnt);
+    //     pmu_registers[CYCLE_CTR].overflowed = 0;
+    // }
 }
 
 
@@ -187,14 +228,8 @@ void add_sample(microkit_child id, uint32_t time, uint64_t pc, uint64_t nr, uint
     // Notify the client that we need to dump. If we are dumping, do not
     // restart the PMU until we have managed to purge all buffers over the network.
     if (net_queue_empty_free(&profiler_queue)) {
-        reset_pmu();
-        halt_pmu();
         sddf_dprintf("trying to dump queue!\n");
         microkit_notify(config.ch);
-    } else {
-        sddf_dprintf("Buffers were not full, resuming PMU!\n");
-        reset_pmu();
-        resume_pmu();
     }
 }
 
@@ -275,7 +310,7 @@ seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo) {
         case PROFILER_RESTART:
             /* Only restart PMU if we haven't halted */
             if (profiler_state == PROF_START) {
-                reset_pmu();
+                // reset_pmu();
                 resume_pmu();
             }
             break;
@@ -292,7 +327,6 @@ void init () {
 
     // First, we must mark each of the TCB's that we are profiling with the
     // seL4_TCBFlag_profile flag.
-
     for (int i = 0; i < config.num_cli; i++) {
         seL4_TCB_SetFlags_t ret = seL4_TCB_SetFlags(BASE_TCB_CAP + i, 0, seL4_TCBFlag_profile);
         sddf_dprintf("This is the TCB flag for %d: %b\n", i, ret.flags);
@@ -330,14 +364,16 @@ void init () {
 }
 
 void notified(microkit_channel ch) {
-    // sddf_dprintf("Got a notification\n");
+    sddf_dprintf("Got a notification\n");
     if (ch == 21) {
         // Get the interrupt flag from the PMU
         uint32_t irqFlag = 0;
         MRS(PMOVSCLR_EL0, irqFlag);
-
+        // Write back irqFlag to clear interrupts
+        MSR(PMOVSCLR_EL0, irqFlag);
         reset_pmu(irqFlag);
         resume_pmu();
+
 
         microkit_irq_ack(ch);
     }
@@ -348,27 +384,28 @@ seL4_Bool fault(microkit_child child, microkit_msginfo msginfo, microkit_msginfo
     size_t label = microkit_msginfo_get_label(msginfo);
 
     if (label == seL4_Fault_PMUEvent) {
-        sddf_dprintf("AND ITS A PMU FAULT!!!\n");
+        // sddf_dprintf("AND ITS A PMU FAULT!!!\n");
         // Need to figure out how to get the whole 64 bit PC??
         uint64_t pc = microkit_mr_get(0);
         uint64_t fp = microkit_mr_get(1);
-        sddf_dprintf("this was the PC: %p and this was the child id: %p and this was the fp: %p\n", pc, child, fp);
-        sddf_dprintf("Attempting a call stack unwind!\n");
+        uint64_t callstack[4] = {0,0,0,0};
+        callstack_unwind(child,fp,4,callstack);
+
+        // sddf_dprintf("this was the PC: %p and this was the child id: %p and this was the fp: %p\n", pc, child, fp);
         // Get the interrupt flag from the PMU
         uint32_t irqFlag = 0;
         MRS(PMOVSCLR_EL0, irqFlag);
-
-        handle_event(child, irqFlag, pc, fp, sddf_timer_time_now(timer_config.driver_id));
-        sddf_dprintf("resetting the PMU!\n");
-
-        // Clear the interrupt flag
-        MSR(PMOVSCLR_EL0, irqFlag | BIT(31));
-
-        // reset_pmu(irqFlag);
-        // resume_pmu();
-        // microkit_irq_ack(21);
+        // Write back irqFlag to clear interrupts
+        MSR(PMOVSCLR_EL0, irqFlag);
+        // sddf_dprintf("This is the IRQ flag: %b\n", irqFlag);
+        // handle_event(child, irqFlag, pc, fp, sddf_timer_time_now(timer_config.driver_id));
+        // sddf_dprintf("resetting the PMU!\n");
+        reset_pmu(irqFlag);
+        resume_pmu();
     }
 
+    // Acknowledge the interrupt!
+    microkit_irq_ack(21);
     *reply_msginfo = microkit_msginfo_new(0 ,0);
     return true;
 }
