@@ -76,6 +76,11 @@
 #define PMCNTENSET_EL0 "pmcntenset_el0"
 #define PMOVSCLR_EL0 "pmovsclr_el0"
 
+/* PMU Control Register Bits */
+#define PMCR_EN     BIT(0)      /* Enable */
+#define PMCR_P      BIT(1)      /* Event counter reset */
+#define PMCR_C      BIT(2)      /* Cycle counter reset */
+
 /* Event select register */
 #define PMSELR_EL0 "pmselr_el0"
 #define PMXEVCNTR_EL0 "pmxevcntr_el0"
@@ -111,7 +116,7 @@ struct pmu_reg {
 };
 
 typedef struct pmu_reg pmu_reg_t;
-#define SEL4_PROF_MAX_CALL_DEPTH 16
+#define PROF_MAX_CALL_DEPTH 16
 struct prof_sample {
     uint64_t ip;            /* Instruction pointer */
     uint32_t pid;           /* Process ID */
@@ -119,7 +124,7 @@ struct prof_sample {
     uint32_t cpu;           /* CPU affinity */
     uint64_t period;        /* Number of events per sample */
     uint64_t nr;            /* Number of ips in the call stack*/
-    uint64_t ips[SEL4_PROF_MAX_CALL_DEPTH]; /* Call stack */
+    uint64_t ips[PROF_MAX_CALL_DEPTH]; /* Call stack */
 };
 
 typedef struct prof_sample prof_sample_t;

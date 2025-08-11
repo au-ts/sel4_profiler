@@ -47,7 +47,6 @@ int profiler_state;
 /* Halt the PMU */
 void halt_pmu() {
     uint32_t val = 0;
-
     /* Disable Performance Counter */
     MRS(PMCR_EL0, val);
     val &= ~PMCR_EN;
@@ -56,7 +55,6 @@ void halt_pmu() {
 
 /* Resume the PMU */
 void resume_pmu() {
-    sddf_dprintf("resuming pmu!\n");
     uint64_t val;
     MRS(PMCR_EL0, val);
     val |= PMCR_EN;
@@ -129,8 +127,6 @@ void configure_clkcnt(uint64_t val, bool sampling) {
 }
 
 void reset_pmu(uint32_t irqFlag) {
-    sddf_dprintf("resetting pmu!\n");
-
     for (int i = 0; i < PMU_NUM_REGS; i++) {
         if ((irqFlag & (1 << i)) && pmu_registers[i].sampling) {
             write_counter_val(i, UINT32_MAX - pmu_registers[i].count);
@@ -141,37 +137,11 @@ void reset_pmu(uint32_t irqFlag) {
 
     if (irqFlag & (1 << 31) && pmu_registers[CYCLE_CTR].sampling) {
         // Case for cycle counter!
-        sddf_dprintf("resetting the cycle counter?\n");
         uint64_t cnt = UINT64_MAX - CYCLE_COUNTER_PERIOD;
         MSR(PMU_CYCLE_CTR, cnt);
     } else if (irqFlag & (1 << 31)) {
         pmu_registers[CYCLE_CTR].overflowed = 0;
     }
-
-    // Loop through the pmu registers, if the overflown flag has been set,
-    // and we are sampling on this register, reset to max value - count.
-    // Otherwise, reset to 0.
-    // for (int i = 0; i < PMU_NUM_REGS; i++) {
-    //     if (pmu_registers[i].overflowed == 1 && pmu_registers[i].sampling == 1) {
-    //         write_counter_val(i, UINT32_MAX - pmu_registers[i].count);
-    //         write_event_val(i, pmu_registers[i].event);
-    //         pmu_registers[i].overflowed = 0;
-    //     } else if (pmu_registers[i].overflowed == 1) {
-    //         write_counter_val(i, 0);
-    //         pmu_registers[i].overflowed = 0;
-    //     }
-    // }
-
-    // // Handle the cycle counter.
-    // if (pmu_registers[CYCLE_CTR].overflowed == 1) {
-    //     uint64_t init_cnt = 0;
-    //     if (pmu_registers[CYCLE_CTR].sampling == 1) {
-    //         sddf_dprintf("resetting the cycle counter!\n");
-    //         init_cnt = UINT64_MAX - CYCLE_COUNTER_PERIOD;
-    //     }
-    //     MSR(PMU_CYCLE_CTR, init_cnt);
-    //     pmu_registers[CYCLE_CTR].overflowed = 0;
-    // }
 }
 
 
@@ -204,7 +174,6 @@ void add_sample(microkit_child id, uint32_t time, uint64_t pc, uint64_t nr, uint
     prof_sample_t *temp_sample = (prof_sample_t *) buffer.io_or_offset;
 
     // Find which counter overflowed, and the corresponding period
-
     temp_sample->ip = pc;
     temp_sample->pid = id;
     temp_sample->time = time;
@@ -251,7 +220,6 @@ int callstack_unwind(microkit_channel ch, uintptr_t fp_addr, int depth, uint64_t
             // Set the fp value to the next frame entry
             fp_addr = fp;
             // If the fp is 0, then we have reached the end of the frame stack chain
-            sddf_dprintf("This is the LR: %p\n", lr);
             callstack[i] = lr;
             nr++;
             if (fp_addr == 0) {
@@ -269,13 +237,12 @@ int callstack_unwind(microkit_channel ch, uintptr_t fp_addr, int depth, uint64_t
 void handle_event(microkit_channel child, uint32_t irqFlag, uint64_t pc, uint64_t fp, uint64_t time) {
     uint32_t period = 0;
 
-    uint64_t callstack[4] = {0,0,0,0};
+    uint64_t callstack[PROF_MAX_CALL_DEPTH] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 
-    int nr = callstack_unwind(child, fp, 4, callstack);
+    int nr = callstack_unwind(child, fp, PROF_MAX_CALL_DEPTH, callstack);
 
     // Update structs to check what counters overflowed
     if (irqFlag & (pmu_registers[CYCLE_CTR].sampling << 31)) {
-        sddf_dprintf("The cycle counter overflowed!\n");
         period = pmu_registers[CYCLE_CTR].count;
         pmu_registers[CYCLE_CTR].overflowed = 1;
         add_sample(child, time, pc, nr, irqFlag, callstack, period);
@@ -382,24 +349,16 @@ void notified(microkit_channel ch) {
 seL4_Bool fault(microkit_child child, microkit_msginfo msginfo, microkit_msginfo *reply_msginfo) {
     sddf_dprintf("Received a fault!\n");
     size_t label = microkit_msginfo_get_label(msginfo);
-
     if (label == seL4_Fault_PMUEvent) {
-        // sddf_dprintf("AND ITS A PMU FAULT!!!\n");
         // Need to figure out how to get the whole 64 bit PC??
         uint64_t pc = microkit_mr_get(0);
         uint64_t fp = microkit_mr_get(1);
-        uint64_t callstack[4] = {0,0,0,0};
-        callstack_unwind(child,fp,4,callstack);
-
-        // sddf_dprintf("this was the PC: %p and this was the child id: %p and this was the fp: %p\n", pc, child, fp);
         // Get the interrupt flag from the PMU
         uint32_t irqFlag = 0;
         MRS(PMOVSCLR_EL0, irqFlag);
         // Write back irqFlag to clear interrupts
         MSR(PMOVSCLR_EL0, irqFlag);
-        // sddf_dprintf("This is the IRQ flag: %b\n", irqFlag);
-        // handle_event(child, irqFlag, pc, fp, sddf_timer_time_now(timer_config.driver_id));
-        // sddf_dprintf("resetting the PMU!\n");
+        handle_event(child, irqFlag, pc, fp, sddf_timer_time_now(timer_config.driver_id));
         reset_pmu(irqFlag);
         resume_pmu();
     }
