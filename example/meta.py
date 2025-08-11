@@ -19,6 +19,8 @@ Map = SystemDescription.Map
 Channel = SystemDescription.Channel
 Irq = SystemDescription.Irq
 
+profiling_pd_names = []
+
 @dataclass
 class Board:
     name: str
@@ -46,6 +48,19 @@ BOARDS: List[Board] = [
         ethernet="soc@0/bus@30800000/ethernet@30be0000",
     ),
 ]
+
+def create_samples_header():
+    data_path = "sample_header.json"
+    with open(data_path, "w+") as f:
+        print("{\n\"elf_tcb_mappings\": {", file=f)
+        pd_index = 0
+        for pd in profiling_pd_names:
+            if (pd == profiling_pd_names[-1]):
+                print(f"\"{pd}\": {pd_index}", file=f)
+            else:
+                print(f"\"{pd}\": {pd_index},", file=f)
+            pd_index += 1
+        print("}\n}", file=f)
 
 def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     uart_node = dtb.node(board.serial)
@@ -105,10 +120,14 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
 
     dummy_prog1 = ProtectionDomain("dummy_prog1", "dummy_prog1.elf", priority=20)
     profiler.add_child_pd(dummy_prog1)
+    profiling_pd_names.append("dummy_prog1.elf")
     dummy_prog2 = ProtectionDomain("dummy_prog2", "dummy_prog2.elf", priority=21)
     profiler.add_child_pd(dummy_prog2)
+    profiling_pd_names.append("dummy_prog2.elf")
     dummy_ch = Channel(dummy_prog1, dummy_prog2, a_id=1, b_id=1)
     sdf.add_channel(dummy_ch)
+
+    create_samples_header()
 
     # Connect the profiler to the profiler client
     profiler_ring_used = MemoryRegion(sdf, "profiler_ring_used", 0x200000)

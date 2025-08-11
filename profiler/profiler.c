@@ -12,9 +12,10 @@
 
 #include <vspace.h>
 #include "profiler.h"
-#include "profiler_config.h"
 #include "client.h"
 #include "config.h"
+
+#define CYCLE_COUNTER_PERIOD 1.3e9
 
 // The user provides the following mapping regions.
 // The small mapping region must be of page_size 0x1000

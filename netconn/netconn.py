@@ -37,30 +37,6 @@ class ProfilerClient:
         """
         self.socket.send((cmd + "\n").encode('utf-8'))
 
-    def get_mappings(self):
-        """
-        Get the mappings from pid to ELF names
-        """
-        self.send_command("MAPPINGS")
-        self.output.write("{\n")
-        self.output.write("\"elf_tcb_mappings\": {\n")
-        data = self.socket.recv(4096).decode()
-        mappings = str(data).rstrip()
-        print(mappings)
-        lines = mappings.split("\n")
-        if (len(lines) == 0):
-            print("NC|ERR: No mappings provided. Please ensure the correct mappings are placed within the elf_tcb_mappings field.")
-        for i in range(0, len(lines)):
-            content = lines[i].split(":")
-            if (len(content) != 2):
-                print("NC|ERR: Bad mapping string format. Please check outputted samples.json file.")
-            else:
-                self.output.write(f"\"{content[0]}\": {content[1]}")
-                if (i == len(lines) - 1):
-                    self.output.write("\n")
-                else:
-                    self.output.write(",\n")
-        self.output.write("}")
     def connect(self):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
@@ -149,8 +125,7 @@ if __name__ == "__main__":
         user_input = input("> ").upper()
         if user_input == "CONNECT":
             client.connect()
-            client.get_mappings()
-            client.output.write(",\n\"samples\": [\n")
+            client.output.write("{\n\"samples\": [\n")
 
         elif user_input == "START":
             if client.socket is not None:

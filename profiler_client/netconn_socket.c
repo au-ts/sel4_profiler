@@ -22,7 +22,6 @@
 
 #include "socket.h"
 #include "client.h"
-#include "profiler_config.h"
 #include "profiler.h"
 #include "config.h"
 
@@ -92,14 +91,6 @@ static err_t netconn_recv_callback(void *arg, struct tcp_pcb *pcb, struct pbuf *
         microkit_ppcall(prof_config.ch, microkit_msginfo_new(PROFILER_START, 0));
     } else if (msg_match(data_packet_str, STOP)) {
         microkit_ppcall(prof_config.ch, microkit_msginfo_new(PROFILER_STOP, 0));
-    } else if (msg_match(data_packet_str, MAPPINGS)) {
-        #ifndef MAPPINGS_STR
-        #define MAPPINGS_STR ""
-        #endif
-        error = tcp_write(pcb, MAPPINGS_STR, sddf_strlen(MAPPINGS_STR), TCP_WRITE_FLAG_COPY);
-        if (error) {
-            sddf_dprintf("Failed to send mappings through netconn peer");
-        }
     } else if (msg_match(data_packet_str, REFRESH)) {
         // This is just to refresh the socket from the linux client side
         return ERR_OK;
