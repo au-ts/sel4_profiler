@@ -2,7 +2,6 @@
 #include <microkit.h>
 #include <sel4/sel4.h>
 #include <sddf/util/printf.h>
-#include "util.h"
 
 void big_loop() {
     for (int i = 0; i < 9999999999999; i++) {

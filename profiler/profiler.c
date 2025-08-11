@@ -1,19 +1,20 @@
-#include <stdbool.h>
-#include <stdint.h>
 #include <microkit.h>
 #include <sel4/sel4.h>
-#include <sel4/profiler_types.h>
-#include <string.h>
+
+#include <stdbool.h>
+#include <stdint.h>
+
+#include <sddf/util/string.h>
+#include <sddf/util/printf.h>
+#include <sddf/network/queue.h>
+#include <sddf/timer/client.h>
+#include <sddf/timer/config.h>
+
+#include <vspace.h>
 #include "profiler.h"
-#include "util.h"
 #include "profiler_config.h"
 #include "client.h"
 #include "config.h"
-#include <sddf/util/printf.h>
-#include <sddf/network/queue.h>
-#include <vspace.h>
-#include <sddf/timer/client.h>
-#include <sddf/timer/config.h>
 
 // The user provides the following mapping regions.
 // The small mapping region must be of page_size 0x1000

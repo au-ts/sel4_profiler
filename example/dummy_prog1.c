@@ -1,7 +1,6 @@
 #include <stdint.h>
 #include <microkit.h>
 #include <sel4/sel4.h>
-#include "util.h"
 
 void endless_loop() {
     uint64_t i = 0;

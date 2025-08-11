@@ -1,30 +1,27 @@
 /* Test client for dumping profiler buffers when full */
 
 #include <stdint.h>
+#include <string.h>
 #include <microkit.h>
 #include <sel4/sel4.h>
-#include "client.h"
-#include "profiler.h"
+
+#include <sddf/network/config.h>
 #include <sddf/network/queue.h>
 #include <sddf/network/lib_sddf_lwip.h>
-#include <sddf/serial/queue.h>
 #include <sddf/serial/config.h>
+#include <sddf/serial/queue.h>
 #include <sddf/timer/client.h>
 #include <sddf/timer/config.h>
-#include <sddf/network/config.h>
+
+#include "client.h"
+#include "profiler.h"
 #include "socket.h"
-#include <string.h>
-#include <serial_config.h>
-#include "lwip/ip.h"
-#include "lwip/pbuf.h"
-#include "lwip/tcp.h"
 #include "pb_encode.h"
 #include "pmu_sample.pb.h"
 #include "config.h"
-
-/* Serial communication. */
-#define SERIAL_TX_CH 9
-#define SERIAL_RX_CH 12
+#include "lwip/ip.h"
+#include "lwip/pbuf.h"
+#include "lwip/tcp.h"
 
 serial_queue_handle_t rx_queue_handle;
 serial_queue_handle_t tx_queue_handle;
