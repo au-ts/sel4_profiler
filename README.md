@@ -22,8 +22,8 @@ TO-DO:
 # Installation
 
 - We require a special kernel configuration. The kernel version can be found at:
-https://github.com/Kswin01/seL4/tree/microkit-dev.
-- We have tested with this version of Microkit: https://github.com/Kswin01/sel4cp/tree/microkit_prof_dev.
+https://github.com/au-ts/seL4/tree/microkit_profiler_2025.
+- We have tested with this version of Microkit: https://github.com/au-ts/microkit/tree/profiler_2025.
 
 # Building example
 - Ensure that you have either downloaded the appropriate Microkit SDK, or built from source. Instructions
