@@ -171,8 +171,8 @@ void print_dump() {
         sddf_printf("\t\"period\": \"%ld\"\n", sample->period);
         sddf_printf("\t\"nr\": \"%ld\"\n", sample->nr);
         sddf_printf("\t\"ips\": [\n");
-        for (int i = 0; i < SEL4_PROF_MAX_CALL_DEPTH; i++) {
-            if (i != SEL4_PROF_MAX_CALL_DEPTH - 1) {
+        for (int i = 0; i < PROF_MAX_CALL_DEPTH; i++) {
+            if (i != PROF_MAX_CALL_DEPTH - 1) {
                 sddf_printf("\t\t\"%ld\",\n", sample->ips[i]);
             } else {
                 sddf_printf("\t\t\"%ld\"\n]\n", sample->ips[i]);
@@ -222,9 +222,9 @@ void eth_dump() {
         pb_sample.time = sample->time;
         pb_sample.cpu = sample->cpu;
         pb_sample.nr = sample->nr;
-        pb_sample.ips_count = SEL4_PROF_MAX_CALL_DEPTH;
+        pb_sample.ips_count = PROF_MAX_CALL_DEPTH;
         pb_sample.period = sample->period;
-        for (int i = 0; i < SEL4_PROF_MAX_CALL_DEPTH; i++) {
+        for (int i = 0; i < PROF_MAX_CALL_DEPTH; i++) {
             pb_sample.ips[i] = sample->ips[i];
         }
 

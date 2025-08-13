@@ -182,7 +182,7 @@ void add_sample(microkit_child id, uint32_t time, uint64_t pc, uint64_t nr, uint
     temp_sample->cpu = 0;
     temp_sample->period = period;
     temp_sample->nr = nr;
-    for (int i = 0; i < SEL4_PROF_MAX_CALL_DEPTH; i++) {
+    for (int i = 0; i < PROF_MAX_CALL_DEPTH; i++) {
         temp_sample->ips[i] = 0;
         temp_sample->ips[i] = cc[i];
     }
