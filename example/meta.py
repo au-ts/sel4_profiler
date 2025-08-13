@@ -1,0 +1,211 @@
+# Copyright 2025, UNSW
+# SPDX-License-Identifier: BSD-2-Clause
+import argparse
+import struct
+import random
+from dataclasses import dataclass
+from typing import List, Tuple
+from sdfgen import SystemDescription, Sddf, DeviceTree
+from importlib.metadata import version
+
+assert version("sdfgen").split(".")[1] == "25", "Unexpected sdfgen version"
+
+from sdfgen_helper import *
+from config_structs import *
+
+ProtectionDomain = SystemDescription.ProtectionDomain
+MemoryRegion = SystemDescription.MemoryRegion
+Map = SystemDescription.Map
+Channel = SystemDescription.Channel
+Irq = SystemDescription.Irq
+
+profiling_pd_names = []
+
+@dataclass
+class Board:
+    name: str
+    arch: SystemDescription.Arch
+    paddr_top: int
+    serial: str
+    timer: str
+    ethernet: str
+
+BOARDS: List[Board] = [
+    Board(
+        name="odroidc4",
+        arch=SystemDescription.Arch.AARCH64,
+        paddr_top=0x60000000,
+        serial="soc/bus@ff800000/serial@3000",
+        timer="soc/bus@ffd00000/watchdog@f0d0",
+        ethernet="soc/ethernet@ff3f0000",
+    ),
+    Board(
+        name="maaxboard",
+        arch=SystemDescription.Arch.AARCH64,
+        paddr_top=0x70000000,
+        serial="soc@0/bus@30800000/serial@30860000",
+        timer="soc@0/bus@30000000/timer@302d0000",
+        ethernet="soc@0/bus@30800000/ethernet@30be0000",
+    ),
+]
+
+def create_samples_header():
+    data_path = "sample_header.json"
+    with open(data_path, "w+") as f:
+        print("{\n\"elf_tcb_mappings\": {", file=f)
+        pd_index = 0
+        for pd in profiling_pd_names:
+            if (pd == profiling_pd_names[-1]):
+                print(f"\"{pd}\": {pd_index}", file=f)
+            else:
+                print(f"\"{pd}\": {pd_index},", file=f)
+            pd_index += 1
+        print("}\n}", file=f)
+
+def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
+    uart_node = dtb.node(board.serial)
+    assert uart_node is not None
+    ethernet_node = dtb.node(board.ethernet)
+    assert ethernet_node is not None
+    timer_node = dtb.node(board.timer)
+    assert timer_node is not None
+
+    timer_driver = ProtectionDomain("timer_driver", "timer_driver.elf", priority=120)
+    sdf.add_pd(timer_driver)
+    timer_system = Sddf.Timer(sdf, timer_node, timer_driver)
+
+    uart_driver = ProtectionDomain("uart_driver", "serial_driver.elf", priority=100)
+    sdf.add_pd(uart_driver)
+    serial_virt_tx = ProtectionDomain("serial_virt_tx", "serial_virt_tx.elf", priority=96)
+    sdf.add_pd(serial_virt_tx)
+    serial_virt_rx = ProtectionDomain("serial_virt_rx", "serial_virt_rx.elf", priority=95)
+    sdf.add_pd(serial_virt_rx)
+    serial_system = Sddf.Serial(sdf, uart_node, uart_driver, serial_virt_tx, virt_rx=serial_virt_rx)
+
+    ethernet_driver = ProtectionDomain("ethernet_driver", "eth_driver.elf", priority=101, budget=100, period=400)
+    sdf.add_pd(ethernet_driver)
+    net_virt_tx = ProtectionDomain("net_virt_tx", "network_virt_tx.elf", priority=100, budget=20000)
+    sdf.add_pd(net_virt_tx)
+    net_virt_rx = ProtectionDomain("net_virt_rx", "network_virt_rx.elf", priority=99)
+    sdf.add_pd(net_virt_rx)
+    net_system = Sddf.Net(sdf, ethernet_node, ethernet_driver, net_virt_tx, net_virt_rx)
+
+    prof_client = ProtectionDomain("prof_client", "prof_client.elf", priority=94)
+    sdf.add_pd(prof_client)
+    net_system.add_client_with_copier(prof_client, None)
+    serial_system.add_client(prof_client)
+    timer_system.add_client(prof_client)
+    prof_client_lwip = Sddf.Lwip(sdf, net_system, prof_client)
+
+    # echo_client = ProtectionDomain("echo", "echo.elf", priority=94, budget=20000)
+    # sdf.add_pd(echo_client)
+    # net_system.add_client_with_copier(echo_client, None)
+    # serial_system.add_client(echo_client)
+    # timer_system.add_client(echo_client)
+    # echo_client_lwip = Sddf.Lwip(sdf, net_system, echo_client)
+
+    profiler = ProtectionDomain("profiler", "profiler.elf", priority=105, child_pts=True)
+    sdf.add_pd(profiler)
+    timer_system.add_client(profiler)
+
+    small_mapping_region = MemoryRegion(sdf, "small_region", 0x1000)
+    sdf.add_mr(small_mapping_region)
+    small_map = Map(small_mapping_region, 0x900000, "rw", setvar_vaddr="small_mapping_mr")
+    profiler.add_map(small_map)
+
+    large_mapping_region = MemoryRegion(sdf, "large_region", 0x200000, page_size=MemoryRegion.PageSize.LargePage)
+    sdf.add_mr(large_mapping_region)
+    large_map = Map(large_mapping_region, 0xa00000, "rw", setvar_vaddr="large_mapping_mr")
+    profiler.add_map(large_map)
+
+    dummy_prog1 = ProtectionDomain("dummy_prog1", "dummy_prog1.elf", priority=20)
+    profiler.add_child_pd(dummy_prog1)
+    profiling_pd_names.append("dummy_prog1.elf")
+    dummy_prog2 = ProtectionDomain("dummy_prog2", "dummy_prog2.elf", priority=21)
+    profiler.add_child_pd(dummy_prog2)
+    profiling_pd_names.append("dummy_prog2.elf")
+    dummy_ch = Channel(dummy_prog1, dummy_prog2, a_id=1, b_id=1)
+    sdf.add_channel(dummy_ch)
+
+    create_samples_header()
+
+    # Connect the profiler to the profiler client
+    profiler_ring_used = MemoryRegion(sdf, "profiler_ring_used", 0x200000)
+    sdf.add_mr(profiler_ring_used)
+    profiler_ring_used_prof_map = Map(profiler_ring_used, 0x8000000, perms="rw")
+    profiler.add_map(profiler_ring_used_prof_map)
+    profiler_ring_used_cli_map = Map(profiler_ring_used, 0x8000000, perms="rw")
+    prof_client.add_map(profiler_ring_used_cli_map)
+
+    profiler_ring_free = MemoryRegion(sdf, "profiler_ring_free", 0x200000)
+    sdf.add_mr(profiler_ring_free)
+    profiler_ring_free_prof_map = Map(profiler_ring_free, 0x8200000, perms="rw")
+    profiler.add_map(profiler_ring_free_prof_map)
+    profiler_ring_free_cli_map = Map(profiler_ring_free, 0x8200000, perms="rw")
+    prof_client.add_map(profiler_ring_free_cli_map)
+
+    profiler_mem = MemoryRegion(sdf, "profiler_mem", 0x1000000)
+    sdf.add_mr(profiler_mem)
+    profiler_mem_prof_map = Map(profiler_mem, 0x8600000, perms="rw")
+    profiler.add_map(profiler_mem_prof_map)
+    profiler_mem_cli_map = Map(profiler_mem, 0x8600000, perms="rw")
+    prof_client.add_map(profiler_mem_cli_map)
+
+    prof_ch = Channel(profiler, prof_client, pp_b=True)
+    sdf.add_channel(prof_ch)
+
+    pmu_irq = Irq(23, id=21)
+    profiler.add_irq(pmu_irq)
+
+    profiler_conn = ProfilerConfig(RegionResource(profiler_ring_used_prof_map.vaddr, 0x200000),
+                                   RegionResource(profiler_ring_free_prof_map.vaddr, 0x200000),
+                                   RegionResource(profiler_mem_prof_map.vaddr, 0x1000000),
+                                   2,
+                                   prof_ch.pd_a_id)
+
+    prof_client_conn = ProfilerConfig(RegionResource(profiler_ring_used_cli_map.vaddr, 0x200000),
+                                   RegionResource(profiler_ring_free_cli_map.vaddr, 0x200000),
+                                   RegionResource(profiler_mem_cli_map.vaddr, 0x1000000),
+                                   2,
+                                   prof_ch.pd_b_id)
+
+
+    assert timer_system.connect()
+    assert timer_system.serialise_config(output_dir)
+    assert serial_system.connect()
+    assert serial_system.serialise_config(output_dir)
+    assert net_system.connect()
+    assert net_system.serialise_config(output_dir)
+    assert prof_client_lwip.connect()
+    assert prof_client_lwip.serialise_config(output_dir)
+    # assert echo_client_lwip.connect()
+    # assert echo_client_lwip.serialise_config(output_dir)
+
+    data_path = output_dir + "/profiler_conn.data"
+    with open(data_path, "wb+") as f:
+        f.write(profiler_conn.serialise())
+    data_path = output_dir + "/prof_client_conn.data"
+    with open(data_path, "wb+") as f:
+        f.write(prof_client_conn.serialise())
+    with open(f"{output_dir}/{sdf_file}", "w+") as f:
+        f.write(sdf.render())
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--dtb", required=True)
+    parser.add_argument("--sddf", required=True)
+    parser.add_argument("--board", required=True, choices=[b.name for b in BOARDS])
+    parser.add_argument("--output", required=True)
+    parser.add_argument("--sdf", required=True)
+
+    args = parser.parse_args()
+
+    board = next(filter(lambda b: b.name == args.board, BOARDS))
+
+    sdf = SystemDescription(board.arch, board.paddr_top)
+    sddf = Sddf(args.sddf)
+
+    with open(args.dtb, "rb") as f:
+        dtb = DeviceTree(f.read())
+
+    generate(args.sdf, args.output, dtb)

@@ -10,18 +10,24 @@
  * @TAG(DATA61_BSD)
  */
 
-#include <string.h>
 #include <microkit.h>
+
+#include <sddf/util/string.h>
+#include <sddf/util/printf.h>
 
 #include "lwip/ip.h"
 #include "lwip/pbuf.h"
 #include "lwip/tcp.h"
 #include "lwip/udp.h"
+
 #include "socket.h"
-#include "util.h"
 #include "client.h"
-#include "profiler_config.h"
 #include "profiler.h"
+#include "config.h"
+
+#define MAX_PACKET_SIZE 0x1000
+
+extern profiler_config_t prof_config;
 
 /* This file implements a TCP based profiler control process that starts
  * and stops the profiler based on a client's requests.
@@ -44,7 +50,7 @@
  */
 
 static struct tcp_pcb *utiliz_socket;
-uintptr_t data_packet;
+char data_packet_str[MAX_PACKET_SIZE];
 
 #define WHOAMI "100 SEL4 PROFILING CLIENT\n"
 #define HELLO "HELLO\n"
@@ -57,7 +63,7 @@ uintptr_t data_packet;
 #define MAPPINGS "MAPPINGS\n"
 #define REFRESH "REFRESH\n"
 
-#define msg_match(msg, match) (strncmp(msg, match, strlen(match))==0)
+#define msg_match(msg, match) (sddf_strncmp(msg, match, sddf_strlen(match))==0)
 
 
 static err_t netconn_sent_callback(void *arg, struct tcp_pcb *pcb, u16_t len)
@@ -72,38 +78,29 @@ static err_t netconn_recv_callback(void *arg, struct tcp_pcb *pcb, struct pbuf *
         return ERR_OK;
     }
 
-    char *data_packet_str = (char *)data_packet;
 
-    pbuf_copy_partial(p, (void *)data_packet, p->tot_len, 0);
+    pbuf_copy_partial(p, (void *)data_packet_str, p->tot_len, 0);
     err_t error;
 
     if (msg_match(data_packet_str, HELLO)) {
-        error = tcp_write(pcb, OK_READY, strlen(OK_READY), TCP_WRITE_FLAG_COPY);
+        error = tcp_write(pcb, OK_READY, sddf_strlen(OK_READY), TCP_WRITE_FLAG_COPY);
         if (error) {
-            microkit_dbg_puts("Failed to send OK_READY message through netconn peer");
+            sddf_dprintf("Failed to send OK_READY message through netconn peer");
         }
     } else if (msg_match(data_packet_str, START)) {
-        microkit_ppcall(CLIENT_PROFILER_CH, microkit_msginfo_new(PROFILER_START, 0));
+        microkit_ppcall(prof_config.ch, microkit_msginfo_new(PROFILER_START, 0));
     } else if (msg_match(data_packet_str, STOP)) {
-        microkit_ppcall(CLIENT_PROFILER_CH, microkit_msginfo_new(PROFILER_STOP, 0));
-    } else if (msg_match(data_packet_str, MAPPINGS)) {
-        #ifndef MAPPINGS_STR
-        #define MAPPINGS_STR ""
-        #endif
-        error = tcp_write(pcb, MAPPINGS_STR, strlen(MAPPINGS_STR), TCP_WRITE_FLAG_COPY);
-        if (error) {
-            microkit_dbg_puts("Failed to send mappings through netconn peer");
-        }
+        microkit_ppcall(prof_config.ch, microkit_msginfo_new(PROFILER_STOP, 0));
     } else if (msg_match(data_packet_str, REFRESH)) {
         // This is just to refresh the socket from the linux client side
         return ERR_OK;
     } else {
-        microkit_dbg_puts("Received a message that we can't handle ");
-        microkit_dbg_puts(data_packet_str);
-        microkit_dbg_puts("\n");
-        error = tcp_write(pcb, ERROR, strlen(ERROR), TCP_WRITE_FLAG_COPY);
+        sddf_dprintf("Received a message that we can't handle ");
+        sddf_dprintf(data_packet_str);
+        sddf_dprintf("\n");
+        error = tcp_write(pcb, ERROR, sddf_strlen(ERROR), TCP_WRITE_FLAG_COPY);
         if (error) {
-            microkit_dbg_puts("Failed to send OK message through netconn peer");
+            sddf_dprintf("Failed to send OK message through netconn peer");
         }
     }
 
@@ -112,10 +109,10 @@ static err_t netconn_recv_callback(void *arg, struct tcp_pcb *pcb, struct pbuf *
 
 static err_t netconn_accept_callback(void *arg, struct tcp_pcb *newpcb, err_t err)
 {
-    microkit_dbg_puts("Netconn connection established!\n");
-    err_t error = tcp_write(newpcb, WHOAMI, strlen(WHOAMI), TCP_WRITE_FLAG_COPY);
+    sddf_dprintf("Netconn connection established!\n");
+    err_t error = tcp_write(newpcb, WHOAMI, sddf_strlen(WHOAMI), TCP_WRITE_FLAG_COPY);
     if (error) {
-        print("Failed to send WHOAMI message through netconn peer\n");
+        sddf_dprintf("Failed to send WHOAMI message through netconn peer\n");
     }
     tcp_sent(newpcb, netconn_sent_callback);
     tcp_recv(newpcb, netconn_recv_callback);
@@ -127,20 +124,16 @@ int send_tcp(void *buff, uint32_t len) {
 
     err_t error = tcp_write(utiliz_socket, buff, len, TCP_WRITE_FLAG_COPY);
     if (error) {
-        print("Failed to send message through netconn peer: ");
-        put8(error);
-        print("\n");
+        sddf_dprintf("Failed to send message through netconn peer: %d\n", error);
         if (error == -1) {
-            print("MEM ERROR\n");
+            sddf_dprintf("MEM ERROR\n");
         }
         return 1;
     }
 
     error = tcp_output(utiliz_socket);
     if (error) {
-        print("Failed to output via tcp through netconn peer: ");
-        put8(error);
-        print("\n");
+        sddf_dprintf("Failed to output via tcp through netconn peer: %d\n", error);
     }
 
     return 0;
@@ -158,21 +151,21 @@ int setup_netconn_socket(void)
 {
     utiliz_socket = tcp_new_ip_type(IPADDR_TYPE_V4);
     if (utiliz_socket == NULL) {
-        print("Failed to open a socket for listening!");
+        sddf_dprintf("Failed to open a socket for listening!");
         return -1;
     }
 
     err_t error = tcp_bind(utiliz_socket, IP_ANY_TYPE, NETCONN_PORT);
     if (error) {
-        print("Failed to bind the TCP socket");
+        sddf_dprintf("Failed to bind the TCP socket");
         return -1;
     } else {
-        // print("Utilisation port bound to port 1236\n");
+        sddf_dprintf("Netconn socket bound to port 1236\n");
     }
 
     utiliz_socket = tcp_listen_with_backlog_and_err(utiliz_socket, 1, &error);
     if (error != ERR_OK) {
-        print("Failed to listen on the netconn socket");
+        sddf_dprintf("Failed to listen on the netconn socket");
         return -1;
     }
     tcp_accept(utiliz_socket, netconn_accept_callback);
